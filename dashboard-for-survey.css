@@ -93,7 +93,7 @@
   --radius-pill: 999px;
   --shadow: 4px 4px 16px 0 rgba(0, 0, 0, 0.05);
   --panel-shell-width: clamp(240px, 22vw, 340px);
-  --panel-width: calc(var(--panel-shell-width)-20px);
+  --panel-width: calc(var(--panel-shell-width) - 20px);
   --panel-handle-width: 20px;
   --panel-pad-left: 28px;
   --panel-pad-right: 28px;
@@ -106,7 +106,7 @@
   --viz-control-bottom-gap: 40px;
   --viz-chart-table-gap: 40px;
   --viz-chart-legend-gap: 52px;
-  --viz-legend-width: calc(var(--criterion-col-width)-60px);
+  --viz-legend-width: calc(var(--criterion-col-width) - 60px);
   --viz-chart-inline-pad: 16px;
   --viz-label-col-width: clamp(120px, 20%, 220px);
   --viz-bar-height: 32px;
