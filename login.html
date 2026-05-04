@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>팀 대시보드 로그인</title>
+
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto;
+      background: #f5f5f5;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    .login-box {
+      background: white;
+      padding: 32px;
+      border-radius: 12px;
+      width: 300px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+
+    h1 {
+      font-size: 20px;
+      margin-bottom: 20px;
+    }
+
+    input {
+      width: 100%;
+      padding: 12px;
+      margin-bottom: 12px;
+      border-radius: 8px;
+      border: 1px solid #ddd;
+      font-size: 14px;
+    }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      border-radius: 8px;
+      border: none;
+      background: black;
+      color: white;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      opacity: 0.85;
+    }
+
+    #message {
+      margin-top: 10px;
+      font-size: 13px;
+      color: red;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="login-box">
+    <h1>팀 대시보드</h1>
+
+    <input
+      id="password"
+      type="password"
+      placeholder="비밀번호 입력"
+    />
+
+    <button id="loginBtn">입장</button>
+
+    <p id="message"></p>
+  </div>
+
+  <!-- Supabase SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- 너가 만든 client -->
+  <script src="./supabase-client.js"></script>
+
+  <script>
+    const TEAM_EMAIL = "team-dashboard@yourcompany.com"; // 👉 Supabase에 만든 계정
+
+    const loginBtn = document.getElementById("loginBtn");
+    const message = document.getElementById("message");
+
+    // 이미 로그인 상태면 바로 이동
+    async function checkSession() {
+      const { data } = await supabase.auth.getSession();
+      if (data.session) {
+        window.location.href = "./index.html";
+      }
+    }
+
+    checkSession();
+
+    // 로그인
+    loginBtn.addEventListener("click", async () => {
+      const password = document.getElementById("password").value;
+
+      if (!password) {
+        message.textContent = "비밀번호를 입력해주세요.";
+        return;
+      }
+
+      loginBtn.disabled = true;
+      loginBtn.textContent = "접속 중...";
+
+      const { error } = await supabase.auth.signInWithPassword({
+        email: TEAM_EMAIL,
+        password: password,
+      });
+
+      if (error) {
+        message.textContent = "비밀번호가 맞지 않습니다.";
+        loginBtn.disabled = false;
+        loginBtn.textContent = "입장";
+        return;
+      }
+
+      window.location.href = "./index.html";
+    });
+  </script>
+
+</body>
+</html>
