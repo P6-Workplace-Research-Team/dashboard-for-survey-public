@@ -1,0 +1,8 @@
+node_modules/
+.claude/
+scripts/
+.edge-profile*/
+*.dmp
+.mcp.json
+supabase-client.js
+setup.sql
