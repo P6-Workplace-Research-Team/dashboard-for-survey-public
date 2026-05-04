@@ -1775,7 +1775,8 @@ const resultState = {
   customGroupDefs: new Map(),        // Map<criterionLabel, Array<{id, name}>>
   customGroupAssignments: new Map(), // Map<criterionLabel, Map<groupValue, groupId>>
   customGroupModes: new Set(),       // Set<targetLabel> - 그룹으로 묶어보기 활성화된 문항
-  groupConfigModalState: null
+  groupConfigModalState: null,
+  dualBarModes: new Map(),           // Map<targetLabel, boolean> - 이중 막대 모드
 };
 
 const TARGET_SCALE_COMPARE_VIEW_KEY = '__target_scale_compare__';
@@ -3422,7 +3423,8 @@ function buildGroupCompareChartHtml(data, hiddenGroups = new Set()) {
           pct: group.pct || 0,
           count: group.count || 0
         }));
-        return `<div class="hbar-group-tick" style="left:${left}%; background:${color};" data-tip="${tip}"></div>`;
+        const labelSide = left > 50 ? 'left' : 'right';
+        return `<div class="hbar-group-dot-wrap" style="left:${left}%;" data-tip="${tip}" data-group-key="${escapeHtml(String(group.key))}" data-label-side="${labelSide}"><div class="hbar-group-dot" style="background:${color};"></div><span class="hbar-group-dot-label">${formatPercent(group.pct || 0)}</span></div>`;
       }).join('');
     return `
       <div class="single-hbar-row">
@@ -3435,6 +3437,47 @@ function buildGroupCompareChartHtml(data, hiddenGroups = new Set()) {
     `;
   }).join('');
   return `<div class="single-hbar-chart group-compare">${rowHtml}</div>`;
+}
+
+function buildDualHbarChartHtml(data, hiddenGroups = new Set()) {
+  const displayGroups = getDisplayGroupResults(data.groupResults, hiddenGroups);
+  if (!displayGroups.length) return '<div class="result-empty">표시할 그룹이 없습니다.</div>';
+
+  const items = buildGroupCompareItems(data);
+
+  const rowHtml = items.map(item => {
+    const labelTip = encodeURIComponent(JSON.stringify({ kind: 'option-label', option: item.label }));
+    const barsHtml = displayGroups.map(group => {
+      const groupItem = (item.groups || []).find(g => g.key === group.value) || { pct: 0, count: 0 };
+      const color = getGroupColor(data.groupResults, group.value);
+      const pct = Math.max(0, Math.min(100, groupItem.pct || 0));
+      const tip = encodeURIComponent(JSON.stringify({
+        kind: 'compare-bar',
+        groupLabel: group.label,
+        option: item.label,
+        pct: groupItem.pct || 0,
+        count: groupItem.count || 0
+      }));
+      const valueClass = pct >= HBAR_INSIDE_VALUE_THRESHOLD
+        ? 'single-hbar-outside-value is-inside'
+        : 'single-hbar-outside-value';
+      return `
+        <div class="dual-hbar-track">
+          <div class="dual-hbar-fill" style="width:${pct}%; background:${color};" data-tip="${tip}"></div>
+          <span class="${valueClass}" style="left:${pct}%;">${formatPercent(groupItem.pct || 0)}</span>
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div class="dual-hbar-row">
+        <div class="dual-hbar-label" title="${escapeHtml(item.label)}" data-tip="${labelTip}">${escapeHtml(item.label)}</div>
+        <div class="dual-hbar-bars">${barsHtml}</div>
+      </div>
+    `;
+  }).join('');
+
+  return `<div class="dual-hbar-chart">${rowHtml}</div>`;
 }
 
 function buildVerticalBarChartHtml(data) {
@@ -3562,10 +3605,11 @@ function nextCustomGroupId(criterionLabel) {
   return 'cg' + n;
 }
 
-function buildLegendHtml(data, hidden) {
+function buildLegendHtml(data, hidden, opts = {}) {
   if (!data.groupResults) return '';
   const displayGroups = getDisplayGroupResults(data.groupResults);
   if (displayGroups.length === 0) return '';
+  const { showDualBar = false, isDualBar = false } = opts;
   const criterionLabel = data.criterionLabel || null;
   const defs = criterionLabel ? (resultState.customGroupDefs.get(criterionLabel) || []) : [];
   const assignments = criterionLabel ? (resultState.customGroupAssignments.get(criterionLabel) || new Map()) : new Map();
@@ -3591,14 +3635,19 @@ function buildLegendHtml(data, hidden) {
     `;
   }).join('');
 
+  const dualBarBtnHtml = showDualBar
+    ? `<div class="dual-bar-btn-wrap"><button type="button" class="dual-bar-btn${isDualBar ? ' is-active' : ''}" data-dual-bar-toggle="${escapeHtml(data.targetLabel)}">${isDualBar ? '기본 그래프로 보기' : '두 그룹만 비교하기'}</button></div>`
+    : '';
+
   return `
     <aside class="legend-panel">
       <div class="legend" data-target="${escapeHtml(data.targetLabel)}" data-mode="group">${items}</div>
       <div class="legend-actions" data-target="${escapeHtml(data.targetLabel)}" data-mode="group">
         <button type="button" class="legend-action-btn" data-legend-action="all-on">전체 선택</button>
         <button type="button" class="legend-action-btn" data-legend-action="all-off">전체 해제</button>
-        ${criterionLabel ? `<button type="button" class="legend-action-btn" data-open-group-config="true" data-target="${escapeHtml(data.targetLabel)}" data-criterion="${escapeHtml(criterionLabel)}">그룹 설정</button>` : ''}
+        ${criterionLabel ? `<button type="button" class="legend-action-btn" data-open-group-config="true" data-target="${escapeHtml(data.targetLabel)}" data-criterion="${escapeHtml(criterionLabel)}">그룹 편집</button>` : ''}
       </div>
+      ${dualBarBtnHtml}
     </aside>
   `;
 }
@@ -3620,7 +3669,7 @@ function getResultVisualClass(hasLegend) {
 }
 
 function buildGroupedCountHeader(label, count, colspan) {
-  return `<th colspan="${colspan}" class="group-col">${escapeHtml(label)}<br><span style="font-weight:500;color:var(--text-3);">N=${Number(count || 0).toLocaleString()}</span></th>`;
+  return `<th colspan="${colspan}" class="group-col">${escapeHtml(label)}</th>`;
 }
 
 function buildDataTableToggleButtonHtml() {
@@ -4494,7 +4543,7 @@ function buildScaleCompareLegendHtml(groups, hiddenGroups = new Set(), targetLab
       <div class="legend-actions" data-target="${escapeHtml(targetLabel)}" data-mode="group">
         <button type="button" class="legend-action-btn" data-legend-action="all-on">전체 선택</button>
         <button type="button" class="legend-action-btn" data-legend-action="all-off">전체 해제</button>
-        ${criterionLabel ? `<button type="button" class="legend-action-btn" data-open-group-config="true" data-target="${escapeHtml(targetLabel)}" data-criterion="${escapeHtml(criterionLabel)}">그룹 설정</button>` : ''}
+        ${criterionLabel ? `<button type="button" class="legend-action-btn" data-open-group-config="true" data-target="${escapeHtml(targetLabel)}" data-criterion="${escapeHtml(criterionLabel)}">그룹 편집</button>` : ''}
       </div>
     </aside>
   `;
@@ -4797,7 +4846,7 @@ function buildScaleGroupControlsHtml(data, hiddenGroups) {
       <div class="legend-actions scale-group-actions" data-target="${escapeHtml(data.targetLabel)}" data-mode="group">
         <button type="button" class="legend-action-btn" data-legend-action="all-on">전체 선택</button>
         <button type="button" class="legend-action-btn" data-legend-action="all-off">전체 해제</button>
-        ${criterionLabel ? `<button type="button" class="legend-action-btn" data-open-group-config="true" data-target="${escapeHtml(data.targetLabel)}" data-criterion="${escapeHtml(criterionLabel)}">그룹 설정</button>` : ''}
+        ${criterionLabel ? `<button type="button" class="legend-action-btn" data-open-group-config="true" data-target="${escapeHtml(data.targetLabel)}" data-criterion="${escapeHtml(criterionLabel)}">그룹 편집</button>` : ''}
       </div>
     </div>
   `;
@@ -6157,7 +6206,7 @@ function buildRankGroupLegendHtml(data, hiddenGroups) {
       <div class="legend-actions" data-target="${escapeHtml(data.targetLabel)}" data-mode="group">
         <button type="button" class="legend-action-btn" data-legend-action="all-on">전체 선택</button>
         <button type="button" class="legend-action-btn" data-legend-action="all-off">전체 해제</button>
-        ${criterionLabel ? `<button type="button" class="legend-action-btn" data-open-group-config="true" data-target="${escapeHtml(data.targetLabel)}" data-criterion="${escapeHtml(criterionLabel)}">그룹 설정</button>` : ''}
+        ${criterionLabel ? `<button type="button" class="legend-action-btn" data-open-group-config="true" data-target="${escapeHtml(data.targetLabel)}" data-criterion="${escapeHtml(criterionLabel)}">그룹 편집</button>` : ''}
       </div>
     </aside>
   `;
@@ -6722,10 +6771,17 @@ function applyChoiceSortToData(data, sortByRate) {
     : null;
   return {
     ...data,
+    originalOptionOrder: data.originalOptionOrder || data.optionOrder,
     optionOrder: newOrder,
     totalResults: sortedTotal,
     groupResults: sortedGroupResults
   };
+}
+
+function getOptionPaletteColor(data, option) {
+  const baseOrder = data.originalOptionOrder || data.optionOrder || [];
+  const idx = baseOrder.indexOf(option);
+  return GROUP_PALETTE[(idx < 0 ? 0 : idx) % GROUP_PALETTE.length];
 }
 
 function buildChoiceControlsHtml(targetLabel, options) {
@@ -6837,7 +6893,7 @@ function buildGroupCompareStack100ChartHtml(data, hiddenGroups = new Set()) {
 
   const rowHtml = displayGroups.map(group => {
     const segmentsHtml = options.map((opt, i) => {
-      const color = GROUP_PALETTE[i % GROUP_PALETTE.length];
+      const color = getOptionPaletteColor(data, opt.option);
       const result = (group.results || []).find(r => r.option === opt.option) || { pct: 0, count: 0 };
       const width = Math.max(0, Math.min(100, result.pct || 0));
       const tip = encodeURIComponent(JSON.stringify({
@@ -6851,7 +6907,7 @@ function buildGroupCompareStack100ChartHtml(data, hiddenGroups = new Set()) {
     }).join('');
     return `
       <div class="scale-group-row">
-        <div class="scale-group-label"><strong>${escapeHtml(group.label)}</strong></div>
+        <div class="scale-group-label">${escapeHtml(group.label)}</div>
         <div class="scale-group-chart-cell">
           <div class="stack100-track">${segmentsHtml}</div>
         </div>
@@ -6859,16 +6915,60 @@ function buildGroupCompareStack100ChartHtml(data, hiddenGroups = new Set()) {
     `;
   }).join('');
 
-  const legendItems = options.map((opt, i) => {
-    const color = GROUP_PALETTE[i % GROUP_PALETTE.length];
-    return `<div class="legend-item is-static"><span class="legend-swatch" style="background:${color}"></span><span title="${escapeHtml(opt.option)}">${escapeHtml(opt.option)}</span></div>`;
-  }).join('');
-
   return `
     <div class="stack100-group-chart">
       ${displayGroups.length === 0 ? '<div class="result-empty">표시할 그룹이 없습니다.</div>' : rowHtml}
-      ${displayGroups.length > 0 ? `<div class="stack100-group-legend"><div class="legend is-static">${legendItems}</div></div>` : ''}
     </div>
+  `;
+}
+
+function buildStack100GroupLegendHtml(data, hiddenGroups) {
+  const options = data.totalResults || [];
+  const optionItems = options.map((opt, i) => {
+    const color = getOptionPaletteColor(data, opt.option);
+    return `<div class="legend-item is-static"><span class="legend-swatch" style="background:${color}"></span><span title="${escapeHtml(opt.option)}">${escapeHtml(opt.option)}</span></div>`;
+  }).join('');
+
+  const displayGroups = getDisplayGroupResults(data.groupResults);
+  if (!displayGroups.length) {
+    return `<aside class="legend-panel"><div class="legend is-static">${optionItems}</div></aside>`;
+  }
+
+  const criterionLabel = data.criterionLabel || null;
+  const defs = criterionLabel ? (resultState.customGroupDefs.get(criterionLabel) || []) : [];
+  const assignments = criterionLabel ? (resultState.customGroupAssignments.get(criterionLabel) || new Map()) : new Map();
+
+  const groupItems = displayGroups.map(g => {
+    const color = getGroupColor(data.groupResults, g.value);
+    const isHidden = hiddenGroups.has(g.value);
+    const assignedId = assignments.get(g.value) || '';
+    const assignedDef = defs.find(def => def.id === assignedId) || null;
+    const assignedBadge = assignedDef
+      ? `<span class="legend-group-badge"><span class="legend-swatch" style="background:${getCustomGroupColor(criterionLabel, assignedDef.id)}"></span>${escapeHtml(assignedDef.name)}</span>`
+      : '';
+    return `
+      <div class="legend-row">
+        <label class="legend-item ${isHidden ? 'disabled' : ''}" data-group="${escapeHtml(g.value)}">
+          <input type="checkbox" ${isHidden ? '' : 'checked'}>
+          <span class="legend-swatch" style="background:${color}"></span>
+          <span>${escapeHtml(g.label)}</span>
+        </label>
+        ${assignedBadge}
+      </div>
+    `;
+  }).join('');
+
+  return `
+    <aside class="legend-panel">
+      <div class="legend is-static">${optionItems}</div>
+      <div class="stack100-group-legend-divider"></div>
+      <div class="legend" data-target="${escapeHtml(data.targetLabel)}" data-mode="group">${groupItems}</div>
+      <div class="legend-actions" data-target="${escapeHtml(data.targetLabel)}" data-mode="group">
+        <button type="button" class="legend-action-btn" data-legend-action="all-on">전체 선택</button>
+        <button type="button" class="legend-action-btn" data-legend-action="all-off">전체 해제</button>
+        ${criterionLabel ? `<button type="button" class="legend-action-btn" data-open-group-config="true" data-target="${escapeHtml(data.targetLabel)}" data-criterion="${escapeHtml(criterionLabel)}">그룹 편집</button>` : ''}
+      </div>
+    </aside>
   `;
 }
 
@@ -6877,7 +6977,7 @@ function buildStacked100ChartHtml(data) {
   const rows = data.totalResults;
   const segmentsHtml = rows.map((r, i) => {
     const width = Math.max(0, Math.min(100, r.pct));
-    const color = GROUP_PALETTE[i % GROUP_PALETTE.length];
+    const color = getOptionPaletteColor(data, r.option);
     const tip = encodeURIComponent(JSON.stringify({
       kind: 'basic-bar',
       option: r.option,
@@ -6909,7 +7009,7 @@ function buildStacked100ChartHtml(data) {
 
 function buildChoiceOptionLegendHtml(data) {
   const items = (data.totalResults || []).map((row, index) => {
-    const color = GROUP_PALETTE[index % GROUP_PALETTE.length];
+    const color = getOptionPaletteColor(data, row.option);
     return `
       <div class="legend-item is-static">
         <span class="legend-swatch" style="background:${color}"></span>
@@ -6928,7 +7028,7 @@ function buildChoiceOptionLegendHtml(data) {
 /* ---------- 원/파이 공통 렌더러 ---------- */
 // rows: [{ label, pct, count, color }]
 function buildPieChartFromRows(rows) {
-  const cx = 160, cy = 160, r = 160;
+  const cx = 140, cy = 140, r = 140;
   const visibleRows = rows.filter(row => (row.pct || 0) > 0);
   if (visibleRows.length === 0) return '<div class="result-empty">표시할 데이터가 없습니다.</div>';
   const totalPct = visibleRows.reduce((s, row) => s + (row.pct || 0), 0) || 100;
@@ -6992,7 +7092,7 @@ function buildPieChartFromRows(rows) {
   return `
     <div class="pie-chart">
       <div class="pie-svg-wrap">
-        <svg class="pie-svg" viewBox="0 0 320 320" role="img" aria-label="원형(파이) 그래프">
+        <svg class="pie-svg" viewBox="0 0 280 280" role="img" aria-label="원형(파이) 그래프">
           ${slicesHtml}
           ${labelsHtml}
         </svg>
@@ -7320,14 +7420,22 @@ function buildChoiceSectionHtml(data, rows) {
       })
     : '';
 
+  const displayGroupsForBtn = groupResults ? getDisplayGroupResults(groupResults, displayHidden) : [];
+  const canDualBar = !!groupResults && chartType === 'bar_horizontal' && displayGroupsForBtn.length >= 1 && displayGroupsForBtn.length <= 2;
+  const isDualBar = canDualBar && !!resultState.dualBarModes.get(targetLabel);
+
   const chartHtml = groupResults
     ? (chartType === 'bar_horizontal_100'
         ? buildGroupCompareStack100ChartHtml(displayData, displayHidden)
-        : buildGroupCompareChartHtml(displayData, displayHidden))
+        : isDualBar
+          ? buildDualHbarChartHtml(displayData, displayHidden)
+          : buildGroupCompareChartHtml(displayData, displayHidden))
     : buildSingleChoiceChartByType(displayData, chartType);
   // legend는 항상 원본 data 기준으로 (그룹 설정 버튼/체크 유지)
   const legendHtml = groupResults
-    ? buildLegendHtml(data, hiddenGroups)
+    ? (chartType === 'bar_horizontal_100'
+        ? buildStack100GroupLegendHtml(data, hiddenGroups)
+        : buildLegendHtml(data, hiddenGroups, { showDualBar: canDualBar, isDualBar }))
     : (isSingleWithoutGroup && chartType === 'pie' ? buildChoiceOptionLegendHtml(displayData) : '');
   const sidePanelHtml = buildResultSidePanelHtml(legendHtml, targetLabel);
   const tableNoteHtml = data.isMulti
@@ -7624,6 +7732,22 @@ function applyDataTableCollapsed(wrapper, btn, collapsed) {
   }
 }
 
+function ensureHbarDotOutsideReset() {
+  if (resultState._hbarDotOutsideBound) return;
+  resultState._hbarDotOutsideBound = true;
+  document.addEventListener('click', (e) => {
+    if (!document.querySelector('.hbar-group-dot-wrap.is-dimmed')) return;
+    if (e.target && e.target.closest && e.target.closest('.hbar-group-dot-wrap')) return;
+    document.querySelectorAll('.hbar-group-dot-wrap').forEach(w => {
+      w.classList.remove('is-dimmed');
+      w.classList.remove('is-highlighted');
+    });
+    document.querySelectorAll('.single-hbar-chart.group-compare').forEach(c => {
+      c.classList.remove('has-highlight');
+    });
+  });
+}
+
 function ensureChoiceMenuOutsideClose() {
   if (resultState._choiceMenuOutsideBound) return;
   resultState._choiceMenuOutsideBound = true;
@@ -7647,6 +7771,7 @@ function ensureChoiceMenuOutsideClose() {
 function attachResultEventListeners(container) {
   ensureTooltip();
   ensureChoiceMenuOutsideClose();
+  ensureHbarDotOutsideReset();
   container.querySelectorAll('[data-tip]').forEach(el => {
     el.addEventListener('mouseenter', onTipEnter);
     el.addEventListener('mousemove', onTipMove);
@@ -7950,6 +8075,37 @@ function attachResultEventListeners(container) {
       e.preventDefault();
       e.stopPropagation();
       openGroupConfigModal(btn.dataset.target, btn.dataset.criterion);
+    });
+  });
+  container.querySelectorAll('[data-dual-bar-toggle]').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      const targetLabel = btn.dataset.dualBarToggle;
+      if (!targetLabel) return;
+      resultState.dualBarModes.set(targetLabel, !resultState.dualBarModes.get(targetLabel));
+      renderResults();
+    });
+  });
+  container.querySelectorAll('.hbar-group-dot-wrap').forEach(wrap => {
+    wrap.addEventListener('click', e => {
+      e.stopPropagation();
+      const chart = wrap.closest('.single-hbar-chart.group-compare');
+      if (!chart) return;
+      const allWraps = chart.querySelectorAll('.hbar-group-dot-wrap');
+      const clickedKey = wrap.dataset.groupKey;
+      const isActive = wrap.classList.contains('is-highlighted');
+      if (isActive) {
+        allWraps.forEach(w => { w.classList.remove('is-dimmed'); w.classList.remove('is-highlighted'); });
+        chart.classList.remove('has-highlight');
+      } else {
+        allWraps.forEach(w => {
+          const same = w.dataset.groupKey === clickedKey;
+          w.classList.toggle('is-dimmed', !same);
+          w.classList.toggle('is-highlighted', same);
+        });
+        chart.classList.add('has-highlight');
+      }
     });
   });
 }

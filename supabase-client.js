@@ -7,8 +7,22 @@ const _BUCKET = 'survey-files';
 
 const _supabase = window.supabase.createClient(_SUPABASE_URL, _SUPABASE_KEY);
 
-// 인증 없음 — no-op
-async function requireAuth() {}
+const _SESSION_DURATION = 24 * 60 * 60 * 1000; // 24시간
+
+// 세션 없거나 24시간 경과 시 로그인 페이지로 이동
+async function requireAuth() {
+  const { data } = await _supabase.auth.getSession();
+  if (!data.session) {
+    window.location.replace('./login.html');
+    return;
+  }
+  const loginTime = parseInt(localStorage.getItem('_loginTime') || '0', 10);
+  if (!loginTime || Date.now() - loginTime > _SESSION_DURATION) {
+    await _supabase.auth.signOut();
+    localStorage.removeItem('_loginTime');
+    window.location.replace('./login.html');
+  }
+}
 
 // ── 인메모리 캐시 ─────────────────────────────────────────────
 
@@ -41,6 +55,7 @@ async function loadSurveysFromServer(shareToken) {
     .select('*, survey_files(*)')
     .order('created_at', { ascending: false });
 
+  if (res.error) console.error('[loadSurveysFromServer] DB 오류:', res.error);
   _surveysCache = (res.data || []).map(_toLocalSurveyFormat);
 
   if (shareToken) {
@@ -154,7 +169,10 @@ async function getStoredFilePayload(fileRec) {
   if (!fileRec.storagePath) return null;
   try {
     var res = await _supabase.storage.from(_BUCKET).download(fileRec.storagePath);
-    if (res.error || !res.data) return null;
+    if (res.error || !res.data) {
+      console.error('[getStoredFilePayload] Storage 오류:', res.error, '| 경로:', fileRec.storagePath);
+      return null;
+    }
     var content = await res.data.text();
     return { name: fileRec.name, size: fileRec.size || 0, contentType: 'csv-text', content: content };
   } catch (_) {
