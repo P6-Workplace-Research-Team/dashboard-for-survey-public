@@ -103,6 +103,8 @@
   --viz-title-control-gap: 28px;
   --viz-control-gap: 32px;
   --viz-control-item-gap: 16px;
+  --viz-controls-padding-x: 16px;
+  --viz-controls-row-gap: 8px;
   --viz-control-bottom-gap: 40px;
   --viz-chart-table-gap: 40px;
   --viz-chart-legend-gap: 52px;
@@ -1928,9 +1930,7 @@ body.filter-dragging .filter-add-btn:hover {
   line-height: var(--body-line-height);
 }
 
-.result-header>.choice-controls,
-.result-header>.scale-view-controls,
-.result-header>.numeric-open-controls {
+.result-header > .viz-controls {
   margin-top: var(--viz-title-control-gap);
 }
 
@@ -1946,66 +1946,51 @@ body.filter-dragging .filter-add-btn:hover {
 }
 
 /* ================ 컨트롤 바 ================ */
-/* TBD - 정리 필요 */
+/* 공통 래퍼(.viz-controls): 동일 padding·열 간격. 행 간격만 기본 8px → 단일 갭은 .viz-controls--uniform-gap */
 
-
-/* ======== 컨트롤 바 전체 ======== */
-.choice-controls {
+.viz-controls {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--viz-control-gap);
+  column-gap: var(--viz-control-gap);
+  row-gap: var(--viz-controls-row-gap);
+  padding: 0 var(--viz-controls-padding-x);
   margin-bottom: 0;
-  padding: 0 16px;
 }
 
-.choice-controls-group {
+.viz-controls--uniform-gap {
+  gap: var(--viz-control-gap);
+}
+
+.viz-controls-group {
   display: inline-flex;
   align-items: center;
   gap: var(--viz-control-item-gap);
 }
 
-.choice-controls-label {
+.viz-controls-label {
   font-size: var(--label-1-size);
   font-weight: var(--font-weight-semibold);
   color: var(--neutral-700);
   line-height: var(--body-line-height);
 }
 
-.scale-view-controls {
-  display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px var(--viz-control-gap);
-  padding: 0 16px;
-}
-
-.scale-view-controls-row {
+.viz-controls-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--viz-control-gap);
 }
 
-.numeric-open-controls {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  row-gap: 8px;
-  column-gap: var(--viz-control-gap);
-  padding: 0 16px;
-}
-
-.numeric-open-bin-controls {
+.viz-controls-bin-row {
   display: flex;
   align-items: center;
   gap: 16px;
 }
 
-/*======== 컨트롤 1 - 차트 보기 선택 (toggle) ======== */
+/* --- 세그먼트 토글 --- */
 
-.result-view-toggle {
+.viz-control-toggle {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -2016,7 +2001,7 @@ body.filter-dragging .filter-add-btn:hover {
   width: fit-content;
 }
 
-.result-view-btn {
+.viz-control-toggle__btn {
   border: none;
   background: transparent;
   color: var(--neutral-900);
@@ -2028,75 +2013,42 @@ body.filter-dragging .filter-add-btn:hover {
   transition: background .15s ease, color .15s ease;
 }
 
-.result-view-btn.active {
+.viz-control-toggle__btn.active {
   background: var(--neutral-900);
   color: var(--White);
 }
 
-.result-view-btn:disabled {
+.viz-control-toggle__btn:disabled {
   color: var(--neutral-300);
   font-weight: var(--font-weight-regular);
   cursor: default;
 }
 
-.result-view-btn[aria-disabled="true"] {
+.viz-control-toggle__btn[aria-disabled="true"] {
   color: var(--neutral-300);
   font-weight: var(--font-weight-regular);
   cursor: not-allowed;
 }
 
-.result-view-btn:disabled:hover,
-.result-view-btn[aria-disabled="true"]:hover {
+.viz-control-toggle__btn:disabled:hover,
+.viz-control-toggle__btn[aria-disabled="true"]:hover {
   background: transparent;
   color: var(--neutral-300);
 }
 
-.result-view-toggle.is-disabled {
+.viz-control-toggle.is-disabled {
   background: var(--neutral-100);
   border-color: var(--neutral-300);
   pointer-events: none;
 }
 
-.result-view-toggle.is-disabled .result-view-btn,
-.result-view-toggle.is-disabled .result-view-btn.active {
+.viz-control-toggle.is-disabled .viz-control-toggle__btn,
+.viz-control-toggle.is-disabled .viz-control-toggle__btn.active {
   background: transparent;
   color: var(--neutral-300);
 }
 
-.numeric-open-view-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px;
-  border: 1px solid var(--neutral-300);
-  border-radius: var(--radius-12);
-  background: var(--White);
-}
-
-.numeric-open-view-btn {
-  border: none;
-  background: transparent;
-  color: var(--neutral-900);
-  font-size: var(--label-1-size);
-  font-weight: var(--font-weight-semibold);
-  line-height: var(--body-line-height);
-  padding: 4px 12px;
-  border-radius: var(--radius-8);
-  transition: background .15s ease, color .15s ease;
-}
-
-.numeric-open-view-btn.active {
-  background: var(--neutral-900);
-  color: var(--White);
-}
-
-.numeric-open-view-btn:disabled {
-  color: var(--neutral-300);
-  font-weight: var(--font-weight-regular);
-  cursor: not-allowed;
-}
-
-/* ======== 컨트롤 2 - 차트 유형 선택 (드롭다운) ======== */
+/* ======== 드롭다운 (그래프 유형 등; 향후 .viz-control-dropdown 으로 이름 정리 가능) ======== */
 
 .choice-chart-type-select {
   position: relative;
@@ -2199,9 +2151,9 @@ body.filter-dragging .filter-add-btn:hover {
   background: transparent;
 }
 
-/* ======== 컨트롤 3 - 상세 보기 옵션 (체크박스) ======== */
+/* ======== 체크박스 (레이블 + 커스텀 박스) ======== */
 
-.choice-controls-sort {
+.viz-control-checkbox {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -2209,7 +2161,7 @@ body.filter-dragging .filter-add-btn:hover {
   user-select: none;
 }
 
-.choice-controls-sort input[type="checkbox"] {
+.viz-control-checkbox input[type="checkbox"] {
   appearance: none;
   -webkit-appearance: none;
   width: 14px;
@@ -2223,12 +2175,12 @@ body.filter-dragging .filter-add-btn:hover {
   flex-shrink: 0;
 }
 
-.choice-controls-sort input[type="checkbox"]:checked {
+.viz-control-checkbox input[type="checkbox"]:checked {
   background: var(--neutral-900);
   border-color: var(--neutral-900);
 }
 
-.choice-controls-sort input[type="checkbox"]:checked::after {
+.viz-control-checkbox input[type="checkbox"]:checked::after {
   content: "";
   position: absolute;
   width: 12px;
@@ -2241,7 +2193,7 @@ body.filter-dragging .filter-add-btn:hover {
   pointer-events: none;
 }
 
-.choice-controls-sort-label {
+.viz-control-checkbox__label {
   font-size: var(--label-1-size);
   font-weight: var(--font-weight-semibold);
   color: var(--neutral-700);
@@ -2269,9 +2221,9 @@ body.filter-dragging .filter-add-btn:hover {
   pointer-events: none;
 }
 
-/* ======== 컨트롤 4 - 구간 입력값 (bin) ======== */
+/* ======== 레이블 + 숫자 입력 ======== */
 
-.numeric-open-bin-control {
+.viz-control-number {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -2280,7 +2232,7 @@ body.filter-dragging .filter-add-btn:hover {
   color: var(--neutral-700);
 }
 
-.numeric-open-bin-input {
+.viz-control-number__input {
   width: 72px;
   padding: 8px 6px 8px 10px;
   border: 1px solid var(--neutral-300);
@@ -2293,43 +2245,35 @@ body.filter-dragging .filter-add-btn:hover {
   text-align: left;
 }
 
-.numeric-open-bin-input:focus {
+.viz-control-number__input:focus {
   outline: none;
   border-color: var(--neutral-900);
 }
 
-.numeric-open-bin-input:disabled {
+.viz-control-number__input:disabled {
   color: var(--neutral-300);
   background: var(--neutral-100);
   border-color: var(--neutral-300);
   cursor: not-allowed;
 }
 
-/* ======== 컨트롤 바 하단 안내글 ======== */
+/* ======== 컨트롤 바 하단·전행 안내글 ======== */
 
-.rank-formula-note {
-  margin-top: 8px;
-  padding: 0 16px;
+.viz-controls-note {
   font-size: var(--caption-1-size);
   line-height: var(--body-line-height);
   font-weight: var(--font-weight-regular);
   color: var(--neutral-600);
 }
 
-.scale-view-note {
-  flex: 0 0 100%;
-  margin-top: 0;
-  font-size: var(--caption-1-size);
-  line-height: var(--body-line-height);
-  color: var(--neutral-600);
+.viz-controls-note--padded {
+  margin-top: 8px;
+  padding: 0 var(--viz-controls-padding-x);
 }
 
-.numeric-open-controls-note {
-  margin-top: 8px;
+.viz-controls-note--full-row {
+  flex: 0 0 100%;
   width: 100%;
-  font-size: var(--caption-1-size);
-  color: var(--neutral-600);
-  line-height: var(--body-line-height);
 }
 
 .result-table-note.allocation-note {

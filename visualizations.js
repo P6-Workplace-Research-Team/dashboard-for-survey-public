@@ -3180,7 +3180,7 @@ function buildChartViewToggleHtml(targetLabel, activeMode, chartType) {
     { mode: 'desc', label: '응답률 높은 순' }
   ].map(item => `
     <button type="button"
-            class="result-view-btn ${activeSort === item.mode ? 'active' : ''}"
+            class="viz-control-toggle__btn ${activeSort === item.mode ? 'active' : ''}"
             data-chart-sort="${item.mode}"
             data-chart-type="${escapeHtml(chartType)}"
             data-target="${escapeHtml(targetLabel)}">
@@ -3190,7 +3190,7 @@ function buildChartViewToggleHtml(targetLabel, activeMode, chartType) {
   return `
     <div class="chart-view-controls">
       ${modeSelect}
-      <div class="result-view-toggle">${sortButtons}</div>
+      <div class="viz-control-toggle">${sortButtons}</div>
     </div>
   `;
 }
@@ -3279,9 +3279,9 @@ function buildGroupCompareViewToggleHtml(data) {
   ].join('');
   return `
     <div class="group-compare-controls">
-      <div class="result-view-toggle" role="tablist" aria-label="그룹 비교 보기 방식">
-        <button type="button" class="result-view-btn ${mode === 'composition' ? 'active' : ''}" data-group-compare-view="composition" data-target="${escapeHtml(targetLabel)}">구성비 보기</button>
-        <button type="button" class="result-view-btn ${mode === 'item' ? 'active' : ''}" data-group-compare-view="item" data-target="${escapeHtml(targetLabel)}">항목 비교 보기</button>
+      <div class="viz-control-toggle" role="tablist" aria-label="그룹 비교 보기 방식">
+        <button type="button" class="viz-control-toggle__btn ${mode === 'composition' ? 'active' : ''}" data-group-compare-view="composition" data-target="${escapeHtml(targetLabel)}">구성비 보기</button>
+        <button type="button" class="viz-control-toggle__btn ${mode === 'item' ? 'active' : ''}" data-group-compare-view="item" data-target="${escapeHtml(targetLabel)}">항목 비교 보기</button>
       </div>
       <label class="group-compare-sort-wrap">
         <span>정렬</span>
@@ -3986,9 +3986,9 @@ function buildRatioAllocationSection(data) {
   const isMenuOpen = resultState.openChoiceMenus.has(menuKey);
 
   const chartTypeControlHtml = showChartType ? `
-    <div class="scale-view-controls">
-      <div class="choice-controls-group">
-        <span class="choice-controls-label">그래프 모양 선택</span>
+    <div class="viz-controls">
+      <div class="viz-controls-group">
+        <span class="viz-controls-label">그래프 모양 선택</span>
         <div class="choice-chart-type-select ${isMenuOpen ? 'is-open' : ''}" data-choice-chart-type-select data-target="${escapeHtml(targetLabel)}" data-scope="ratio">
           <button type="button" class="choice-chart-type-trigger" data-choice-chart-type-trigger data-target="${escapeHtml(targetLabel)}" data-scope="ratio" aria-haspopup="listbox" aria-expanded="${isMenuOpen ? 'true' : 'false'}">
             <span class="choice-chart-type-current">${escapeHtml(SCALE_RATIO_CHART_TYPE_LABELS[chartType] || SCALE_RATIO_CHART_TYPE_LABELS.bar_horizontal_100)}</span>
@@ -4069,8 +4069,8 @@ function buildScaleToggleHtml(targetLabel, activeMode, options = {}) {
   const isMenuOpen = resultState.openChoiceMenus.has(menuKey);
 
   const chartTypeHtml = showChartType ? `
-    <div class="choice-controls-group">
-      <span class="choice-controls-label">그래프 모양 선택</span>
+    <div class="viz-controls-group">
+      <span class="viz-controls-label">그래프 모양 선택</span>
       <div class="choice-chart-type-select ${isMenuOpen ? 'is-open' : ''}" data-choice-chart-type-select data-target="${escapeHtml(targetLabel)}" data-scope="scale">
         <button type="button" class="choice-chart-type-trigger" data-choice-chart-type-trigger data-target="${escapeHtml(targetLabel)}" data-scope="scale" aria-haspopup="listbox" aria-expanded="${isMenuOpen ? 'true' : 'false'}">
           <span class="choice-chart-type-current">${escapeHtml(SCALE_RATIO_CHART_TYPE_LABELS[chartType] || SCALE_RATIO_CHART_TYPE_LABELS.bar_horizontal_100)}</span>
@@ -4101,7 +4101,7 @@ function buildScaleToggleHtml(targetLabel, activeMode, options = {}) {
     const disabled = allDisabledModes.includes(item.mode);
     return `
     <button type="button"
-            class="result-view-btn ${activeMode === item.mode && !isPie ? 'active' : ''}"
+            class="viz-control-toggle__btn ${activeMode === item.mode && !isPie ? 'active' : ''}"
             data-scale-mode="${item.mode}"
             data-target="${escapeHtml(targetLabel)}"
             ${disabled ? 'aria-disabled="true" data-scale-mode-disabled="true"' : ''}>
@@ -4116,13 +4116,13 @@ function buildScaleToggleHtml(targetLabel, activeMode, options = {}) {
     </label>
   ` : '';
   const midpointGuide = showMidpointOption ? `
-    <div class="scale-view-note">중간값 제외 보기는 차트에서만 시각적으로 제외하며, 응답 비율의 계산 모수와 원본 수치는 바뀌지 않습니다.</div>
+    <div class="viz-controls-note viz-controls-note--full-row">중간값 제외 보기는 차트에서만 시각적으로 제외하며, 응답 비율의 계산 모수와 원본 수치는 바뀌지 않습니다.</div>
   ` : '';
   return `
-    <div class="scale-view-controls">
+    <div class="viz-controls">
       ${chartTypeHtml}
-      <div class="scale-view-controls-row">
-        <div class="result-view-toggle">${buttons}</div>
+      <div class="viz-controls-row">
+        <div class="viz-control-toggle">${buttons}</div>
         ${midpointOption}
       </div>
       ${midpointGuide}
@@ -4922,41 +4922,41 @@ function buildNumericOpenControlsHtml(targetLabel, interval, start, disabled = f
       ? ''
       : '구간 시작값과 간격을 조정해 분포를 원하는 기준으로 확인할 수 있습니다.';
   return `
-    <div class="numeric-open-controls">
-      <div class="numeric-open-view-toggle" role="group" aria-label="주관식 숫자 차트 유형">
+    <div class="viz-controls">
+      <div class="viz-control-toggle" role="group" aria-label="주관식 숫자 차트 유형">
         <button type="button"
-                class="numeric-open-view-btn ${safeMode === 'box' ? 'active' : ''}"
+                class="viz-control-toggle__btn ${safeMode === 'box' ? 'active' : ''}"
                 data-numeric-view="box"
                 data-target="${escapeHtml(targetLabel)}"
                 data-numeric-view-locked="${disabled ? 'true' : 'false'}">요약 보기</button>
         <button type="button"
-                class="numeric-open-view-btn ${safeMode === 'histogram' ? 'active' : ''}"
+                class="viz-control-toggle__btn ${safeMode === 'histogram' ? 'active' : ''}"
                 data-numeric-view="histogram"
                 data-target="${escapeHtml(targetLabel)}"
                 data-numeric-view-locked="${disabled ? 'true' : 'false'}">분포 보기</button>
       </div>
-      <div class="numeric-open-bin-controls">
-        <label class="numeric-open-bin-control">
+      <div class="viz-controls-bin-row">
+        <label class="viz-control-number">
           <span>구간 시작값</span>
           <input type="number"
                  step="1"
-                 class="numeric-open-bin-input"
+                 class="viz-control-number__input"
                  data-numeric-start="true"
                  data-target="${escapeHtml(targetLabel)}"
                  value="${normalizeNumericHistogramStart(start)}"${disabledAttr}>
         </label>
-        <label class="numeric-open-bin-control">
+        <label class="viz-control-number">
           <span>구간 간격</span>
           <input type="number"
                  min="1"
                  step="1"
-                 class="numeric-open-bin-input"
+                 class="viz-control-number__input"
                  data-numeric-interval="true"
                  data-target="${escapeHtml(targetLabel)}"
                  value="${clampNumericHistogramStep(interval)}"${disabledAttr}>
         </label>
       </div>
-      ${noteText ? `<div class="numeric-open-controls-note">${noteText}</div>` : ''}
+      ${noteText ? `<div class="viz-controls-note viz-controls-note--padded viz-controls-note--full-row">${noteText}</div>` : ''}
     </div>
   `;
 }
@@ -5881,8 +5881,8 @@ function buildRankControlsHtml(targetLabel, options = {}) {
   const isMenuOpen = resultState.openRankMenus.has(targetLabel);
   const directionLabel = viewMode === 'vertical' ? '세로' : '가로';
   const directionHtml = `
-    <div class="choice-controls-group">
-      <span class="choice-controls-label">그래프 방향 선택</span>
+    <div class="viz-controls-group">
+      <span class="viz-controls-label">그래프 방향 선택</span>
       <div class="choice-chart-type-select ${isMenuOpen ? 'is-open' : ''}" data-rank-view-mode-select="true">
         <button type="button"
                 class="choice-chart-type-trigger"
@@ -5912,11 +5912,11 @@ function buildRankControlsHtml(targetLabel, options = {}) {
     </div>
   `;
   const chartTypeHtml = `
-    <div class="choice-controls-group">
-      <div class="result-view-toggle" role="tablist" aria-label="순위 그래프 형태">
+    <div class="viz-controls-group">
+      <div class="viz-control-toggle" role="tablist" aria-label="순위 그래프 형태">
         ${RANK_CHART_TYPES.map(type => `
           <button type="button"
-                  class="result-view-btn ${type === chartType ? 'active' : ''}"
+                  class="viz-control-toggle__btn ${type === chartType ? 'active' : ''}"
                   data-rank-chart-type="${type}"
                   data-target="${safeTarget}"
                   role="tab"
@@ -5928,12 +5928,12 @@ function buildRankControlsHtml(targetLabel, options = {}) {
     </div>
   `;
   const sortHtml = `
-    <label class="choice-controls-sort">
+    <label class="viz-control-checkbox">
       <input type="checkbox" data-rank-sort-by-score data-target="${safeTarget}" ${sortByScore ? 'checked' : ''}>
-      <span class="choice-controls-sort-label">가중 평균 높은 순서로 정렬</span>
+      <span class="viz-control-checkbox__label">가중 평균 높은 순서로 정렬</span>
     </label>
   `;
-  return `<div class="choice-controls">${directionHtml}${chartTypeHtml}${sortHtml}</div>`;
+  return `<div class="viz-controls viz-controls--uniform-gap">${directionHtml}${chartTypeHtml}${sortHtml}</div>`;
 }
 
 function buildRankSummaryHtml(data) {
@@ -5957,7 +5957,7 @@ function buildRankSummaryHtml(data) {
 
 function buildRankFormulaNoteHtml(data) {
   return `
-    <div class="rank-formula-note">
+    <div class="viz-controls-note viz-controls-note--padded">
       ${escapeHtml(buildRankWeightFormulaText(data.rankCount))}
     </div>
   `;
@@ -6853,8 +6853,8 @@ function buildChoiceControlsHtml(targetLabel, options) {
   const chevron = 'assets/icons/keyboard_arrow_down_40dp_151515_FILL0_wght400_GRAD0_opsz40.svg';
 
   const chartTypeHtml = showChartType ? `
-    <div class="choice-controls-group">
-      <span class="choice-controls-label">그래프 모양 선택</span>
+    <div class="viz-controls-group">
+      <span class="viz-controls-label">그래프 모양 선택</span>
       <div class="choice-chart-type-select ${isMenuOpen ? 'is-open' : ''}" data-choice-chart-type-select data-target="${safeTarget}">
         <button type="button" class="choice-chart-type-trigger" data-choice-chart-type-trigger data-target="${safeTarget}" aria-haspopup="listbox" aria-expanded="${isMenuOpen ? 'true' : 'false'}">
           <span class="choice-chart-type-current">${escapeHtml(CHOICE_CHART_TYPE_LABELS[chartType] || CHOICE_CHART_TYPE_LABELS.bar_horizontal)}</span>
@@ -6882,13 +6882,13 @@ function buildChoiceControlsHtml(targetLabel, options) {
   ` : '';
 
   const sortHtml = showSort ? `
-    <label class="choice-controls-sort">
+    <label class="viz-control-checkbox">
       <input type="checkbox" data-choice-sort-by-rate data-target="${safeTarget}" ${sortByRate ? 'checked' : ''}>
-      <span class="choice-controls-sort-label">응답 비율이 높은 순서로 정렬</span>
+      <span class="viz-control-checkbox__label">응답 비율이 높은 순서로 정렬</span>
     </label>
   ` : '';
 
-  return `<div class="choice-controls">${chartTypeHtml}${sortHtml}</div>`;
+  return `<div class="viz-controls viz-controls--uniform-gap">${chartTypeHtml}${sortHtml}</div>`;
 }
 
 /* ---------- 객관식 단일: 세로 막대 차트 ---------- */
@@ -8373,7 +8373,7 @@ const EXPORT_FOOTER_PAD = 28;         // 푸터 좌우 패딩
 
 const EXPORT_HIDE_SELECTORS = [
   '.chart-view-controls',
-  '.choice-controls',
+  '.viz-controls',
   '[data-data-table-toggle]',
   '.export-img-btn',
 ];
