@@ -341,7 +341,7 @@
 ---
 
 ## 6. 본 문서에서 다루지 않는 범위 (별도 문서로 분리)
-- **결과 영역(`.data-area` / `#result-container`) 내부의 차트·표 시각화 (TBD)**
+- **결과 영역(`.data-area` / `#result-container`) 내부의 차트·표 시각화 (`data_visualization.md` 참조)**
   - 차트 종류 분기 (`response_type` 별 매트릭스)
   - 척도 비교·연도 비교 / 척도 그룹 / 파생 척도 violin 등 묶음 시각화
   - 범례·정렬·평균 라벨 등 결과 영역 컨트롤
