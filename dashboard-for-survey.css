@@ -2610,22 +2610,21 @@ body.home-page {
   /* - 차트 상세 : 객관식 단일 (100% 기준 가로 누적 막대) - */
 
   .stack100-group-chart {
-    --viz-stack-height: 32px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 16px;
   }
   .stack100-group-chart .scale-group-row {
     align-items: center;
   }
   .stack100-group-chart .scale-group-label {
-    min-height: 32px;
+    min-height: var(--viz-stack-height);
     justify-content: flex-end;
     text-align: right;
   }
   .stack100-group-legend-divider {
     border-top: 1px solid var(--neutral-200);
-    margin: 12px 0;
+    margin: 16px 0;
   }
 
   .stack100-chart {
@@ -3524,13 +3523,6 @@ body.home-page {
     height: 20px;
     background: var(--viz-axis-color);
   }
-  .scale-compare-rows-wrap .scale-axis-container {
-    height: 16px;
-    top: calc(var(--scale-track-center) - 8px);
-  }
-  .scale-compare-rows-wrap .scale-axis-tick {
-    height: 16px;
-  }
   .scale-axis-label {
     position: absolute;
     top: calc(var(--scale-track-center) + 28px);
@@ -3700,7 +3692,8 @@ body.home-page {
   }
 
   /* - 차트 상세 : 척도형 문항 여러 개 보기 - */
-  /* (TBD 정리 필요) */
+
+  /* (TBD : 코드 너무 지저분. 정리 필요) */
 
   /*
   .scale-group-chart {
@@ -3718,6 +3711,7 @@ body.home-page {
     flex-wrap: wrap;
     gap: 8px 20px;
   }
+  */
   .scale-group-row {
     display: grid;
     grid-template-columns: var(--viz-label-col-width) minmax(0, 1fr);
@@ -3775,37 +3769,6 @@ body.home-page {
     margin-top: 0;
     justify-content: flex-end;
   }
-  
-  .scale-compare-actions {
-    margin-top: 14px;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-  }
-  .scale-compare-trigger {
-    border: 1px solid var(--neutral-300);
-    background: #fff;
-    color: var(--neutral-900);
-    font-size: 12px;
-    font-weight: 700;
-    padding: 9px 14px;
-    border-radius: 999px;
-    transition: background .15s ease, border-color .15s ease;
-  }
-  .scale-compare-trigger:hover {
-    background: var(--neutral-50);
-    border-color: var(--neutral-300);
-  }
-  .scale-compare-summary {
-    font-size: 12px;
-    color: var(--neutral-600);
-    line-height: var(--body-line-height);
-  }
-  .scale-compare-summary strong {
-    color: var(--neutral-900);
-    font-weight: 700;
-  }
   .scale-compare-section {
     border-top: 1px solid var(--neutral-300);
   }
@@ -3836,39 +3799,12 @@ body.home-page {
     align-self: flex-start;
     padding-top: 0;
   }
-  */
   .scale-compare-chart {
     position: relative;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 16px;
   }
-  /*
-  .scale-compare-overlay {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    z-index: 0;
-  }
-  .scale-compare-line-svg {
-    width: 100%;
-    height: 100%;
-    overflow: visible;
-  }
-  .scale-compare-line {
-    fill: none;
-    stroke-width: 1.4;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-    opacity: 0.9;
-  }
-  .scale-compare-line.is-overall {
-    stroke: var(--Black);
-    stroke-width: 1.4;
-    stroke-dasharray: none;
-    opacity: 0.82;
-  }
-  */
   .scale-compare-row {
     position: relative;
     z-index: 1;
@@ -3894,7 +3830,7 @@ body.home-page {
     min-height: auto;
     padding-top: 0;
     align-items: center;
-    --scale-track-center: 16px;
+    --scale-track-center: 20px;
   }
   .scale-compare-distribution-row .scale-bar-wrap {
     min-height: auto;
@@ -3916,7 +3852,7 @@ body.home-page {
   }
   .scale-compare-distribution-row .numeric-whisker-track-wrap,
   .scale-compare-distribution-row .scale-track {
-    height: 32px;
+    height: 40px;
   }
   .scale-compare-distribution-cell {
     min-width: 0;
@@ -3925,23 +3861,6 @@ body.home-page {
   .scale-compare-distribution-cell .derived-scale-chart {
     gap: 8px;
   }
-  /*
-  .scale-compare-distribution-cell .derived-scale-chart {
-    position: relative;
-    min-height: 112px;
-    --derived-violin-height: 44px;
-    --viz-stack-height: var(--derived-violin-height);
-    --scale-track-center: var(--scale-compare-track-top);
-  }
-  .scale-compare-distribution-cell .derived-scale-violin-wrap {
-    min-height: 112px;
-  }
-  .scale-compare-distribution-cell .derived-scale-violin {
-    inset: auto 0 auto 0;
-    top: calc(var(--scale-compare-track-top) - (var(--derived-violin-height) / 2));
-    height: var(--derived-violin-height);
-  }
-  */
   .scale-compare-distribution-cell .scale-bar-wrap {
     position: static;
     min-height: auto;
@@ -3953,19 +3872,19 @@ body.home-page {
     right: auto;
   }
   .scale-compare-distribution-cell .scale-segment-value-row {
-    height: 32px;
+    height: 40px;
   }
   .scale-compare-mean-row {
     align-items: center;
-    --scale-track-center: 16px;
+    --scale-track-center: 20px;
   }
   .scale-compare-mean-row .scale-compare-label {
     min-height: auto;
     padding-top: 0;
   }
   .scale-compare-mean-row .scale-mean-only {
-    min-height: 32px;
-    height: 32px;
+    min-height: 40px;
+    height: 40px;
   }
   .scale-compare-mean-row .scale-axis-label {
     display: none;
@@ -3987,37 +3906,7 @@ body.home-page {
   }
   .scale-compare-mean-row .numeric-whisker-track-wrap,
   .scale-compare-mean-row .scale-track {
-    height: 32px;
-  }
-  .scale-compare-mean-row .scale-mean-dot {
-    width: 32px;
-    height: 32px;
-    font-size: var(--label-2-size);
-  }
-  /*
-  .scale-compare-distribution-cell .scale-summary {
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 20px;
-  }
-
-  .scale-compare-distribution-cell .scale-summary,
-  .scale-compare-distribution-cell .scale-summary-item .label,
-  .scale-compare-distribution-cell .scale-summary-item .value {
-    font-size: var(--label-2-size);
-    line-height: var(--body-line-height);
-  }
-  .scale-compare-distribution-cell .scale-summary-item .label,
-  .scale-compare-distribution-cell .scale-summary-item .value {
-    color: var(--neutral-900);
-  }
-  .scale-compare-distribution-cell .scale-summary-item .label {
-    font-weight: var(--font-weight-regular);
-  }
-  .scale-compare-distribution-cell .scale-summary-item .value {
-    font-weight: var(--font-weight-semibold);
-    margin-top: 0;
+    height: 40px;
   }
   .scale-compare-plot {
     position: relative;
@@ -4037,7 +3926,7 @@ body.home-page {
     left: 0;
     right: 0;
     top: var(--scale-compare-track-top);
-    height: 32px;
+    height: 42px;
     transform: translateY(-50%);
     pointer-events: none;
     z-index: 1;
@@ -4067,10 +3956,10 @@ body.home-page {
   }
   .scale-compare-row-axis-point {
     position: absolute;
-    top: calc(var(--scale-compare-track-top) - 8px);
+    top: calc(var(--scale-compare-track-top) - 5px);
     transform: translateX(-50%);
     width: 1px;
-    height: 16px;
+    height: 10px;
     background: #b8b8b8;
   }
   .scale-compare-row-axis-label {
@@ -4118,8 +4007,8 @@ body.home-page {
     position: absolute;
     top: var(--scale-compare-track-top);
     transform: translate(-50%, -50%);
-    width: 32px;
-    height: 32px;
+    width: 40px;
+    height: 40px;
     border-radius: 50%;
     display: inline-flex;
     flex-direction: column;
@@ -4169,7 +4058,7 @@ body.home-page {
     white-space: nowrap;
   }
   .scale-compare-dot-value {
-    font-size: var(--label-2-size);
+    font-size: var(--label-1-size);
     font-weight: var(--font-weight-semibold);
     line-height: var(--body-line-height);
     color: var(--White);
@@ -4178,9 +4067,6 @@ body.home-page {
   .scale-compare-dot.is-compact.is-group.has-overall {
     box-shadow: 0 0 0 0.5px rgba(0,0,0,0.08);
   }
-  */
-  
-  
   .scale-compare-legend {
     display: flex;
     flex-direction: column;
@@ -4240,12 +4126,6 @@ body.home-page {
   }
   .scale-compare-legend-item.disabled .scale-compare-legend-dot {
     opacity: 0.28;
-  }
-  .scale-compare-legend-note {
-    margin-top: 2px;
-    font-size: 11px;
-    color: var(--neutral-600);
-    line-height: var(--body-line-height);
   }
   .scale-compare-modal-note {
     margin-bottom: 10px;
@@ -4670,7 +4550,6 @@ body.home-page {
     display: flex;
     height: 40px;
     position: relative;
-    z-index: 1;
   }
   .numeric-whisker-dead-seg {
     position: relative;
@@ -4745,6 +4624,7 @@ body.home-page {
     font-weight: var(--font-weight-semibold);
     line-height: var(--body-line-height);
     white-space: nowrap;
+    z-index: 3;
   }
   .numeric-whisker-q-label-layer {
     position: relative;
