@@ -3837,6 +3837,56 @@ function buildRatioAllocationStackHtml(results, options = {}) {
   `;
 }
 
+function buildAllocationGroupLegendHtml(data, hiddenGroups) {
+  const options = data.totalResults || [];
+  const optionItems = options.map((opt, i) => {
+    const color = allocationColor(i);
+    return `<div class="legend-item is-static"><span class="legend-swatch" style="background:${color}"></span><span title="${escapeHtml(opt.option)}">${escapeHtml(opt.option)}</span></div>`;
+  }).join('');
+
+  const displayGroups = getDisplayGroupResults(data.groupResults);
+  if (!displayGroups.length) {
+    return `<aside class="legend-panel"><div class="legend is-static">${optionItems}</div></aside>`;
+  }
+
+  const criterionLabel = data.criterionLabel || null;
+  const defs = criterionLabel ? (resultState.customGroupDefs.get(criterionLabel) || []) : [];
+  const assignments = criterionLabel ? (resultState.customGroupAssignments.get(criterionLabel) || new Map()) : new Map();
+
+  const groupItems = displayGroups.map(g => {
+    const color = getGroupColor(data.groupResults, g.value);
+    const isHidden = hiddenGroups.has(g.value);
+    const assignedId = assignments.get(g.value) || '';
+    const assignedDef = defs.find(def => def.id === assignedId) || null;
+    const assignedBadge = assignedDef
+      ? `<span class="legend-group-badge"><span class="legend-swatch" style="background:${getCustomGroupColor(criterionLabel, assignedDef.id)}"></span>${escapeHtml(assignedDef.name)}</span>`
+      : '';
+    return `
+      <div class="legend-row">
+        <label class="legend-item ${isHidden ? 'disabled' : ''}" data-group="${escapeHtml(g.value)}">
+          <input type="checkbox" ${isHidden ? '' : 'checked'}>
+          <span class="legend-swatch" style="background:${color}"></span>
+          <span>${escapeHtml(g.label)}</span>
+        </label>
+        ${assignedBadge}
+      </div>
+    `;
+  }).join('');
+
+  return `
+    <aside class="legend-panel">
+      <div class="legend is-static">${optionItems}</div>
+      <div class="stack100-group-legend-divider"></div>
+      <div class="legend" data-target="${escapeHtml(data.targetLabel)}" data-mode="group">${groupItems}</div>
+      <div class="legend-actions" data-target="${escapeHtml(data.targetLabel)}" data-mode="group">
+        <button type="button" class="legend-action-btn" data-legend-action="all-on">전체 선택</button>
+        <button type="button" class="legend-action-btn" data-legend-action="all-off">전체 해제</button>
+        ${criterionLabel ? `<button type="button" class="legend-action-btn" data-open-group-config="true" data-target="${escapeHtml(data.targetLabel)}" data-criterion="${escapeHtml(criterionLabel)}">그룹 편집</button>` : ''}
+      </div>
+    </aside>
+  `;
+}
+
 function buildRatioAllocationChartHtml(data, hiddenGroups = new Set()) {
   if (!data.groupResults) {
     return `
@@ -3848,21 +3898,17 @@ function buildRatioAllocationChartHtml(data, hiddenGroups = new Set()) {
 
   const displayGroups = getDisplayGroupResults(data.groupResults, hiddenGroups);
   if (displayGroups.length === 0) return '<div class="result-empty">표시할 그룹이 없습니다.</div>';
-  const rowsHtml = displayGroups.map((group, index) => {
-    const color = getGroupColor(data.groupResults, group.value);
-    const isLast = index === displayGroups.length - 1;
+  const rowsHtml = displayGroups.map(group => {
     return `
-      <div class="allocation-group-row">
-        <div class="allocation-group-label" style="--group-color:${color};">
-          <strong>${escapeHtml(group.label)}</strong>
-        </div>
-        <div class="allocation-group-stack">
-          ${buildRatioAllocationStackHtml(group.results, { groupLabel: group.label, n: group.n, showLabels: isLast })}
+      <div class="stack100-group-row">
+        <div class="stack100-group-label">${escapeHtml(group.label)}</div>
+        <div class="stack100-group-chart-cell">
+          ${buildRatioAllocationStackHtml(group.results, { groupLabel: group.label, n: group.n, showLabels: false })}
         </div>
       </div>
     `;
   }).join('');
-  return `<div class="allocation-group-chart">${rowsHtml}</div>`;
+  return `<div class="stack100-group-chart">${rowsHtml}</div>`;
 }
 
 function buildRatioAllocationDataTableHtml(data, hiddenGroups = new Set()) {
@@ -3969,12 +4015,8 @@ function buildRatioAllocationSection(data) {
   const baseChartHtml = isPie
     ? buildRatioAllocationPieChartHtml(data)
     : buildRatioAllocationChartHtml(data, hiddenGroups);
-  const compareMode = groupResults ? getGroupCompareViewMode(targetLabel) : 'composition';
-  const compareChartHtml = groupResults && compareMode === 'item'
-    ? buildGroupedHorizontalCompareChartHtml(data, hiddenGroups)
-    : baseChartHtml;
   const legendHtml = groupResults
-    ? buildLegendHtml(data, hiddenGroups)
+    ? buildAllocationGroupLegendHtml(data, hiddenGroups)
     : (isPie ? buildRatioAllocationItemLegendHtml(data) : '');
   const tableHtml = buildRatioAllocationDataTableHtml(data, hiddenGroups);
   const fullText = buildQuestionFullHtml(codebookEntry);
@@ -3991,12 +4033,11 @@ function buildRatioAllocationSection(data) {
         ${fullText}
         ${chartTypeControlHtml}
       </div>
-      ${groupResults ? buildGroupCompareViewToggleHtml(data) : ''}
+      ${noteHtml}
       <div class="${visualClass}">
-        <div class="result-chart-col">${compareChartHtml}${isPie ? '' : noteHtml}</div>
+        <div class="result-chart-col">${baseChartHtml}</div>
         ${legendHtml}
       </div>
-      ${isPie ? noteHtml : ''}
       ${tableHtml}
     </section>
   `;
@@ -4140,8 +4181,11 @@ function getScaleDisplayResults(scoreResults, options = {}) {
 function buildScaleTrackHtml(scoreResults, maxScore, options = {}) {
   const { muted = false, interactive = true, hideMidpoint = false } = options;
   const displayResults = getScaleDisplayResults(scoreResults, { hideMidpoint });
-  const segments = displayResults.map(result => {
-    const width = Math.max(0, Math.min(100, result.displayPct || 0));
+  const widths = displayResults.map(r => Math.max(0, Math.min(100, r.displayPct || 0)));
+  const firstNonZero = widths.findIndex(w => w > 0);
+  const lastNonZero = widths.reduce((acc, w, i) => w > 0 ? i : acc, -1);
+  const segments = displayResults.map((result, i) => {
+    const width = widths[i];
     const color = muted ? getScaleMutedColor(result.score, maxScore) : getScaleColor(result.score, maxScore);
     const tip = encodeURIComponent(JSON.stringify({
       kind: 'scale-segment',
@@ -4150,8 +4194,9 @@ function buildScaleTrackHtml(scoreResults, maxScore, options = {}) {
       pct: result.pct,
       count: result.count
     }));
+    const edgeClass = (i === firstNonZero ? ' is-first' : '') + (i === lastNonZero ? ' is-last' : '');
     return `
-      <div class="scale-segment"
+      <div class="scale-segment${edgeClass}"
            style="width:${width}%; background:${color};"
            ${interactive ? `data-tip="${tip}"` : ''}></div>
     `;
@@ -4631,15 +4676,15 @@ function buildScaleCompareDistributionSectionHtml(compareData) {
       ? buildDerivedScaleBoxPlotHtml(item, 'distribution', { showFooter: false, hideAxis: true })
       : `<div class="scale-chart">${buildScaleDistributionBarHtml(item.scoreResults, item.scoreRange.length, { hideMidpoint, hideSummary: true })}</div>`;
     return `
-      <div class="scale-compare-row scale-compare-distribution-row">
+      <div class="stack100-group-row">
         ${buildScaleCompareQuestionLabelHtml(question)}
-        <div class="scale-compare-distribution-cell">${chartHtml}</div>
+        <div class="stack100-group-chart-cell">${chartHtml}</div>
       </div>
     `;
   }).join('');
   return `
     <div class="scale-compare-section is-flush">
-      <div class="${visualClass} scale-compare-card">
+      <div class="${visualClass}">
         <div class="result-chart-col">
           <div class="scale-compare-chart">${rowsHtml}</div>
         </div>
@@ -4756,7 +4801,7 @@ function buildScaleCompareSectionHtml(compareData, hiddenGroups, options = {}) {
       const overallDotHtml = buildScaleCompareOverallDotHtml(question, compareData.maxScore, compactMarkers);
       const groupDotHtml = visibleGroups.map(group => buildScaleCompareGroupDotHtml(group, group.points[questionIndex], compareData.maxScore, !!overallDotHtml, compactMarkers)).join('');
       return `
-        <div class="scale-compare-row">
+        <div class="stack100-group-row">
           ${buildScaleCompareQuestionLabelHtml(question)}
           <div class="scale-compare-plot">
             <div class="scale-compare-track"></div>
@@ -4784,9 +4829,9 @@ function buildScaleCompareSectionHtml(compareData, hiddenGroups, options = {}) {
             { hideMidpoint }
           );
       return `
-        <div class="scale-compare-row scale-compare-mean-row">
+        <div class="stack100-group-row scale-compare-mean-row">
           ${buildScaleCompareQuestionLabelHtml(question)}
-          <div class="scale-compare-distribution-cell">${chartHtml}</div>
+          <div class="stack100-group-chart-cell">${chartHtml}</div>
         </div>
       `;
     }).join('');
@@ -4810,7 +4855,7 @@ function buildScaleCompareSectionHtml(compareData, hiddenGroups, options = {}) {
           ${hasGroups ? '연한 회색 점은 전체 평균이고, 색상 점은 각 그룹의 평균입니다.' : '선택한 문항들의 평균값을 한 화면에서 비교합니다.'}
         </div>
       </div>` : ''}
-      <div class="${visualClass} scale-compare-card">
+      <div class="${visualClass}">
         <div class="result-chart-col">${chartHtml}</div>
         ${legendHtml}
       </div>
@@ -4818,37 +4863,52 @@ function buildScaleCompareSectionHtml(compareData, hiddenGroups, options = {}) {
   `;
 }
 
-function buildScaleGroupControlsHtml(data, hiddenGroups) {
+
+function buildScaleGroupLegendHtml(data, hiddenGroups, viewMode) {
+  const showScoreColors = !data.isDerivedScale;
+  const scoreItemsHtml = showScoreColors ? buildScaleLegendItemsHtml(data) : '';
+
   const allGroups = getDisplayGroupResults(data.groupResults);
-  if (allGroups.length === 0) return '';
+  if (!allGroups.length) {
+    return scoreItemsHtml
+      ? `<aside class="legend-panel">${scoreItemsHtml}</aside>`
+      : '<aside class="legend-panel is-placeholder" aria-hidden="true"></aside>';
+  }
+
   const criterionLabel = data.criterionLabel || '';
-  const items = allGroups.map(group => {
-    const color = getGroupColor(data.groupResults, group.value);
-    const isHidden = hiddenGroups.has(group.value);
+  const defs = criterionLabel ? (resultState.customGroupDefs.get(criterionLabel) || []) : [];
+  const assignments = criterionLabel ? (resultState.customGroupAssignments.get(criterionLabel) || new Map()) : new Map();
+
+  const groupItems = allGroups.map(g => {
+    const color = getGroupColor(data.groupResults, g.value);
+    const isHidden = hiddenGroups.has(g.value);
+    const assignedId = assignments.get(g.value) || '';
+    const assignedDef = defs.find(def => def.id === assignedId) || null;
+    const assignedBadge = assignedDef
+      ? `<span class="legend-group-badge"><span class="legend-swatch" style="background:${getCustomGroupColor(criterionLabel, assignedDef.id)}"></span>${escapeHtml(assignedDef.name)}</span>`
+      : '';
     return `
-      <label class="legend-item ${isHidden ? 'disabled' : ''}" data-group="${escapeHtml(group.value)}">
-        <input type="checkbox"
-               data-scale-group-toggle="true"
-               data-target="${escapeHtml(data.targetLabel)}"
-               data-group="${escapeHtml(group.value)}"
-               ${isHidden ? '' : 'checked'}>
-        <span class="legend-swatch" style="background:${color}"></span>
-        <span>${escapeHtml(group.label)}</span>
-      </label>
+      <div class="legend-row">
+        <label class="legend-item ${isHidden ? 'disabled' : ''}" data-group="${escapeHtml(g.value)}">
+          <input type="checkbox" ${isHidden ? '' : 'checked'}>
+          <span class="legend-swatch" style="background:${color}"></span>
+          <span>${escapeHtml(g.label)}</span>
+        </label>
+        ${assignedBadge}
+      </div>
     `;
   }).join('');
+
   return `
-    <div class="scale-group-controls-bar">
-      <div class="legend scale-group-legend" data-target="${escapeHtml(data.targetLabel)}" data-mode="group">
-        <span class="scale-group-controls-title">그룹 표시</span>
-        ${items}
-      </div>
-      <div class="legend-actions scale-group-actions" data-target="${escapeHtml(data.targetLabel)}" data-mode="group">
+    <aside class="legend-panel">
+      ${showScoreColors ? scoreItemsHtml + '<div class="stack100-group-legend-divider"></div>' : ''}
+      <div class="legend" data-target="${escapeHtml(data.targetLabel)}" data-mode="group">${groupItems}</div>
+      <div class="legend-actions" data-target="${escapeHtml(data.targetLabel)}" data-mode="group">
         <button type="button" class="legend-action-btn" data-legend-action="all-on">전체 선택</button>
         <button type="button" class="legend-action-btn" data-legend-action="all-off">전체 해제</button>
         ${criterionLabel ? `<button type="button" class="legend-action-btn" data-open-group-config="true" data-target="${escapeHtml(data.targetLabel)}" data-criterion="${escapeHtml(criterionLabel)}">그룹 편집</button>` : ''}
       </div>
-    </div>
+    </aside>
   `;
 }
 
@@ -5236,15 +5296,14 @@ function buildScaleGroupRowHtml(group, maxScore, viewMode, hideMidpoint) {
     totalN: group.n,
     groupLabel: group.label
   };
-  const chartHtml = viewMode === 'mean'
+  const isMean = viewMode === 'mean';
+  const chartHtml = isMean
     ? buildScaleMeanOnlyHtml(group.mean, maxScore, meanTip, group.scoreResults, { hideMidpoint })
     : buildScaleDistributionBarHtml(group.scoreResults, maxScore, { hideMidpoint, hideSummary: true });
   return `
-    <div class="scale-group-row">
-      <div class="scale-group-label">
-        <strong>${escapeHtml(group.label)}</strong>
-      </div>
-      <div class="scale-group-chart-cell">
+    <div class="stack100-group-row${isMean ? ' scale-compare-mean-row' : ''}">
+      <div class="stack100-group-label">${escapeHtml(group.label)}</div>
+      <div class="stack100-group-chart-cell">
         ${chartHtml}
       </div>
     </div>
@@ -5266,11 +5325,9 @@ function buildDerivedScaleGroupRowHtml(group, scoreRange, viewMode) {
     groupLabel: group.label
   };
   return `
-    <div class="scale-group-row">
-      <div class="scale-group-label">
-        <strong>${escapeHtml(group.label)}</strong>
-      </div>
-      <div class="scale-group-chart-cell">
+    <div class="stack100-group-row${viewMode === 'mean' ? ' scale-compare-mean-row' : ''}">
+      <div class="stack100-group-label">${escapeHtml(group.label)}</div>
+      <div class="stack100-group-chart-cell">
         ${buildDerivedScaleBoxPlotHtml(chartData, viewMode, { showFooter: false })}
       </div>
     </div>
@@ -5288,18 +5345,15 @@ function buildScaleGroupChartHtml(data, hiddenGroups, viewMode) {
       </div>
     `;
     return `
-      <div class="scale-group-chart">
+      <div class="stack100-group-chart">
         ${displayGroups.length === 0 ? '<div class="result-empty">표시할 그룹이 없습니다.</div>' : displayGroups.map(group => buildDerivedScaleGroupRowHtml(group, data.scoreRange, viewMode)).join('')}
         ${displayGroups.length > 0 ? footerNote : ''}
       </div>
     `;
   }
-  const isDistribution = viewMode !== 'mean';
-  const legendHtml = isDistribution ? buildScaleLegendItemsHtml(data) : '';
   return `
-    <div class="scale-group-chart${isDistribution ? ' is-distribution' : ''}">
+    <div class="stack100-group-chart">
       ${displayGroups.length === 0 ? '<div class="result-empty">표시할 그룹이 없습니다.</div>' : displayGroups.map(group => buildScaleGroupRowHtml(group, maxScore, viewMode, hideMidpoint)).join('')}
-      ${legendHtml ? `<div class="scale-group-chart-legend">${legendHtml}</div>` : ''}
     </div>
   `;
 }
@@ -6906,9 +6960,9 @@ function buildGroupCompareStack100ChartHtml(data, hiddenGroups = new Set()) {
       return `<div class="stack100-segment ${width < 8 ? 'is-narrow' : ''}" style="flex:0 0 ${width}%; background:${color};" data-tip="${tip}">${valueHtml}</div>`;
     }).join('');
     return `
-      <div class="scale-group-row">
-        <div class="scale-group-label">${escapeHtml(group.label)}</div>
-        <div class="scale-group-chart-cell">
+      <div class="stack100-group-row">
+        <div class="stack100-group-label">${escapeHtml(group.label)}</div>
+        <div class="stack100-group-chart-cell">
           <div class="stack100-track">${segmentsHtml}</div>
         </div>
       </div>
@@ -7473,15 +7527,11 @@ function buildScaleSection(data, rows) {
   const showChartType = !data.isDerivedScale && !groupResults;
   const chartType = showChartType ? getScaleChartType(targetLabel) : 'bar_horizontal_100';
   const chartHtml = buildScaleChartHtml(data, hiddenGroups, viewMode, chartType);
-  const compareMode = groupResults ? getGroupCompareViewMode(targetLabel) : 'composition';
-  const compareChartHtml = groupResults && compareMode === 'item'
-    ? buildGroupedHorizontalCompareChartHtml(data, hiddenGroups)
-    : chartHtml;
   const showLegend = !data.isDerivedScale && !groupResults && (chartType === 'pie' || viewMode === 'distribution');
-  const legendHtml = showLegend ? buildScaleLegendHtml(data) : '';
+  const legendHtml = groupResults
+    ? buildScaleGroupLegendHtml(data, hiddenGroups, viewMode)
+    : (showLegend ? buildScaleLegendHtml(data) : '');
   const tableHtml = showTable ? buildDataTableHtml(data, hiddenGroups) : '';
-  const compareTriggerHtml = '';
-  const compareSectionHtml = '';
   const fullText = buildQuestionFullHtml(codebookEntry);
   const toggleHtml = data.isDerivedScale ? '' : buildScaleToggleHtml(targetLabel, viewMode, {
     showMidpointOption: canHideScaleMidpoint(data),
@@ -7489,7 +7539,6 @@ function buildScaleSection(data, rows) {
     showChartType,
     chartType
   });
-  const groupControlsHtml = groupResults ? buildScaleGroupControlsHtml(data, hiddenGroups) : '';
   const sidePanelHtml = buildResultSidePanelHtml(legendHtml, targetLabel);
   const visualClass = getResultVisualClass(true);
 
@@ -7500,14 +7549,11 @@ function buildScaleSection(data, rows) {
         ${fullText}
         ${toggleHtml}
       </div>
-      ${groupResults ? buildGroupCompareViewToggleHtml(data) : ''}
       <div class="${visualClass}">
-        <div class="result-chart-col">${groupControlsHtml}${compareChartHtml}</div>
+        <div class="result-chart-col">${chartHtml}</div>
         ${sidePanelHtml}
       </div>
       ${tableHtml}
-      ${compareTriggerHtml}
-      ${compareSectionHtml}
     </section>
   `;
 }
@@ -7827,19 +7873,7 @@ function attachResultEventListeners(container) {
       renderResults();
     });
   });
-  container.querySelectorAll('[data-scale-group-toggle]').forEach(input => {
-    input.addEventListener('change', e => {
-      e.stopPropagation();
-      const targetLabel = input.dataset.target;
-      const groupValue = input.dataset.group;
-      if (!targetLabel || !groupValue) return;
-      const hidden = resultState.hiddenGroupKeys.get(targetLabel) || new Set();
-      if (input.checked) hidden.delete(groupValue);
-      else hidden.add(groupValue);
-      resultState.hiddenGroupKeys.set(targetLabel, hidden);
-      renderResults();
-    });
-  });
+
   const bindNumericCommit = (selector, key, normalize) => {
     container.querySelectorAll(selector).forEach(input => {
       const commit = () => {
