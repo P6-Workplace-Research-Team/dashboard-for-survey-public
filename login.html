@@ -1,131 +1,171 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>팀 대시보드 로그인</title>
-
-  <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto;
-      background: #f5f5f5;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-    }
-
-    .login-box {
-      background: white;
-      padding: 32px;
-      border-radius: 12px;
-      width: 300px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-      text-align: center;
-    }
-
-    h1 {
-      font-size: 20px;
-      margin-bottom: 20px;
-    }
-
-    input {
-      width: 100%;
-      padding: 12px;
-      margin-bottom: 12px;
-      border-radius: 8px;
-      border: 1px solid #ddd;
-      font-size: 14px;
-    }
-
-    button {
-      width: 100%;
-      padding: 12px;
-      border-radius: 8px;
-      border: none;
-      background: black;
-      color: white;
-      font-size: 14px;
-      cursor: pointer;
-    }
-
-    button:hover {
-      opacity: 0.85;
-    }
-
-    #message {
-      margin-top: 10px;
-      font-size: 13px;
-      color: red;
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>로그인 | purple6studio</title>
+<link rel="stylesheet" href="dashboard-for-survey.css">
+<style>
+  body.login-page {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    background: #F8F8F8;
+  }
+  .login-card {
+    width: 100%;
+    max-width: 360px;
+    padding: 48px 40px 40px;
+    background: var(--White);
+    border-radius: var(--radius-16);
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .login-logo {
+    display: block;
+    height: 20px;
+    width: auto;
+    margin: 0 auto 36px;
+  }
+  .login-label {
+    font-size: var(--label-1-size);
+    font-weight: var(--font-weight-medium);
+    color: var(--neutral-700);
+    margin-bottom: 8px;
+  }
+  .login-input {
+    width: 100%;
+    padding: 12px 16px;
+    border: 1px solid var(--neutral-300);
+    border-radius: var(--radius-8);
+    font-size: var(--body-2-size);
+    font-family: inherit;
+    background: var(--White);
+    color: var(--neutral-900);
+    transition: border-color .15s;
+    box-sizing: border-box;
+  }
+  .login-input:focus {
+    outline: none;
+    border-color: var(--neutral-900);
+  }
+  .login-input.error {
+    border-color: var(--error-text);
+  }
+  .login-error {
+    color: var(--error-text);
+    font-size: var(--caption-1-size);
+    margin-top: 8px;
+    min-height: 18px;
+    display: none;
+  }
+  .login-error.show {
+    display: block;
+  }
+  .login-btn {
+    margin-top: 24px;
+    width: 100%;
+    padding: 12px;
+    background: #151515;
+    color: var(--White);
+    border: none;
+    border-radius: var(--radius-8);
+    font-size: var(--body-2-size);
+    font-weight: var(--font-weight-medium);
+    font-family: inherit;
+    cursor: pointer;
+    transition: background .15s;
+  }
+  .login-btn:hover { background: var(--neutral-800); }
+  .login-btn:disabled {
+    background: var(--neutral-300);
+    cursor: not-allowed;
+  }
+</style>
 </head>
+<body class="login-page">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-<body>
+<div class="login-card">
+  <img class="login-logo" src="assets/purple6studio_한줄_black.png" alt="purple6studio">
 
-  <div class="login-box">
-    <h1>팀 대시보드</h1>
+  <div class="login-label">비밀번호</div>
+  <input
+    id="pw-input"
+    class="login-input"
+    type="password"
+    placeholder="비밀번호를 입력하세요"
+    autocomplete="current-password"
+  >
+  <div id="login-error" class="login-error"></div>
 
-    <input
-      id="password"
-      type="password"
-      placeholder="비밀번호 입력"
-    />
+  <button id="login-btn" class="login-btn" type="button">로그인</button>
+</div>
 
-    <button id="loginBtn">입장</button>
+<script>
+  const _SUPABASE_URL = 'https://anryotqsnrhsonpsrdbw.supabase.co';
+  const _SUPABASE_KEY = 'sb_publishable_1hDV_KyYG9qYVR2J-_3iSA_7VTUf9wY';
+  const _LOGIN_EMAIL = 'workplace@fursys.com'; // 로그인에 사용할 계정 이메일
 
-    <p id="message"></p>
-  </div>
+  const _supabase = window.supabase.createClient(_SUPABASE_URL, _SUPABASE_KEY);
 
-  <!-- Supabase SDK -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  // 이미 로그인 상태면 바로 이동
+  _supabase.auth.getSession().then(function({ data }) {
+    if (data.session) window.location.replace('home.html');
+  });
 
-  <!-- 너가 만든 client -->
-  <script src="./supabase-client.js"></script>
+  const pwInput = document.getElementById('pw-input');
+  const loginBtn = document.getElementById('login-btn');
+  const errorDiv = document.getElementById('login-error');
 
-  <script>
-    const TEAM_EMAIL = "team-dashboard@yourcompany.com"; // 👉 Supabase에 만든 계정
+  function showError(msg) {
+    errorDiv.textContent = msg;
+    errorDiv.classList.add('show');
+    pwInput.classList.add('error');
+  }
 
-    const loginBtn = document.getElementById("loginBtn");
-    const message = document.getElementById("message");
+  function clearError() {
+    errorDiv.classList.remove('show');
+    pwInput.classList.remove('error');
+  }
 
-    // 이미 로그인 상태면 바로 이동
-    async function checkSession() {
-      const { data } = await supabase.auth.getSession();
-      if (data.session) {
-        window.location.href = "./index.html";
-      }
+  async function doLogin() {
+    clearError();
+    const password = pwInput.value.trim();
+    if (!password) {
+      showError('비밀번호를 입력해 주세요.');
+      pwInput.focus();
+      return;
     }
 
-    checkSession();
+    loginBtn.disabled = true;
+    loginBtn.textContent = '로그인 중…';
 
-    // 로그인
-    loginBtn.addEventListener("click", async () => {
-      const password = document.getElementById("password").value;
-
-      if (!password) {
-        message.textContent = "비밀번호를 입력해주세요.";
-        return;
-      }
-
-      loginBtn.disabled = true;
-      loginBtn.textContent = "접속 중...";
-
-      const { error } = await supabase.auth.signInWithPassword({
-        email: TEAM_EMAIL,
-        password: password,
-      });
-
-      if (error) {
-        message.textContent = "비밀번호가 맞지 않습니다.";
-        loginBtn.disabled = false;
-        loginBtn.textContent = "입장";
-        return;
-      }
-
-      window.location.href = "./index.html";
+    const { error } = await _supabase.auth.signInWithPassword({
+      email: _LOGIN_EMAIL,
+      password: password
     });
-  </script>
 
+    if (error) {
+      showError('비밀번호가 올바르지 않습니다.');
+      pwInput.value = '';
+      pwInput.focus();
+      loginBtn.disabled = false;
+      loginBtn.textContent = '로그인';
+      return;
+    }
+
+    localStorage.setItem('_loginTime', Date.now());
+    window.location.replace('home.html');
+  }
+
+  loginBtn.addEventListener('click', doLogin);
+  pwInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') doLogin();
+  });
+</script>
 </body>
 </html>
