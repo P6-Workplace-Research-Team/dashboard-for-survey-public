@@ -2529,7 +2529,7 @@ body.filter-dragging .filter-add-btn:hover {
 }
 
 
-/* 범례 그룹화하기 (TBD 확인 필요) 
+/* 범례 그룹화하기 (TBD 필요 없어진 코드 확인 필요) */
 
 .legend-row {
   display: flex;
@@ -2547,6 +2547,7 @@ body.filter-dragging .filter-add-btn:hover {
   flex: 1;
 }
 
+/*
 .legend-group-badge {
   display: inline-flex;
   align-items: center;
@@ -2566,6 +2567,7 @@ body.filter-dragging .filter-add-btn:hover {
   height: 10px;
   border-radius: 2px;
 }
+*/
 
 .legend-group-members {
   display: flex;
@@ -2697,7 +2699,7 @@ body.filter-dragging .filter-add-btn:hover {
 .legend-panel.is-placeholder {
   visibility: hidden;
   pointer-events: none;
-} */
+} 
 
 /* ================ 차트 상세 : 가로 막대 (객관식 단일/중복) ================ */
 /* TBD : 가로 차트도 공통 있어야 할까? 혹은 있을 수 있을까? */
