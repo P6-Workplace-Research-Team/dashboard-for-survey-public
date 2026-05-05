@@ -7667,7 +7667,7 @@ function renderGroupConfigModal() {
             <span class="legend-swatch" style="background:${member.color}"></span>
             <span title="${escapeHtml(member.label)}">${escapeHtml(member.label)}</span>
           </span>
-          <button type="button" class="group-config-member-remove-btn" data-group-config-remove-member="${escapeHtml(def.id)}" data-group-config-member-value="${escapeHtml(member.value)}" aria-label="항목 삭제" title="그룹에서 제외하기">
+          <button type="button" class="group-config-icon-btn" data-group-config-remove-member="${escapeHtml(def.id)}" data-group-config-member-value="${escapeHtml(member.value)}" aria-label="항목 삭제" title="그룹에서 제외하기">
             <img src="assets/icons/remove_40dp_151515_FILL0_wght400_GRAD0_opsz40.svg" alt="">
           </button>
         </div>
