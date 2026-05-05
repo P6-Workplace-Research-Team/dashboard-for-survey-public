@@ -3599,36 +3599,69 @@ function nextCustomGroupId(criterionLabel, defsOverride = null) {
   return 'cg' + n;
 }
 
-function buildLegendHtml(data, hidden, opts = {}) {
-  if (!data.groupResults) return '';
+function getCustomGroupLegendMembers(data, groupValue) {
+  if (!data || !data.isCustomGroupView || !data.criterionLabel) return [];
+  const assignments = resultState.customGroupAssignments.get(data.criterionLabel) || new Map();
+  const sourceGroups = Array.isArray(data.originalGroupResults) ? data.originalGroupResults : [];
+  return sourceGroups
+    .filter(group => assignments.get(group.value) === groupValue)
+    .map(group => ({
+      label: group.label || group.value,
+      color: getGroupColor(sourceGroups, group.value)
+    }));
+}
+
+function buildGroupedLegendRowsHtml(data, hiddenGroups = new Set()) {
   const displayGroups = getDisplayGroupResults(data.groupResults);
   if (displayGroups.length === 0) return '';
-  const { showDualBar = false, isDualBar = false } = opts;
+
   const criterionLabel = data.criterionLabel || null;
   const isCustomGroupView = !!data.isCustomGroupView;
   const defs = criterionLabel ? (resultState.customGroupDefs.get(criterionLabel) || []) : [];
   const assignments = criterionLabel ? (resultState.customGroupAssignments.get(criterionLabel) || new Map()) : new Map();
 
-  const items = displayGroups.map((g) => {
-    const color = getGroupColor(data.groupResults, g.value);
-    const isHidden = hidden.has(g.value);
-    const assignedId = assignments.get(g.value) || '';
+  return displayGroups.map((group) => {
+    const color = getGroupColor(data.groupResults, group.value);
+    const isHidden = hiddenGroups.has(group.value);
+    const assignedId = assignments.get(group.value) || '';
     const assignedDef = defs.find(def => def.id === assignedId) || null;
     const assignedBadge = !isCustomGroupView && assignedDef
       ? `<span class="legend-group-badge"><span class="legend-swatch" style="background:${getCustomGroupColor(criterionLabel, assignedDef.id)}"></span>${escapeHtml(assignedDef.name)}</span>`
       : '';
+    const members = getCustomGroupLegendMembers(data, group.value);
+    const membersHtml = members.length > 0
+      ? `
+        <div class="legend-group-members${isHidden ? ' is-disabled' : ''}">
+          ${members.map(member => `
+            <div class="legend-item is-static legend-group-member">
+              <span class="legend-swatch" style="background:${member.color}"></span>
+              <span>${escapeHtml(member.label)}</span>
+            </div>
+          `).join('')}
+        </div>
+      `
+      : '';
 
     return `
       <div class="legend-row">
-        <label class="legend-item ${isHidden ? 'disabled' : ''}" data-group="${escapeHtml(g.value)}">
+        <label class="legend-item ${isHidden ? 'disabled' : ''}" data-group="${escapeHtml(group.value)}">
           <input type="checkbox" ${isHidden ? '' : 'checked'}>
           <span class="legend-swatch" style="background:${color}"></span>
-          <span>${escapeHtml(g.label)}</span>
+          <span>${escapeHtml(group.label)}</span>
         </label>
         ${assignedBadge}
+        ${membersHtml}
       </div>
     `;
   }).join('');
+}
+
+function buildLegendHtml(data, hidden, opts = {}) {
+  if (!data.groupResults) return '';
+  const items = buildGroupedLegendRowsHtml(data, hidden);
+  if (!items) return '';
+  const { showDualBar = false, isDualBar = false } = opts;
+  const criterionLabel = data.criterionLabel || null;
 
   const dualBarBtnHtml = showDualBar
     ? `<button type="button" class="two-compare-btn${isDualBar ? ' is-active' : ''}" data-dual-bar-toggle="${escapeHtml(data.targetLabel)}">${isDualBar ? '기본 그래프로 보기' : '두 그룹만 비교하기'}</button>`
@@ -3841,34 +3874,12 @@ function buildAllocationGroupLegendHtml(data, hiddenGroups) {
     return `<div class="legend-item is-static"><span class="legend-swatch" style="background:${color}"></span><span title="${escapeHtml(opt.option)}">${escapeHtml(opt.option)}</span></div>`;
   }).join('');
 
-  const displayGroups = getDisplayGroupResults(data.groupResults);
-  if (!displayGroups.length) {
+  const groupItems = buildGroupedLegendRowsHtml(data, hiddenGroups);
+  if (!groupItems) {
     return `<aside class="legend-panel"><div class="legend is-static">${optionItems}</div></aside>`;
   }
 
   const criterionLabel = data.criterionLabel || null;
-  const defs = criterionLabel ? (resultState.customGroupDefs.get(criterionLabel) || []) : [];
-  const assignments = criterionLabel ? (resultState.customGroupAssignments.get(criterionLabel) || new Map()) : new Map();
-
-  const groupItems = displayGroups.map(g => {
-    const color = getGroupColor(data.groupResults, g.value);
-    const isHidden = hiddenGroups.has(g.value);
-    const assignedId = assignments.get(g.value) || '';
-    const assignedDef = defs.find(def => def.id === assignedId) || null;
-    const assignedBadge = assignedDef
-      ? `<span class="legend-group-badge"><span class="legend-swatch" style="background:${getCustomGroupColor(criterionLabel, assignedDef.id)}"></span>${escapeHtml(assignedDef.name)}</span>`
-      : '';
-    return `
-      <div class="legend-row">
-        <label class="legend-item ${isHidden ? 'disabled' : ''}" data-group="${escapeHtml(g.value)}">
-          <input type="checkbox" ${isHidden ? '' : 'checked'}>
-          <span class="legend-swatch" style="background:${color}"></span>
-          <span>${escapeHtml(g.label)}</span>
-        </label>
-        ${assignedBadge}
-      </div>
-    `;
-  }).join('');
 
   return `
     <aside class="legend-panel">
@@ -4911,36 +4922,14 @@ function buildScaleGroupLegendHtml(data, hiddenGroups, viewMode) {
   const showScoreColors = !data.isDerivedScale;
   const scoreItemsHtml = showScoreColors ? buildScaleLegendItemsHtml(data) : '';
 
-  const allGroups = getDisplayGroupResults(data.groupResults);
-  if (!allGroups.length) {
+  const groupItems = buildGroupedLegendRowsHtml(data, hiddenGroups);
+  if (!groupItems) {
     return scoreItemsHtml
       ? `<aside class="legend-panel">${scoreItemsHtml}</aside>`
       : '<aside class="legend-panel is-placeholder" aria-hidden="true"></aside>';
   }
 
   const criterionLabel = data.criterionLabel || '';
-  const defs = criterionLabel ? (resultState.customGroupDefs.get(criterionLabel) || []) : [];
-  const assignments = criterionLabel ? (resultState.customGroupAssignments.get(criterionLabel) || new Map()) : new Map();
-
-  const groupItems = allGroups.map(g => {
-    const color = getGroupColor(data.groupResults, g.value);
-    const isHidden = hiddenGroups.has(g.value);
-    const assignedId = assignments.get(g.value) || '';
-    const assignedDef = defs.find(def => def.id === assignedId) || null;
-    const assignedBadge = assignedDef
-      ? `<span class="legend-group-badge"><span class="legend-swatch" style="background:${getCustomGroupColor(criterionLabel, assignedDef.id)}"></span>${escapeHtml(assignedDef.name)}</span>`
-      : '';
-    return `
-      <div class="legend-row">
-        <label class="legend-item ${isHidden ? 'disabled' : ''}" data-group="${escapeHtml(g.value)}">
-          <input type="checkbox" ${isHidden ? '' : 'checked'}>
-          <span class="legend-swatch" style="background:${color}"></span>
-          <span>${escapeHtml(g.label)}</span>
-        </label>
-        ${assignedBadge}
-      </div>
-    `;
-  }).join('');
 
   return `
     <aside class="legend-panel">
@@ -5299,7 +5288,7 @@ function buildNumericOpenGroupChartHtml(data, hiddenGroups) {
   const numberUnit = data.codebookEntry && data.codebookEntry.numberUnit ? data.codebookEntry.numberUnit : '';
   const criterionLabel = data.criterionLabel || '';
   const groupRowsHtml = displayGroups.map(group => {
-    const groupLabel = criterionLabel ? `${criterionLabel}: ${group.value}` : group.label;
+    const groupLabel = group.label || (criterionLabel ? `${criterionLabel}: ${group.value}` : group.value);
     const color = getGroupColor(data.groupResults, group.value);
     const trackHtml = buildNumericWhiskerTrackHtml(group, data.domainMin, data.domainMax, numberUnit, groupLabel, { color });
     return `
@@ -5391,23 +5380,26 @@ function buildTextOpenSection(data) {
 function buildNumericOpenSection(data) {
   if (!data) return '';
   const { codebookEntry, targetLabel, groupResults } = data;
+  const customGroupOn = shouldApplyCustomGroup(data);
+  const customGroupData = (customGroupOn && groupResults) ? buildCustomGroupData(data) : null;
+  const baseData = customGroupData || data;
   const hiddenGroups = resultState.hiddenGroupKeys.get(targetLabel) || new Set();
   const showTable = true;
   const viewMode = groupResults ? 'box' : (resultState.numericOpenViewModes.get(targetLabel) || 'box');
   const chartHtml = groupResults
-    ? buildNumericOpenGroupChartHtml(data, hiddenGroups)
+    ? buildNumericOpenGroupChartHtml(baseData, hiddenGroups)
     : viewMode === 'box'
-      ? buildNumericOpenBoxChartHtml(data)
-      : buildNumericHistogramChartHtml(data, {
-          maxBinCount: data.maxBinCount,
+      ? buildNumericOpenBoxChartHtml(baseData)
+      : buildNumericHistogramChartHtml(baseData, {
+          maxBinCount: baseData.maxBinCount,
           numberUnit: codebookEntry && codebookEntry.numberUnit
         });
-  const tableHtml = showTable ? buildDataTableHtml(data, hiddenGroups) : '';
+  const tableHtml = showTable ? buildDataTableHtml(baseData, hiddenGroups) : '';
   const fullText = buildQuestionFullHtml(codebookEntry);
   const controlsHtml = groupResults
     ? `<div class="viz-controls"><div class="viz-controls-note">박스플롯 차트 보는 법: 수염은 응답값의 전체 범위, 박스는 전체 응답 중 가운데 50%가 모인 구간, 분홍색과 파랑색이 나뉘는 지점은 중앙값입니다.</div></div>`
     : buildNumericOpenControlsHtml(targetLabel, data.interval, data.start, false, viewMode);
-  const legendHtml = groupResults ? buildLegendHtml(data, hiddenGroups) : '';
+  const legendHtml = groupResults ? buildLegendHtml(baseData, hiddenGroups) : '';
   const sidePanelHtml = buildResultSidePanelHtml(legendHtml, targetLabel);
   return `
     <section class="result-section" data-target="${escapeHtml(targetLabel)}" data-type="numeric-open">
@@ -6837,8 +6829,11 @@ function buildRankSection(data, rows) {
   const { codebookEntry, targetLabel, groupResults } = data;
   const hiddenRanks = resultState.hiddenRankKeys.get(targetLabel) || new Set();
   const hiddenGroups = resultState.hiddenGroupKeys.get(targetLabel) || new Set();
+  const customGroupOn = shouldApplyCustomGroup(data);
+  const customGroupData = (customGroupOn && groupResults) ? buildCustomGroupData(data) : null;
+  const baseData = customGroupData || data;
   const sortByScore = !groupResults ? getRankSortByScore(targetLabel) : false;
-  const displayData = !groupResults && sortByScore ? applyRankSortToData(data, true) : data;
+  const displayData = !groupResults && sortByScore ? applyRankSortToData(baseData, true) : baseData;
   const chartType = !groupResults ? getRankChartType(targetLabel) : 'lollipop';
   const viewMode = groupResults ? 'horizontal' : getRankChartViewMode(targetLabel);
   const formulaNoteHtml = buildRankFormulaNoteHtml(displayData);
@@ -7292,35 +7287,12 @@ function buildStack100GroupLegendHtml(data, hiddenGroups) {
     return `<div class="legend-item is-static"><span class="legend-swatch" style="background:${color}"></span><span title="${escapeHtml(opt.option)}">${escapeHtml(opt.option)}</span></div>`;
   }).join('');
 
-  const displayGroups = getDisplayGroupResults(data.groupResults);
-  if (!displayGroups.length) {
+  const groupItems = buildGroupedLegendRowsHtml(data, hiddenGroups);
+  if (!groupItems) {
     return `<aside class="legend-panel"><div class="legend is-static">${optionItems}</div></aside>`;
   }
 
   const criterionLabel = data.criterionLabel || null;
-  const isCustomGroupView = !!data.isCustomGroupView;
-  const defs = criterionLabel ? (resultState.customGroupDefs.get(criterionLabel) || []) : [];
-  const assignments = criterionLabel ? (resultState.customGroupAssignments.get(criterionLabel) || new Map()) : new Map();
-
-  const groupItems = displayGroups.map(g => {
-    const color = getGroupColor(data.groupResults, g.value);
-    const isHidden = hiddenGroups.has(g.value);
-    const assignedId = assignments.get(g.value) || '';
-    const assignedDef = defs.find(def => def.id === assignedId) || null;
-    const assignedBadge = !isCustomGroupView && assignedDef
-      ? `<span class="legend-group-badge"><span class="legend-swatch" style="background:${getCustomGroupColor(criterionLabel, assignedDef.id)}"></span>${escapeHtml(assignedDef.name)}</span>`
-      : '';
-    return `
-      <div class="legend-row">
-        <label class="legend-item ${isHidden ? 'disabled' : ''}" data-group="${escapeHtml(g.value)}">
-          <input type="checkbox" ${isHidden ? '' : 'checked'}>
-          <span class="legend-swatch" style="background:${color}"></span>
-          <span>${escapeHtml(g.label)}</span>
-        </label>
-        ${assignedBadge}
-      </div>
-    `;
-  }).join('');
 
   return `
     <aside class="legend-panel">
@@ -7624,6 +7596,19 @@ function closeGroupConfigModal() {
   if (!modal) return;
   modal.classList.remove('show');
   resultState.groupConfigModalState = null;
+}
+
+function getCurrentResultTargetLabelsForCustomGroup(criterionLabel) {
+  if (!criterionLabel) return [];
+  const targetLabels = getTargetChipLabels();
+  if (!Array.isArray(targetLabels) || targetLabels.length === 0) return [];
+  const filteredRowIndexes = getFilteredRowIndexes();
+  const filteredRows = getFilteredLabelDataRows();
+  const filteredValueRows = getFilteredValueDataRows();
+  return targetLabels.filter(label => {
+    const data = aggregateResultQuestion(label, criterionLabel, filteredRows, filteredValueRows, filteredRowIndexes);
+    return !!(data && data.groupResults && data.criterionLabel === criterionLabel);
+  });
 }
 
 function clearGroupConfigDropHighlight(root = document) {
@@ -7960,9 +7945,13 @@ function setupGroupConfigModal() {
     resultState.customGroupDefs.set(state.criterionLabel, appliedDefs);
     resultState.customGroupAssignments.set(state.criterionLabel, appliedAssignments);
     const hasAny = appliedAssignments.size > 0;
-    if (hasAny) resultState.customGroupModes.add(state.targetLabel);
-    else resultState.customGroupModes.delete(state.targetLabel);
-    resultState.hiddenGroupKeys.set(state.targetLabel, new Set());
+    const affectedTargetLabels = getCurrentResultTargetLabelsForCustomGroup(state.criterionLabel);
+    const fallbackTargets = affectedTargetLabels.length > 0 ? affectedTargetLabels : [state.targetLabel];
+    fallbackTargets.forEach(targetLabel => {
+      if (hasAny) resultState.customGroupModes.add(targetLabel);
+      else resultState.customGroupModes.delete(targetLabel);
+      resultState.hiddenGroupKeys.set(targetLabel, new Set());
+    });
     closeGroupConfigModal();
     renderResults();
   });
@@ -8011,6 +8000,138 @@ function buildCustomGroupData(data) {
       });
       return { value: groupValue, label, n, perOption, _customColor: color };
     }
+    // scale (raw)
+    if (groups[0] && Array.isArray(groups[0].scoreResults) && !Array.isArray(groups[0].values)) {
+      const scoreRange = Array.isArray(data.scoreRange) ? data.scoreRange : [];
+      const scoreResults = scoreRange.map(score => {
+        const first = groups.find(group => Array.isArray(group.scoreResults) && group.scoreResults.some(item => Number(item.score) === Number(score)));
+        const sourceLabel = first
+          ? (first.scoreResults.find(item => Number(item.score) === Number(score)) || {}).label
+          : String(score);
+        const count = groups.reduce((sum, group) => {
+          const found = Array.isArray(group.scoreResults)
+            ? group.scoreResults.find(item => Number(item.score) === Number(score))
+            : null;
+          return sum + Number(found ? (found.count || 0) : 0);
+        }, 0);
+        return {
+          score,
+          label: sourceLabel,
+          count,
+          pct: n > 0 ? (count / n) * 100 : 0
+        };
+      });
+      const weightedSum = scoreResults.reduce((sum, item) => sum + (Number(item.score) * Number(item.count || 0)), 0);
+      return {
+        value: groupValue,
+        label,
+        n,
+        mean: n > 0 ? weightedSum / n : 0,
+        scoreResults,
+        _customColor: color
+      };
+    }
+    // scale (derived) / numeric-open
+    if (groups[0] && Array.isArray(groups[0].values)) {
+      const mergedValues = groups.flatMap(group => Array.isArray(group.values) ? group.values : []);
+      if (data.visualType === 'scale' && data.isDerivedScale) {
+        const derived = buildDerivedScaleResult(mergedValues, data.scoreRange || []);
+        return {
+          value: groupValue,
+          label,
+          n: derived.n,
+          mean: derived.mean,
+          min: derived.min,
+          q1: derived.q1,
+          median: derived.median,
+          q3: derived.q3,
+          max: derived.max,
+          values: derived.values,
+          scoreResults: derived.scoreResults,
+          _customColor: color
+        };
+      }
+      if (data.visualType === 'numeric-open') {
+        const histogram = buildNumericHistogram(
+          mergedValues,
+          { interval: data.interval, start: data.start },
+          { min: data.domainMin, max: data.domainMax }
+        );
+        return {
+          value: groupValue,
+          label,
+          ...histogram,
+          values: mergedValues,
+          _customColor: color
+        };
+      }
+    }
+    // rank
+    if (groups[0] && Array.isArray(groups[0].ranking) && Array.isArray(groups[0].perOption)) {
+      const rankCount = Number(data.rankCount || 0);
+      const rankLabels = Array.isArray(data.rankLabels) ? data.rankLabels : [];
+      const visibleOptions = Array.isArray(data.optionOrder) ? data.optionOrder : [];
+      const perOption = visibleOptions.map(opt => {
+        const perRank = Array.from({ length: rankCount }, (_, ri) => {
+          const count = groups.reduce((sum, group) => {
+            const found = Array.isArray(group.perOption)
+              ? group.perOption.find(item => item.option === opt)
+              : null;
+            const rankEntry = found && Array.isArray(found.perRank) ? found.perRank[ri] : null;
+            return sum + Number(rankEntry ? (rankEntry.count || 0) : 0);
+          }, 0);
+          return {
+            rank: rankLabels[ri] || `${ri + 1}순위`,
+            count,
+            pct: n > 0 ? (count / n) * 100 : 0
+          };
+        });
+        const score = perRank.reduce((sum, item, ri) => sum + (Number(item.count || 0) * getRankWeight(rankCount, ri)), 0);
+        const totalCount = groups.reduce((sum, group) => {
+          const found = Array.isArray(group.perOption)
+            ? group.perOption.find(item => item.option === opt)
+            : null;
+          return sum + Number(found ? (found.totalCount || 0) : 0);
+        }, 0);
+        return {
+          option: opt,
+          score,
+          weightedAverage: n > 0 ? score / n : 0,
+          totalCount,
+          totalPct: n > 0 ? (totalCount / n) * 100 : 0,
+          perRank
+        };
+      });
+      const sorted = [...visibleOptions].sort((a, b) => {
+        const aAvg = (perOption.find(item => item.option === a) || {}).weightedAverage || 0;
+        const bAvg = (perOption.find(item => item.option === b) || {}).weightedAverage || 0;
+        if (bAvg !== aAvg) return bAvg - aAvg;
+        return visibleOptions.indexOf(a) - visibleOptions.indexOf(b);
+      });
+      const ranking = [];
+      let currentPos = 0;
+      let lastScore = null;
+      let seen = 0;
+      sorted.forEach(opt => {
+        seen += 1;
+        const item = perOption.find(entry => entry.option === opt);
+        const avg = item ? item.weightedAverage : 0;
+        const score = item ? item.score : 0;
+        if (lastScore === null || avg !== lastScore) {
+          currentPos = seen;
+          lastScore = avg;
+        }
+        ranking.push({ option: opt, position: currentPos, score, weightedAverage: avg });
+      });
+      return {
+        value: groupValue,
+        label,
+        n,
+        ranking,
+        perOption,
+        _customColor: color
+      };
+    }
     return null;
   }
 
@@ -8037,7 +8158,69 @@ function buildCustomGroupData(data) {
   }, []);
 
   if (mergedGroupResults.length === 0) return null;
-  return { ...data, groupResults: mergedGroupResults, isCustomGroupView: true };
+  return { ...data, groupResults: mergedGroupResults, originalGroupResults: groupResults, isCustomGroupView: true };
+}
+
+function buildCustomScaleCompareData(compareData) {
+  if (!compareData || !compareData.criterionLabel || !Array.isArray(compareData.groups) || compareData.groups.length === 0) return null;
+  const defs = resultState.customGroupDefs.get(compareData.criterionLabel) || [];
+  const assignments = resultState.customGroupAssignments.get(compareData.criterionLabel) || new Map();
+  if (defs.length === 0) return null;
+  const hasAny = [...assignments.values()].some(Boolean);
+  if (!hasAny) return null;
+
+  const mergedById = new Map(defs.map(def => {
+    const members = compareData.groups.filter(group => assignments.get(group.value) === def.id);
+    if (members.length === 0) return [def.id, null];
+    const points = (compareData.questions || []).map((question, idx) => {
+      const mergedPoint = members.reduce((acc, group) => {
+        const point = Array.isArray(group.points) ? group.points[idx] : null;
+        const pointN = Number(point ? (point.n || 0) : 0);
+        const pointMean = Number(point ? (point.mean || 0) : 0);
+        acc.n += pointN;
+        acc.sum += pointMean * pointN;
+        return acc;
+      }, { n: 0, sum: 0 });
+      return {
+        questionLabel: question.label,
+        mean: mergedPoint.n > 0 ? mergedPoint.sum / mergedPoint.n : 0,
+        n: mergedPoint.n
+      };
+    });
+    return [def.id, {
+      value: def.id,
+      label: def.name,
+      color: getCustomGroupColor(compareData.criterionLabel, def.id),
+      points
+    }];
+  }).filter(([, group]) => !!group));
+
+  const insertedGroupIds = new Set();
+  const groups = compareData.groups.reduce((acc, group) => {
+    const assignedId = assignments.get(group.value);
+    if (!assignedId) {
+      acc.push(group);
+      return acc;
+    }
+    if (insertedGroupIds.has(assignedId)) return acc;
+    const merged = mergedById.get(assignedId);
+    if (merged) {
+      acc.push(merged);
+      insertedGroupIds.add(assignedId);
+    }
+    return acc;
+  }, []);
+
+  if (groups.length === 0) return null;
+  return { ...compareData, groups };
+}
+
+function shouldApplyCustomGroup(data) {
+  if (!data || !data.criterionLabel || !Array.isArray(data.groupResults) || data.groupResults.length === 0) return false;
+  const defs = resultState.customGroupDefs.get(data.criterionLabel) || [];
+  const assignments = resultState.customGroupAssignments.get(data.criterionLabel) || new Map();
+  if (defs.length === 0) return false;
+  return [...assignments.values()].some(Boolean);
 }
 
 
@@ -8120,23 +8303,26 @@ function buildChoiceSectionHtml(data, rows) {
 function buildScaleSection(data, rows) {
   if (!data) return '';
   const { codebookEntry, targetLabel, groupResults } = data;
+  const customGroupOn = shouldApplyCustomGroup(data);
+  const customGroupData = (customGroupOn && groupResults) ? buildCustomGroupData(data) : null;
+  const baseData = customGroupData || data;
   const hiddenGroups = resultState.hiddenGroupKeys.get(targetLabel) || new Set();
   const showTable = true;
   const viewMode = getScaleViewMode(targetLabel);
   const hideMidpoint = isScaleMidpointHidden(targetLabel);
-  const showChartType = !data.isDerivedScale && !groupResults;
+  const showChartType = !baseData.isDerivedScale && !groupResults;
   const chartType = showChartType ? getScaleChartType(targetLabel) : 'bar_horizontal_100';
-  const chartHtml = buildScaleChartHtml(data, hiddenGroups, viewMode, chartType);
-  const showLegend = !data.isDerivedScale && !groupResults && (chartType === 'pie' || viewMode === 'distribution');
+  const chartHtml = buildScaleChartHtml(baseData, hiddenGroups, viewMode, chartType);
+  const showLegend = !baseData.isDerivedScale && !groupResults && (chartType === 'pie' || viewMode === 'distribution');
   const legendHtml = groupResults
-    ? buildScaleGroupLegendHtml(data, hiddenGroups, viewMode)
-    : (showLegend ? buildScaleLegendHtml(data) : '');
-  const tableHtml = showTable ? buildDataTableHtml(data, hiddenGroups) : '';
+    ? buildScaleGroupLegendHtml(baseData, hiddenGroups, viewMode)
+    : (showLegend ? buildScaleLegendHtml(baseData) : '');
+  const tableHtml = showTable ? buildDataTableHtml(baseData, hiddenGroups) : '';
   const fullText = buildQuestionFullHtml(codebookEntry);
-  const toggleHtml = data.isDerivedScale
+  const toggleHtml = baseData.isDerivedScale
     ? `<div class="viz-controls"><div class="viz-controls-note">박스플롯 차트 보는 법: 수염은 응답값의 전체 범위, 박스는 전체 응답 중 가운데 50%가 모인 구간, 분홍색과 파랑색이 나뉘는 지점은 중앙값입니다.</div></div>`
     : buildScaleToggleHtml(targetLabel, viewMode, {
-      showMidpointOption: canHideScaleMidpoint(data),
+      showMidpointOption: canHideScaleMidpoint(baseData),
       hideMidpoint,
       showChartType,
       chartType
@@ -8162,10 +8348,13 @@ function buildScaleSection(data, rows) {
 
 function buildTargetScaleCompareSection(compareData) {
   if (!compareData || !compareData.baseData) return '';
-  const hiddenGroups = resultState.hiddenGroupKeys.get(compareData.targetLabel) || new Set();
+  const customGroupOn = shouldApplyCustomGroup(compareData.baseData);
+  const customCompareData = customGroupOn ? buildCustomScaleCompareData(compareData) : null;
+  const displayCompareData = customCompareData || compareData;
+  const hiddenGroups = resultState.hiddenGroupKeys.get(displayCompareData.targetLabel) || new Set();
   const tableKey = TARGET_SCALE_COMPARE_VIEW_KEY;
   const showTable = true;
-  const hasGroups = Array.isArray(compareData.groups) && compareData.groups.length > 0;
+  const hasGroups = Array.isArray(displayCompareData.groups) && displayCompareData.groups.length > 0;
   let viewMode = resultState.scaleViewModes.get(TARGET_SCALE_COMPARE_VIEW_KEY) || 'mean';
   if (hasGroups && viewMode === 'distribution') {
     viewMode = 'mean';
@@ -8173,16 +8362,16 @@ function buildTargetScaleCompareSection(compareData) {
   }
   const hideMidpoint = isScaleMidpointHidden(TARGET_SCALE_COMPARE_VIEW_KEY);
   const toggleHtml = buildScaleToggleHtml(TARGET_SCALE_COMPARE_VIEW_KEY, viewMode, {
-    showMidpointOption: canHideScaleMidpoint(compareData.baseData),
+    showMidpointOption: canHideScaleMidpoint(displayCompareData.baseData),
     hideMidpoint,
     disabledModes: hasGroups ? ['distribution'] : []
   });
   const compareSectionHtml = viewMode === 'distribution'
-    ? buildScaleCompareDistributionSectionHtml(compareData)
-    : buildScaleCompareSectionHtml(compareData, hiddenGroups, { showHeader: false, flush: true });
-  const tableHtml = showTable ? buildScaleCompareDataTableHtml(compareData, hiddenGroups) : '';
+    ? buildScaleCompareDistributionSectionHtml(displayCompareData)
+    : buildScaleCompareSectionHtml(displayCompareData, hiddenGroups, { showHeader: false, flush: true });
+  const tableHtml = showTable ? buildScaleCompareDataTableHtml(displayCompareData, hiddenGroups) : '';
   return `
-    <section class="result-section" data-target="${escapeHtml(compareData.targetLabel)}" data-type="scale-compare">
+    <section class="result-section" data-target="${escapeHtml(displayCompareData.targetLabel)}" data-type="scale-compare">
       <div class="result-header">
         <div class="result-title">여러 문항 한 번에 비교하기</div>
         ${toggleHtml}

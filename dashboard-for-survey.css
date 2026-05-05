@@ -2532,13 +2532,17 @@ body.filter-dragging .filter-add-btn:hover {
 .legend-row {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   justify-content: space-between;
 }
 
 .legend-row .legend-item {
-  flex: 1;
   min-width: 0;
+}
+
+.legend-row > .legend-item {
+  flex: 1;
 }
 
 .legend-group-badge {
@@ -2559,6 +2563,27 @@ body.filter-dragging .filter-add-btn:hover {
   width: 10px;
   height: 10px;
   border-radius: 2px;
+}
+
+.legend-group-members {
+  display: flex;
+  flex-direction: column;
+  flex-basis: 100%;
+  gap: 8px;
+  padding-left: 22px;
+  margin-top: -2px;
+}
+
+.legend-group-members.is-disabled {
+  opacity: 0.4;
+}
+
+.legend-group-member {
+  color: var(--neutral-500);
+}
+
+.legend-group-member .legend-swatch {
+  opacity: 0.3;
 }
 
 .legend-group-select-cell {
