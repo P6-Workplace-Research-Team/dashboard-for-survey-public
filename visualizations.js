@@ -3983,16 +3983,19 @@ function buildRatioAllocationDataTableHtml(data, hiddenGroups = new Set()) {
 function buildRatioAllocationSection(data) {
   if (!data) return '';
   const { codebookEntry, targetLabel, groupResults } = data;
+  const customGroupOn = shouldApplyCustomGroup(data);
+  const customGroupData = (customGroupOn && groupResults) ? buildCustomGroupData(data) : null;
+  const baseData = customGroupData || data;
   const hiddenGroups = resultState.hiddenGroupKeys.get(targetLabel) || new Set();
-  const showChartType = !groupResults;
+  const showChartType = !baseData.groupResults;
   const chartType = showChartType ? getRatioChartType(targetLabel) : 'bar_horizontal_100';
   const isPie = chartType === 'pie';
   const chevron = 'assets/icons/keyboard_arrow_down_40dp_151515_FILL0_wght400_GRAD0_opsz40.svg';
   const menuKey = `ratio:${targetLabel}`;
   const isMenuOpen = resultState.openChoiceMenus.has(menuKey);
 
-  const invalidNote = data.invalidN > 0
-    ? ` 합계가 100이 아니거나 비어 있는 응답 ${Number(data.invalidN).toLocaleString()}건은 제외했습니다.`
+  const invalidNote = baseData.invalidN > 0
+    ? ` 합계가 100이 아니거나 비어 있는 응답 ${Number(baseData.invalidN).toLocaleString()}건은 제외했습니다.`
     : '';
   const allocationNoteHtml = `<div class="viz-controls-note">각 응답자가 두 항목의 합이 100이 되도록 값을 나누어 기입하는 문항입니다. 아래 차트는 각 항목에 기입한 값의 평균을 보여줍니다.${invalidNote}</div>`;
 
@@ -4023,12 +4026,12 @@ function buildRatioAllocationSection(data) {
   const controlsHtml = `<div class="viz-controls">${chartRowHtml}${allocationNoteHtml}</div>`;
 
   const baseChartHtml = isPie
-    ? buildRatioAllocationPieChartHtml(data)
-    : buildRatioAllocationChartHtml(data, hiddenGroups);
-  const legendHtml = groupResults
-    ? buildAllocationGroupLegendHtml(data, hiddenGroups)
-    : (isPie ? buildRatioAllocationItemLegendHtml(data) : '');
-  const tableHtml = buildRatioAllocationDataTableHtml(data, hiddenGroups);
+    ? buildRatioAllocationPieChartHtml(baseData)
+    : buildRatioAllocationChartHtml(baseData, hiddenGroups);
+  const legendHtml = baseData.groupResults
+    ? buildAllocationGroupLegendHtml(baseData, hiddenGroups)
+    : (isPie ? buildRatioAllocationItemLegendHtml(baseData) : '');
+  const tableHtml = buildRatioAllocationDataTableHtml(baseData, hiddenGroups);
   const fullText = buildQuestionFullHtml(codebookEntry);
   const visualClass = getResultVisualClass(!!legendHtml);
 
@@ -6528,17 +6531,7 @@ function buildRankGroupLegendHtml(data, hiddenGroups, opts = {}) {
   if (!data.groupResults) return '';
   const { showDualBar = false, isDualBar = false } = opts;
   const criterionLabel = data.criterionLabel || '';
-  const items = data.groupResults.map((g, i) => {
-    const color = GROUP_PALETTE[i % GROUP_PALETTE.length];
-    const isHidden = hiddenGroups.has(g.value);
-    return `
-      <label class="legend-item ${isHidden ? 'disabled' : ''}" data-group="${escapeHtml(g.value)}">
-        <input type="checkbox" ${isHidden ? '' : 'checked'}>
-        <span class="legend-swatch" style="background:${color}"></span>
-        <span>${escapeHtml(g.label)}</span>
-      </label>
-    `;
-  }).join('');
+  const items = buildGroupedLegendRowsHtml(data, hiddenGroups);
   const dualBarBtnHtml = showDualBar
     ? `<button type="button" class="two-compare-btn${isDualBar ? ' is-active' : ''}" data-dual-bar-toggle="${escapeHtml(data.targetLabel)}">${isDualBar ? '기본 그래프로 보기' : '두 그룹만 비교하기'}</button>`
     : '';
@@ -6821,24 +6814,25 @@ function buildRankSection(data, rows) {
   const customGroupOn = shouldApplyCustomGroup(data);
   const customGroupData = (customGroupOn && groupResults) ? buildCustomGroupData(data) : null;
   const baseData = customGroupData || data;
-  const sortByScore = !groupResults ? getRankSortByScore(targetLabel) : false;
-  const displayData = !groupResults && sortByScore ? applyRankSortToData(baseData, true) : baseData;
-  const chartType = !groupResults ? getRankChartType(targetLabel) : 'lollipop';
-  const viewMode = groupResults ? 'horizontal' : getRankChartViewMode(targetLabel);
+  const hasGroupResults = !!baseData.groupResults;
+  const sortByScore = getRankSortByScore(targetLabel);
+  const displayData = sortByScore ? applyRankSortToData(baseData, true) : baseData;
+  const chartType = !hasGroupResults ? getRankChartType(targetLabel) : 'lollipop';
+  const viewMode = hasGroupResults ? 'horizontal' : getRankChartViewMode(targetLabel);
   const formulaNoteHtml = buildRankFormulaNoteHtml(displayData);
   const controlsHtml = buildRankControlsHtml(targetLabel, {
     chartType,
     viewMode,
     sortByScore,
     formulaNoteHtml,
-    groupMode: !!groupResults
+    groupMode: hasGroupResults
   });
-  const displayGroups = groupResults ? getDisplayGroupResults(groupResults, hiddenGroups) : [];
-  const canDualBar = !!groupResults && displayGroups.length >= 1 && displayGroups.length <= 2;
+  const displayGroups = hasGroupResults ? getDisplayGroupResults(baseData.groupResults, hiddenGroups) : [];
+  const canDualBar = hasGroupResults && displayGroups.length >= 1 && displayGroups.length <= 2;
   const isDualBar = canDualBar && !!resultState.dualBarModes.get(targetLabel);
   let chartHtml = '';
   let legendHtml = '';
-  if (groupResults) {
+  if (hasGroupResults) {
     chartHtml = isDualBar
       ? buildRankDualLollipopChartHtml(displayData, hiddenGroups)
       : buildRankLollipopGroupCompareChartHtml(displayData, hiddenGroups);
@@ -7239,10 +7233,16 @@ function buildGroupCompareStack100ChartHtml(data, hiddenGroups = new Set()) {
   const options = data.totalResults || [];
 
   const rowHtml = displayGroups.map(group => {
+    const widths = options.map(opt => {
+      const result = (group.results || []).find(r => r.option === opt.option) || { pct: 0, count: 0 };
+      return Math.max(0, Math.min(100, result.pct || 0));
+    });
+    const firstNonZero = widths.findIndex(width => width > 0);
+    const lastNonZero = widths.reduce((acc, width, index) => width > 0 ? index : acc, -1);
     const segmentsHtml = options.map((opt, i) => {
       const color = getOptionPaletteColor(data, opt.option);
       const result = (group.results || []).find(r => r.option === opt.option) || { pct: 0, count: 0 };
-      const width = Math.max(0, Math.min(100, result.pct || 0));
+      const width = widths[i];
       const tip = encodeURIComponent(JSON.stringify({
         kind: 'basic-bar',
         option: opt.option,
@@ -7250,7 +7250,8 @@ function buildGroupCompareStack100ChartHtml(data, hiddenGroups = new Set()) {
         count: result.count || 0
       }));
       const valueHtml = width >= 8 ? `<span class="stack100-segment-value">${formatPercent(result.pct)}</span>` : '';
-      return `<div class="stack100-segment ${width < 8 ? 'is-narrow' : ''}" style="flex:0 0 ${width}%; background:${color};" data-tip="${tip}">${valueHtml}</div>`;
+      const edgeClass = `${i === firstNonZero ? ' is-first' : ''}${i === lastNonZero ? ' is-last' : ''}`;
+      return `<div class="stack100-segment ${width < 8 ? 'is-narrow' : ''}${edgeClass}" style="flex:0 0 ${width}%; background:${color};" data-tip="${tip}">${valueHtml}</div>`;
     }).join('');
     return `
       <div class="stack100-group-row">
@@ -7300,8 +7301,11 @@ function buildStack100GroupLegendHtml(data, hiddenGroups) {
 /* ---------- 객관식 단일: 가로 100% 누적 ---------- */
 function buildStacked100ChartHtml(data) {
   const rows = data.totalResults;
+  const widths = rows.map(row => Math.max(0, Math.min(100, row.pct)));
+  const firstNonZero = widths.findIndex(width => width > 0);
+  const lastNonZero = widths.reduce((acc, width, index) => width > 0 ? index : acc, -1);
   const segmentsHtml = rows.map((r, i) => {
-    const width = Math.max(0, Math.min(100, r.pct));
+    const width = widths[i];
     const color = getOptionPaletteColor(data, r.option);
     const tip = encodeURIComponent(JSON.stringify({
       kind: 'basic-bar',
@@ -7310,8 +7314,9 @@ function buildStacked100ChartHtml(data) {
       count: r.count
     }));
     const valueHtml = width >= 8 ? `<span class="stack100-segment-value">${formatPercent(r.pct)}</span>` : '';
+    const edgeClass = `${i === firstNonZero ? ' is-first' : ''}${i === lastNonZero ? ' is-last' : ''}`;
     return `
-      <div class="stack100-segment ${width < 8 ? 'is-narrow' : ''}"
+      <div class="stack100-segment ${width < 8 ? 'is-narrow' : ''}${edgeClass}"
            style="flex:0 0 ${width}%; background:${color};"
            data-tip="${tip}">${valueHtml}</div>
     `;
@@ -7967,6 +7972,90 @@ function buildCustomGroupData(data) {
     if (groups.length === 0) return null;
     const n = groups.reduce((s, g) => s + (g.n || 0), 0);
     const opts = optionOrder || [];
+    // ratio-allocation
+    if (data.visualType === 'ratio-allocation' && groups[0] && Array.isArray(groups[0].results)) {
+      const results = opts.map(opt => {
+        const pctSum = groups.reduce((sum, group) => {
+          const found = Array.isArray(group.results)
+            ? group.results.find(item => item.option === opt)
+            : null;
+          const groupN = Number(group.n || 0);
+          return sum + (Number(found ? (found.pct || 0) : 0) * groupN);
+        }, 0);
+        return {
+          option: opt,
+          pct: n > 0 ? pctSum / n : 0,
+          count: n
+        };
+      });
+      return { value: groupValue, label, n, results, _customColor: color };
+    }
+    // rank
+    if (data.visualType === 'rank' && groups[0] && Array.isArray(groups[0].ranking) && Array.isArray(groups[0].perOption)) {
+      const rankCount = Number(data.rankCount || 0);
+      const rankLabels = Array.isArray(data.rankLabels) ? data.rankLabels : [];
+      const visibleOptions = Array.isArray(data.optionOrder) ? data.optionOrder : [];
+      const perOption = visibleOptions.map(opt => {
+        const perRank = Array.from({ length: rankCount }, (_, ri) => {
+          const count = groups.reduce((sum, group) => {
+            const found = Array.isArray(group.perOption)
+              ? group.perOption.find(item => item.option === opt)
+              : null;
+            const rankEntry = found && Array.isArray(found.perRank) ? found.perRank[ri] : null;
+            return sum + Number(rankEntry ? (rankEntry.count || 0) : 0);
+          }, 0);
+          return {
+            rank: rankLabels[ri] || `${ri + 1}순위`,
+            count,
+            pct: n > 0 ? (count / n) * 100 : 0
+          };
+        });
+        const score = perRank.reduce((sum, item, ri) => sum + (Number(item.count || 0) * getRankWeight(rankCount, ri)), 0);
+        const totalCount = groups.reduce((sum, group) => {
+          const found = Array.isArray(group.perOption)
+            ? group.perOption.find(item => item.option === opt)
+            : null;
+          return sum + Number(found ? (found.totalCount || 0) : 0);
+        }, 0);
+        return {
+          option: opt,
+          score,
+          weightedAverage: n > 0 ? score / n : 0,
+          totalCount,
+          totalPct: n > 0 ? (totalCount / n) * 100 : 0,
+          perRank
+        };
+      });
+      const sorted = [...visibleOptions].sort((a, b) => {
+        const aAvg = (perOption.find(item => item.option === a) || {}).weightedAverage || 0;
+        const bAvg = (perOption.find(item => item.option === b) || {}).weightedAverage || 0;
+        if (bAvg !== aAvg) return bAvg - aAvg;
+        return visibleOptions.indexOf(a) - visibleOptions.indexOf(b);
+      });
+      const ranking = [];
+      let currentPos = 0;
+      let lastScore = null;
+      let seen = 0;
+      sorted.forEach(opt => {
+        seen += 1;
+        const item = perOption.find(entry => entry.option === opt);
+        const avg = item ? item.weightedAverage : 0;
+        const score = item ? item.score : 0;
+        if (lastScore === null || avg !== lastScore) {
+          currentPos = seen;
+          lastScore = avg;
+        }
+        ranking.push({ option: opt, position: currentPos, score, weightedAverage: avg });
+      });
+      return {
+        value: groupValue,
+        label,
+        n,
+        ranking,
+        perOption,
+        _customColor: color
+      };
+    }
     // single-choice
     if (groups[0] && Array.isArray(groups[0].results)) {
       const results = opts.map(opt => {
@@ -8054,72 +8143,6 @@ function buildCustomGroupData(data) {
           _customColor: color
         };
       }
-    }
-    // rank
-    if (groups[0] && Array.isArray(groups[0].ranking) && Array.isArray(groups[0].perOption)) {
-      const rankCount = Number(data.rankCount || 0);
-      const rankLabels = Array.isArray(data.rankLabels) ? data.rankLabels : [];
-      const visibleOptions = Array.isArray(data.optionOrder) ? data.optionOrder : [];
-      const perOption = visibleOptions.map(opt => {
-        const perRank = Array.from({ length: rankCount }, (_, ri) => {
-          const count = groups.reduce((sum, group) => {
-            const found = Array.isArray(group.perOption)
-              ? group.perOption.find(item => item.option === opt)
-              : null;
-            const rankEntry = found && Array.isArray(found.perRank) ? found.perRank[ri] : null;
-            return sum + Number(rankEntry ? (rankEntry.count || 0) : 0);
-          }, 0);
-          return {
-            rank: rankLabels[ri] || `${ri + 1}순위`,
-            count,
-            pct: n > 0 ? (count / n) * 100 : 0
-          };
-        });
-        const score = perRank.reduce((sum, item, ri) => sum + (Number(item.count || 0) * getRankWeight(rankCount, ri)), 0);
-        const totalCount = groups.reduce((sum, group) => {
-          const found = Array.isArray(group.perOption)
-            ? group.perOption.find(item => item.option === opt)
-            : null;
-          return sum + Number(found ? (found.totalCount || 0) : 0);
-        }, 0);
-        return {
-          option: opt,
-          score,
-          weightedAverage: n > 0 ? score / n : 0,
-          totalCount,
-          totalPct: n > 0 ? (totalCount / n) * 100 : 0,
-          perRank
-        };
-      });
-      const sorted = [...visibleOptions].sort((a, b) => {
-        const aAvg = (perOption.find(item => item.option === a) || {}).weightedAverage || 0;
-        const bAvg = (perOption.find(item => item.option === b) || {}).weightedAverage || 0;
-        if (bAvg !== aAvg) return bAvg - aAvg;
-        return visibleOptions.indexOf(a) - visibleOptions.indexOf(b);
-      });
-      const ranking = [];
-      let currentPos = 0;
-      let lastScore = null;
-      let seen = 0;
-      sorted.forEach(opt => {
-        seen += 1;
-        const item = perOption.find(entry => entry.option === opt);
-        const avg = item ? item.weightedAverage : 0;
-        const score = item ? item.score : 0;
-        if (lastScore === null || avg !== lastScore) {
-          currentPos = seen;
-          lastScore = avg;
-        }
-        ranking.push({ option: opt, position: currentPos, score, weightedAverage: avg });
-      });
-      return {
-        value: groupValue,
-        label,
-        n,
-        ranking,
-        perOption,
-        _customColor: color
-      };
     }
     return null;
   }

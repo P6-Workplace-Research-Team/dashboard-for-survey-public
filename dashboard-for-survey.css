@@ -636,7 +636,9 @@ body.home-page {
 }
 
 .home-page .primary-btn:hover:not(:disabled) {
-  background: var(--neutral-900);
+  background: var(--neutral-800);
+  border-color: var(--neutral-800);
+  color: var(--White);
 }
 
 .home-page .primary-btn:active:not(:disabled) {
@@ -3511,14 +3513,20 @@ body.filter-dragging .filter-add-btn:hover {
   border-right: 1px solid var(--neutral-300);
 }
 
-.stack100-track .stack100-segment:first-child {
+.stack100-track .stack100-segment:first-child,
+.stack100-track .stack100-segment.is-first {
   border-top-left-radius: var(--viz-bar-radius);
   border-bottom-left-radius: var(--viz-bar-radius);
 }
 
-.stack100-track .stack100-segment:last-child {
+.stack100-track .stack100-segment:last-child,
+.stack100-track .stack100-segment.is-last {
   border-top-right-radius: var(--viz-bar-radius);
   border-bottom-right-radius: var(--viz-bar-radius);
+}
+
+.stack100-track .stack100-segment:last-child,
+.stack100-track .stack100-segment.is-last {
   border-right: none;
 }
 
@@ -4281,7 +4289,11 @@ body.filter-dragging .filter-add-btn:hover {
 }
 
 .scale-compare-chart.group-compare .group-dot-wrap {
-  z-index: 4;
+  z-index: 2;
+}
+
+.scale-compare-chart.group-compare .group-dot-wrap.is-highlighted {
+  z-index: 6;
 }
 
 /* ================ 차트 상세 : 원/파이 (객관식 단일, 객관식 척도, 주관식 비율 배분) ================ */
@@ -5076,8 +5088,8 @@ body.filter-dragging .filter-add-btn:hover {
 }
 
 .group-config-accordion-btn {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -5085,8 +5097,8 @@ body.filter-dragging .filter-add-btn:hover {
 }
 
 .group-config-accordion-icon {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   object-fit: contain;
   transition: transform .15s ease;
 }
