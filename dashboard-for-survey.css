@@ -5383,7 +5383,7 @@ body.filter-dragging .filter-add-btn:hover {
   white-space: nowrap;
   font-size: var(--button-2-size);
   font-weight: var(--font-weight-regular);
-  line-height: var(--body-line-height);
+  line-height: var(--body-line-height) !important;
   color: var(--neutral-700);
   border: 1px solid var(--neutral-300);
   border-radius: var(--button-2-radius);
