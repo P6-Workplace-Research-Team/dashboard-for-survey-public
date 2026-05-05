@@ -4213,7 +4213,7 @@ body.filter-dragging .filter-add-btn:hover {
 .chart-bottom-axis {
   position: relative;
   height: 36px;
-  margin-top :32px;
+  margin-top :40px;
   border-top: 1px solid var(--neutral-300);
 }
 
