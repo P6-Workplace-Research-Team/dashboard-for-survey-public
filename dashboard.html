@@ -189,22 +189,23 @@
 <div class="modal-backdrop" id="group-config-modal" role="dialog" aria-modal="true" aria-labelledby="group-config-modal-title">
   <div class="modal">
     <div class="modal-header">
-      <div class="modal-title" id="group-config-modal-title">그룹 설정</div>
+      <div class="modal-title" id="group-config-modal-title">범례 그룹 편집</div>
       <button class="modal-close" id="close-group-config-btn" aria-label="닫기">
         <img class="modal-close-icon" src="assets/icons/close_wght600fill1_40px.svg" alt="">
       </button>
     </div>
     <div class="modal-body">
-      <div class="group-config-note">범례 항목을 원하는 그룹으로 지정한 뒤 적용하면 묶음 보기로 전환됩니다.</div>
-      <div id="group-config-list"></div>
-      <div class="group-config-divider"></div>
-      <div class="group-config-heading">그룹 이름</div>
-      <div id="group-config-defs"></div>
-      <button type="button" class="legend-action-btn" id="group-config-add-btn">+ 그룹 추가</button>
+      <div id="group-config-list" class="legend group-config-list"></div>
     </div>
-    <div class="modal-footer">
-      <button type="button" class="modal-action-btn" id="group-config-reset-btn">원래대로 보기</button>
-      <button type="button" class="modal-action-btn primary" id="group-config-apply-btn">적용</button>
+    <div class="modal-footer group-config-footer">
+      <button type="button" class="modal-action-btn group-config-create-btn" id="group-config-add-btn">
+        <img class="group-config-create-icon" src="assets/icons/add_40dp_151515_FILL0_wght400_GRAD0_opsz40.svg" alt="">
+        <span>그룹 만들기</span>
+      </button>
+      <div class="group-config-footer-actions">
+        <button type="button" class="modal-action-btn group-config-reset-btn" id="group-config-reset-btn">전체 해제</button>
+        <button type="button" class="modal-action-btn primary group-config-apply-btn" id="group-config-apply-btn">편집 완료</button>
+      </div>
     </div>
   </div>
 </div>
