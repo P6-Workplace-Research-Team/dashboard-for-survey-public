@@ -8890,15 +8890,16 @@ function attachResultEventListeners(container) {
         e.preventDefault();
         e.stopPropagation();
         const action = btn.dataset.legendAction;
+        const legendPanel = actions.closest('.legend-panel');
         if (mode === 'rank') {
-          const legend = actions.parentElement ? actions.parentElement.querySelector('.legend[data-mode="rank"]') : null;
+          const legend = legendPanel ? legendPanel.querySelector('.legend[data-mode="rank"]') : null;
           const rankIndexes = legend
             ? Array.from(legend.querySelectorAll('.legend-item')).map(item => Number(item.dataset.rank)).filter(Number.isFinite)
             : [];
           const nextHidden = action === 'all-off' ? new Set(rankIndexes) : new Set();
           resultState.hiddenRankKeys.set(targetLabel, nextHidden);
         } else {
-          const legend = actions.parentElement ? actions.parentElement.querySelector('.legend[data-mode="group"]') : null;
+          const legend = legendPanel ? legendPanel.querySelector('.legend[data-mode="group"]') : null;
           const groupValues = legend
             ? Array.from(legend.querySelectorAll('.legend-item, .scale-compare-legend-item')).map(item => item.dataset.group).filter(Boolean)
             : [];
