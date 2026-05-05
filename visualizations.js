@@ -706,14 +706,9 @@ function setupSelectionAndDragDrop() {
 
       let added = 0;
       let blockedByLimit = false;
-      let blockedTextOpen = false;
       for (const data of items) {
         if (!data || !data.label) continue;
         const entry = resultState.codebookByLabel.get(data.label);
-        if (zone.dataset.zone === 'target' && entry && isTextOpenType(entry.type)) {
-          blockedTextOpen = true;
-          continue;
-        }
         if (zone.dataset.zone === 'criterion') {
           if (!entry || entry.role !== 'raw' || !isSingleChoiceType(entry.type)) continue;
         }
@@ -728,9 +723,6 @@ function setupSelectionAndDragDrop() {
       if (blockedByLimit) {
         const remaining = items.length - added;
         alert(`${zoneName} 문항은 최대 ${limit}개까지 추가할 수 있습니다. (추가됨 ${added}개, 제외됨 ${remaining}개)`);
-      }
-      if (blockedTextOpen) {
-        alert('주관식 문자는 별도의 시각화를 제공하지 않습니다.');
       }
 
       clearSelection();
@@ -1945,7 +1937,8 @@ function supportsResultType(type) {
     || isRankChoiceType(type)
     || isScaleChoiceType(type)
     || isNumericOpenType(type)
-    || isRatioAllocationType(type);
+    || isRatioAllocationType(type)
+    || isTextOpenType(type);
 }
 
 function getCriterionEntry(criterionLabel) {
@@ -2449,6 +2442,7 @@ function aggregateResultQuestion(targetLabel, criterionLabel, rows, valueRows = 
   if (isScaleChoiceType(entry.type)) return aggregateScale(targetLabel, criterionLabel, rows);
   if (isNumericOpenType(entry.type)) return aggregateNumericOpen(targetLabel, criterionLabel, rowIndexes);
   if (isRatioAllocationType(entry.type)) return aggregateRatioAllocation(targetLabel, criterionLabel, rowIndexes);
+  if (isTextOpenType(entry.type)) return aggregateTextOpen(targetLabel, rowIndexes);
   return null;
 }
 
@@ -3424,7 +3418,7 @@ function buildGroupCompareChartHtml(data, hiddenGroups = new Set()) {
           count: group.count || 0
         }));
         const labelSide = left > 50 ? 'left' : 'right';
-        return `<div class="hbar-group-dot-wrap" style="left:${left}%;" data-tip="${tip}" data-group-key="${escapeHtml(String(group.key))}" data-label-side="${labelSide}"><div class="hbar-group-dot" style="background:${color};"></div><span class="hbar-group-dot-label">${formatPercent(group.pct || 0)}</span></div>`;
+        return `<div class="group-dot-wrap" style="left:${left}%;" data-tip="${tip}" data-group-key="${escapeHtml(String(group.key))}" data-label-side="${labelSide}"><div class="group-dot" style="background:${color};"></div><span class="group-dot-label">${formatPercent(group.pct || 0)}</span></div>`;
       }).join('');
     return `
       <div class="single-hbar-row">
@@ -3597,8 +3591,8 @@ function getCustomGroupColor(criterionLabel, groupId) {
   return CUSTOM_GROUP_PALETTE[(idx < 0 ? 0 : idx) % CUSTOM_GROUP_PALETTE.length];
 }
 
-function nextCustomGroupId(criterionLabel) {
-  const defs = resultState.customGroupDefs.get(criterionLabel) || [];
+function nextCustomGroupId(criterionLabel, defsOverride = null) {
+  const defs = Array.isArray(defsOverride) ? defsOverride : (resultState.customGroupDefs.get(criterionLabel) || []);
   const ids = new Set(defs.map(d => d.id));
   let n = 1;
   while (ids.has('cg' + n)) n++;
@@ -3611,6 +3605,7 @@ function buildLegendHtml(data, hidden, opts = {}) {
   if (displayGroups.length === 0) return '';
   const { showDualBar = false, isDualBar = false } = opts;
   const criterionLabel = data.criterionLabel || null;
+  const isCustomGroupView = !!data.isCustomGroupView;
   const defs = criterionLabel ? (resultState.customGroupDefs.get(criterionLabel) || []) : [];
   const assignments = criterionLabel ? (resultState.customGroupAssignments.get(criterionLabel) || new Map()) : new Map();
 
@@ -3619,7 +3614,7 @@ function buildLegendHtml(data, hidden, opts = {}) {
     const isHidden = hidden.has(g.value);
     const assignedId = assignments.get(g.value) || '';
     const assignedDef = defs.find(def => def.id === assignedId) || null;
-    const assignedBadge = assignedDef
+    const assignedBadge = !isCustomGroupView && assignedDef
       ? `<span class="legend-group-badge"><span class="legend-swatch" style="background:${getCustomGroupColor(criterionLabel, assignedDef.id)}"></span>${escapeHtml(assignedDef.name)}</span>`
       : '';
 
@@ -3636,18 +3631,20 @@ function buildLegendHtml(data, hidden, opts = {}) {
   }).join('');
 
   const dualBarBtnHtml = showDualBar
-    ? `<div class="dual-bar-btn-wrap"><button type="button" class="dual-bar-btn${isDualBar ? ' is-active' : ''}" data-dual-bar-toggle="${escapeHtml(data.targetLabel)}">${isDualBar ? '기본 그래프로 보기' : '두 그룹만 비교하기'}</button></div>`
+    ? `<button type="button" class="two-compare-btn${isDualBar ? ' is-active' : ''}" data-dual-bar-toggle="${escapeHtml(data.targetLabel)}">${isDualBar ? '기본 그래프로 보기' : '두 그룹만 비교하기'}</button>`
     : '';
 
   return `
     <aside class="legend-panel">
       <div class="legend" data-target="${escapeHtml(data.targetLabel)}" data-mode="group">${items}</div>
-      <div class="legend-actions" data-target="${escapeHtml(data.targetLabel)}" data-mode="group">
-        <button type="button" class="legend-action-btn" data-legend-action="all-on">전체 선택</button>
-        <button type="button" class="legend-action-btn" data-legend-action="all-off">전체 해제</button>
-        ${criterionLabel ? `<button type="button" class="legend-action-btn" data-open-group-config="true" data-target="${escapeHtml(data.targetLabel)}" data-criterion="${escapeHtml(criterionLabel)}">그룹 편집</button>` : ''}
+      <div class="legend-btn-group">
+        <div class="legend-actions" data-target="${escapeHtml(data.targetLabel)}" data-mode="group">
+          <button type="button" class="legend-action-btn" data-legend-action="all-on">전체 선택</button>
+          <button type="button" class="legend-action-btn" data-legend-action="all-off">전체 해제</button>
+          ${criterionLabel ? `<button type="button" class="legend-action-btn" data-open-group-config="true" data-target="${escapeHtml(data.targetLabel)}" data-criterion="${escapeHtml(criterionLabel)}">그룹 편집</button>` : ''}
+        </div>
+        ${dualBarBtnHtml}
       </div>
-      ${dualBarBtnHtml}
     </aside>
   `;
 }
@@ -3898,6 +3895,15 @@ function buildRatioAllocationChartHtml(data, hiddenGroups = new Set()) {
 
   const displayGroups = getDisplayGroupResults(data.groupResults, hiddenGroups);
   if (displayGroups.length === 0) return '<div class="result-empty">표시할 그룹이 없습니다.</div>';
+  const overallRowHtml = `
+    <div class="stack100-group-row">
+      <div class="stack100-group-label">응답자 전체</div>
+      <div class="stack100-group-chart-cell">
+        ${buildRatioAllocationStackHtml(data.totalResults, { groupLabel: '응답자 전체', n: data.totalN, showLabels: false })}
+      </div>
+    </div>
+    <div class="stack100-group-chart-divider"></div>
+  `;
   const rowsHtml = displayGroups.map(group => {
     return `
       <div class="stack100-group-row">
@@ -3908,7 +3914,7 @@ function buildRatioAllocationChartHtml(data, hiddenGroups = new Set()) {
       </div>
     `;
   }).join('');
-  return `<div class="stack100-group-chart">${rowsHtml}</div>`;
+  return `<div class="stack100-group-chart">${overallRowHtml}${rowsHtml}</div>`;
 }
 
 function buildRatioAllocationDataTableHtml(data, hiddenGroups = new Set()) {
@@ -3939,11 +3945,11 @@ function buildRatioAllocationDataTableHtml(data, hiddenGroups = new Set()) {
   const displayGroups = getDisplayGroupResults(data.groupResults, hiddenGroups);
   const topRow = [
     `<th rowspan="2">배분 항목</th>`,
-    buildGroupedCountHeader('응답자 전체', data.totalN, 2),
+    `<th colspan="2">응답자 전체</th>`,
     ...displayGroups.map(group => buildGroupedCountHeader(group.label, group.n, 2))
   ].join('');
   const subRow = [
-    `<th class="num group-col">평균 배분값</th><th class="num">응답 수(명)</th>`,
+    `<th class="num">평균 배분값</th><th class="num">응답 수(명)</th>`,
     ...displayGroups.map(() => `<th class="num group-col">평균 배분값</th><th class="num">응답 수(명)</th>`)
   ].join('');
   const bodyRows = data.totalResults.map(result => {
@@ -3954,7 +3960,7 @@ function buildRatioAllocationDataTableHtml(data, hiddenGroups = new Set()) {
     return `
       <tr>
         <td>${escapeHtml(result.option)}</td>
-        <td class="num group-col mean-value">${formatPercent(result.pct)}</td>
+        <td class="num mean-value">${formatPercent(result.pct)}</td>
         <td class="num">${Number(result.count || 0).toLocaleString()}</td>
         ${groupCells}
       </tr>
@@ -3985,19 +3991,23 @@ function buildRatioAllocationSection(data) {
   const menuKey = `ratio:${targetLabel}`;
   const isMenuOpen = resultState.openChoiceMenus.has(menuKey);
 
-  const chartTypeControlHtml = showChartType ? `
-    <div class="viz-controls">
-      <div class="viz-controls-group">
+  const invalidNote = data.invalidN > 0
+    ? ` 합계가 100이 아니거나 비어 있는 응답 ${Number(data.invalidN).toLocaleString()}건은 제외했습니다.`
+    : '';
+  const allocationNoteHtml = `<div class="viz-controls-note">각 응답자가 두 항목의 합이 100이 되도록 값을 나누어 기입하는 문항입니다. 아래 차트는 각 항목에 기입한 값의 평균을 보여줍니다.${invalidNote}</div>`;
+
+  const chartRowHtml = showChartType ? `
+      <div class="viz-controls-element">
         <span class="viz-controls-label">그래프 모양 선택</span>
-        <div class="choice-chart-type-select ${isMenuOpen ? 'is-open' : ''}" data-choice-chart-type-select data-target="${escapeHtml(targetLabel)}" data-scope="ratio">
-          <button type="button" class="choice-chart-type-trigger" data-choice-chart-type-trigger data-target="${escapeHtml(targetLabel)}" data-scope="ratio" aria-haspopup="listbox" aria-expanded="${isMenuOpen ? 'true' : 'false'}">
-            <span class="choice-chart-type-current">${escapeHtml(SCALE_RATIO_CHART_TYPE_LABELS[chartType] || SCALE_RATIO_CHART_TYPE_LABELS.bar_horizontal_100)}</span>
-            <img class="choice-chart-type-chevron" src="${chevron}" alt="" aria-hidden="true">
+        <div class="viz-control-dropdown ${isMenuOpen ? 'is-open' : ''}" data-choice-chart-type-select data-target="${escapeHtml(targetLabel)}" data-scope="ratio">
+          <button type="button" class="viz-control-dropdown__trigger" data-choice-chart-type-trigger data-target="${escapeHtml(targetLabel)}" data-scope="ratio" aria-haspopup="listbox" aria-expanded="${isMenuOpen ? 'true' : 'false'}">
+            <span class="viz-control-dropdown__current">${escapeHtml(SCALE_RATIO_CHART_TYPE_LABELS[chartType] || SCALE_RATIO_CHART_TYPE_LABELS.bar_horizontal_100)}</span>
+            <img class="viz-control-dropdown__chevron" src="${chevron}" alt="" aria-hidden="true">
           </button>
-          <div class="choice-chart-type-menu" role="listbox" ${isMenuOpen ? '' : 'hidden'}>
+          <div class="viz-control-dropdown__menu" role="listbox" ${isMenuOpen ? '' : 'hidden'}>
             ${RATIO_CHART_TYPES.map(type => `
               <button type="button"
-                      class="choice-chart-type-option"
+                      class="viz-control-dropdown__option"
                       data-choice-chart-type="${type}"
                       data-choice-chart-scope="ratio"
                       data-target="${escapeHtml(targetLabel)}"
@@ -4008,9 +4018,9 @@ function buildRatioAllocationSection(data) {
             `).join('')}
           </div>
         </div>
-      </div>
-    </div>
-  ` : '';
+      </div>` : '';
+
+  const controlsHtml = `<div class="viz-controls">${chartRowHtml}${allocationNoteHtml}</div>`;
 
   const baseChartHtml = isPie
     ? buildRatioAllocationPieChartHtml(data)
@@ -4021,19 +4031,14 @@ function buildRatioAllocationSection(data) {
   const tableHtml = buildRatioAllocationDataTableHtml(data, hiddenGroups);
   const fullText = buildQuestionFullHtml(codebookEntry);
   const visualClass = getResultVisualClass(!!legendHtml);
-  const invalidNote = data.invalidN > 0
-    ? ` 합계가 100이 아니거나 비어 있는 응답 ${Number(data.invalidN).toLocaleString()}건은 제외했습니다.`
-    : '';
-  const noteHtml = `<div class="result-table-note allocation-note">각 응답자가 두 항목의 합이 100이 되도록 값을 나누어 기입하는 문항입니다. 위 차트는 각 항목에 기입한 값의 평균을 보여줍니다.${invalidNote}</div>`;
 
   return `
     <section class="result-section" data-target="${escapeHtml(targetLabel)}" data-type="ratio-allocation">
       <div class="result-header">
         <div class="result-title">${escapeHtml(targetLabel)}</div>
         ${fullText}
-        ${chartTypeControlHtml}
+        ${controlsHtml}
       </div>
-      ${noteHtml}
       <div class="${visualClass}">
         <div class="result-chart-col">${baseChartHtml}</div>
         ${legendHtml}
@@ -4069,17 +4074,17 @@ function buildScaleToggleHtml(targetLabel, activeMode, options = {}) {
   const isMenuOpen = resultState.openChoiceMenus.has(menuKey);
 
   const chartTypeHtml = showChartType ? `
-    <div class="viz-controls-group">
+    <div class="viz-controls-element">
       <span class="viz-controls-label">그래프 모양 선택</span>
-      <div class="choice-chart-type-select ${isMenuOpen ? 'is-open' : ''}" data-choice-chart-type-select data-target="${escapeHtml(targetLabel)}" data-scope="scale">
-        <button type="button" class="choice-chart-type-trigger" data-choice-chart-type-trigger data-target="${escapeHtml(targetLabel)}" data-scope="scale" aria-haspopup="listbox" aria-expanded="${isMenuOpen ? 'true' : 'false'}">
-          <span class="choice-chart-type-current">${escapeHtml(SCALE_RATIO_CHART_TYPE_LABELS[chartType] || SCALE_RATIO_CHART_TYPE_LABELS.bar_horizontal_100)}</span>
-          <img class="choice-chart-type-chevron" src="${chevron}" alt="" aria-hidden="true">
+      <div class="viz-control-dropdown ${isMenuOpen ? 'is-open' : ''}" data-choice-chart-type-select data-target="${escapeHtml(targetLabel)}" data-scope="scale">
+        <button type="button" class="viz-control-dropdown__trigger" data-choice-chart-type-trigger data-target="${escapeHtml(targetLabel)}" data-scope="scale" aria-haspopup="listbox" aria-expanded="${isMenuOpen ? 'true' : 'false'}">
+          <span class="viz-control-dropdown__current">${escapeHtml(SCALE_RATIO_CHART_TYPE_LABELS[chartType] || SCALE_RATIO_CHART_TYPE_LABELS.bar_horizontal_100)}</span>
+          <img class="viz-control-dropdown__chevron" src="${chevron}" alt="" aria-hidden="true">
         </button>
-        <div class="choice-chart-type-menu" role="listbox" ${isMenuOpen ? '' : 'hidden'}>
+        <div class="viz-control-dropdown__menu" role="listbox" ${isMenuOpen ? '' : 'hidden'}>
           ${SCALE_CHART_TYPES.map(type => `
             <button type="button"
-                    class="choice-chart-type-option"
+                    class="viz-control-dropdown__option"
                     data-choice-chart-type="${type}"
                     data-choice-chart-scope="scale"
                     data-target="${escapeHtml(targetLabel)}"
@@ -4099,32 +4104,41 @@ function buildScaleToggleHtml(targetLabel, activeMode, options = {}) {
     { mode: 'mean', label: '평균 보기' }
   ].map(item => {
     const disabled = allDisabledModes.includes(item.mode);
+    let disabledTitle = '';
+    if (disabled) {
+      if (targetLabel === TARGET_SCALE_COMPARE_VIEW_KEY && item.mode === 'distribution') {
+        disabledTitle = '그룹별 비교 기준이 적용된 상태에서는 분포 보기를 사용할 수 없습니다. 분포 보기를 보려면 그룹별 비교 기준을 해제해 주세요.';
+      } else if (isPie) {
+        disabledTitle = '원형 그래프에서는 분포·평균 보기 전환을 사용할 수 없습니다.';
+      } else {
+        disabledTitle = '현재 이 보기를 선택할 수 없습니다.';
+      }
+    }
+    const titleAttr = disabled ? ` title="${escapeHtml(disabledTitle)}"` : '';
     return `
     <button type="button"
             class="viz-control-toggle__btn ${activeMode === item.mode && !isPie ? 'active' : ''}"
             data-scale-mode="${item.mode}"
             data-target="${escapeHtml(targetLabel)}"
-            ${disabled ? 'aria-disabled="true" data-scale-mode-disabled="true"' : ''}>
+            ${disabled ? `disabled${titleAttr}` : ''}>
       ${escapeHtml(item.label)}
     </button>
   `;
   }).join('');
   const midpointOption = showMidpointOption ? `
-    <label class="scale-view-option${isPie ? ' is-disabled' : ''}">
+    <label class="viz-control-checkbox${isPie ? ' is-disabled' : ''}">
       <input type="checkbox" data-scale-hide-midpoint="true" data-target="${escapeHtml(targetLabel)}" ${hideMidpoint ? 'checked' : ''} ${isPie ? 'disabled' : ''}>
-      <span>중간값 제외 보기</span>
+      <span class="viz-control-checkbox__label">중간값 제외 보기</span>
     </label>
   ` : '';
   const midpointGuide = showMidpointOption ? `
-    <div class="viz-controls-note viz-controls-note--full-row">중간값 제외 보기는 차트에서만 시각적으로 제외하며, 응답 비율의 계산 모수와 원본 수치는 바뀌지 않습니다.</div>
+    <div class="viz-controls-note">중간값 제외 보기는 차트에서만 시각적으로 제외하며, 응답 비율의 계산 모수와 원본 수치는 바뀌지 않습니다.</div>
   ` : '';
   return `
     <div class="viz-controls">
       ${chartTypeHtml}
-      <div class="viz-controls-row">
-        <div class="viz-control-toggle">${buttons}</div>
-        ${midpointOption}
-      </div>
+      <div class="viz-control-toggle">${buttons}</div>
+      ${midpointOption}
       ${midpointGuide}
     </div>
   `;
@@ -4147,14 +4161,19 @@ function buildScaleAxisHtml(maxScore, showLabels = false) {
   `;
 }
 
-function buildScaleMeanHtml(mean, maxScore, tipData) {
+function buildScaleMeanHtml(mean, maxScore, tipData, options = {}) {
+  const { markerColor = '', hideValue = false, hideLabel = false, hideMarker = false } = options;
+  if (hideMarker) return '<div class="scale-mean-row"></div>';
   if (!Number.isFinite(mean) || mean <= 0) return '<div class="scale-mean-row"></div>';
   const left = getScaleMeanLeftPct(mean, maxScore);
+  const dotStyle = markerColor || hideValue
+    ? ` style="${markerColor ? `background:${markerColor};` : ''}${hideValue ? 'color:transparent;' : ''}"`
+    : '';
   return `
     <div class="scale-mean-row">
       <div class="scale-mean centered" style="left:${left}%;" data-tip="${encodeURIComponent(JSON.stringify(tipData))}">
-        <div class="scale-mean-label">평균</div>
-        <div class="scale-mean-dot">${mean.toFixed(2)}</div>
+        ${hideLabel ? '' : `<div class="scale-mean-label">평균</div>`}
+        <div class="scale-mean-dot"${dotStyle}>${hideValue ? '' : mean.toFixed(2)}</div>
       </div>
     </div>
   `;
@@ -4258,7 +4277,7 @@ function buildScaleDistributionBarHtml(scoreResults, maxScore, options = {}) {
 }
 
 function buildScaleMeanOnlyHtml(mean, maxScore, meanTipData, scoreResults, options = {}) {
-  const { hideMidpoint = false } = options;
+  const { hideMidpoint = false, meanMarkerColor = '', hideMeanValue = false, hideMeanLabel = false, hideMeanMarker = false } = options;
   return `
     <div class="scale-mean-only">
       <div class="scale-mean-background">
@@ -4266,7 +4285,12 @@ function buildScaleMeanOnlyHtml(mean, maxScore, meanTipData, scoreResults, optio
       </div>
       ${buildScaleAxisHtml(maxScore, true)}
       ${buildScaleEdgeLabelsHtml(scoreResults)}
-      ${buildScaleMeanHtml(mean, maxScore, meanTipData)}
+      ${buildScaleMeanHtml(mean, maxScore, meanTipData, {
+        markerColor: meanMarkerColor,
+        hideValue: hideMeanValue,
+        hideLabel: hideMeanLabel,
+        hideMarker: hideMeanMarker
+      })}
     </div>
   `;
 }
@@ -4382,22 +4406,16 @@ function formatScaleScoreLabel(result) {
     : baseLabel;
 }
 
-function buildDerivedScaleBoxPlotHtml(data, viewMode, { showFooter = true, hideAxis = false } = {}) {
+function buildDerivedScaleBoxPlotHtml(data, viewMode, { hideAxis = false, mutedMeanMarker = false, hideMeanMarker = false } = {}) {
   const axisMin = 1;
   const axisMax = data.scoreRange.length;
   const item = { ...data, n: data.n ?? data.totalN };
-  const footerHtml = `
-    <div class="numeric-open-footer">
-      <div class="numeric-open-note">박스플롯 차트 보는 법: 수염은 응답값의 전체 범위, 박스는 전체 응답 중 가운데 50%가 모인 구간, 분홍색과 파랑색이 나뉘는 지점은 중앙값입니다.</div>
-    </div>
-  `;
   return `
     <div class="numeric-open-summary-whisker${viewMode === 'mean' ? ' is-mean-mode' : ''}">
       <div class="numeric-open-summary-body">
-        ${buildNumericWhiskerTrackHtml(item, axisMin, axisMax, '', data.groupLabel || '', { meanDecimals: 2 })}
-        ${hideAxis ? '' : `<div class="numeric-whisker-axis">${buildIntegerBoxAxisHtml(axisMin, axisMax)}</div>`}
+        ${buildNumericWhiskerTrackHtml(item, axisMin, axisMax, '', data.groupLabel || '', { meanDecimals: 2, color: data.color, mutedMeanMarker, hideMeanMarker })}
+        ${hideAxis ? '' : `<div class="chart-bottom-axis">${buildIntegerBoxAxisHtml(axisMin, axisMax)}</div>`}
       </div>
-      ${showFooter ? footerHtml : ''}
     </div>
   `;
 }
@@ -4566,25 +4584,27 @@ function buildScaleCompareGroupDotHtml(group, point, maxScore, withOverall, comp
 function buildScaleCompareLegendHtml(groups, hiddenGroups = new Set(), targetLabel = '', criterionLabel = '') {
   if (!Array.isArray(groups) || groups.length === 0) return '';
   const items = [
-    `<div class="scale-compare-legend-item"><span class="scale-compare-legend-dot is-overall"></span><span>응답자 전체 평균</span></div>`,
+    `<div class="legend-row"><div class="legend-item is-static"><span class="legend-swatch" style="background:var(--neutral-700);"></span><span>응답자 전체</span></div></div>`,
     ...groups.map(group => {
       const isHidden = hiddenGroups && hiddenGroups.has(group.value);
       return `
-      <label class="scale-compare-legend-item ${isHidden ? 'disabled' : ''}" data-group="${escapeHtml(group.value)}">
-        <input type="checkbox"
-               data-scale-group-toggle="true"
-               data-target="${escapeHtml(targetLabel)}"
-               data-group="${escapeHtml(group.value)}"
-               ${isHidden ? '' : 'checked'}>
-        <span class="scale-compare-legend-dot" style="background:${group.color};"></span>
-        <span>${escapeHtml(group.label)}</span>
-      </label>
+      <div class="legend-row">
+        <label class="legend-item ${isHidden ? 'disabled' : ''}" data-group="${escapeHtml(group.value)}">
+          <input type="checkbox"
+                 data-scale-group-toggle="true"
+                 data-target="${escapeHtml(targetLabel)}"
+                 data-group="${escapeHtml(group.value)}"
+                 ${isHidden ? '' : 'checked'}>
+          <span class="legend-swatch" style="background:${group.color};"></span>
+          <span>${escapeHtml(group.label)}</span>
+        </label>
+      </div>
     `;
     })
   ].join('');
   return `
     <aside class="legend-panel">
-      <div class="scale-compare-legend legend" data-target="${escapeHtml(targetLabel)}" data-mode="group">${items}</div>
+      <div class="legend" data-target="${escapeHtml(targetLabel)}" data-mode="group">${items}</div>
       <div class="legend-actions" data-target="${escapeHtml(targetLabel)}" data-mode="group">
         <button type="button" class="legend-action-btn" data-legend-action="all-on">전체 선택</button>
         <button type="button" class="legend-action-btn" data-legend-action="all-off">전체 해제</button>
@@ -4673,7 +4693,7 @@ function buildScaleCompareDistributionSectionHtml(compareData) {
     if (!item) return '';
     const hideMidpoint = isScaleMidpointHidden(TARGET_SCALE_COMPARE_VIEW_KEY);
     const chartHtml = item.isDerivedScale
-      ? buildDerivedScaleBoxPlotHtml(item, 'distribution', { showFooter: false, hideAxis: true })
+      ? buildDerivedScaleBoxPlotHtml(item, 'distribution', { hideAxis: true })
       : `<div class="scale-chart">${buildScaleDistributionBarHtml(item.scoreResults, item.scoreRange.length, { hideMidpoint, hideSummary: true })}</div>`;
     return `
       <div class="stack100-group-row">
@@ -4796,31 +4816,49 @@ function buildScaleCompareSectionHtml(compareData, hiddenGroups, options = {}) {
   let rowHtml;
   let chartInnerHtml;
   if (hasGroups) {
-    const compactMarkers = true;
     rowHtml = compareData.questions.map((question, questionIndex) => {
-      const overallDotHtml = buildScaleCompareOverallDotHtml(question, compareData.maxScore, compactMarkers);
-      const groupDotHtml = visibleGroups.map(group => buildScaleCompareGroupDotHtml(group, group.points[questionIndex], compareData.maxScore, !!overallDotHtml, compactMarkers)).join('');
+      const item = question.data;
+      if (!item) return '';
+      const hideMidpoint = isScaleMidpointHidden(TARGET_SCALE_COMPARE_VIEW_KEY);
+      const baseChartHtml = item.isDerivedScale
+        ? buildDerivedScaleBoxPlotHtml(item, 'mean', { hideAxis: true, hideMeanMarker: true })
+        : buildScaleMeanOnlyHtml(
+            question.mean,
+            compareData.maxScore,
+            { kind: 'scale-mean', questionLabel: question.label, groupLabel: '응답자 전체', mean: question.mean, totalN: item.totalN },
+            item.scoreResults,
+            { hideMidpoint, hideMeanMarker: true }
+          );
+      const overallDotHtml = buildScaleCompareOverallGroupedMeanDotHtml(question, compareData.maxScore);
+      const groupDotHtml = visibleGroups
+        .map(group => buildScaleCompareGroupedMeanDotHtml(group, group.points[questionIndex], compareData.maxScore))
+        .join('');
       return `
-        <div class="stack100-group-row">
+        <div class="stack100-group-row scale-compare-mean-row">
           ${buildScaleCompareQuestionLabelHtml(question)}
-          <div class="scale-compare-plot">
-            <div class="scale-compare-track"></div>
-            ${buildScaleCompareDistributionBackgroundHtml(question.data)}
-            ${buildScaleCompareRowAxisHtml(compareData.maxScore, question.data)}
-            ${overallDotHtml}
-            ${groupDotHtml}
+          <div class="stack100-group-chart-cell">
+            <div class="scale-compare-group-row-chart">
+              ${baseChartHtml}
+              ${overallDotHtml}
+              ${groupDotHtml}
+            </div>
           </div>
         </div>
       `;
     }).join('');
-    chartInnerHtml = `<div class="scale-compare-rows-wrap">${rowHtml}</div>`;
+    chartInnerHtml = `
+      <div class="numeric-whisker-group-chart">
+        <div class="stack100-group-chart">${rowHtml}</div>
+        ${compareData.questions.length > 0 ? buildScaleBottomAxisHtml(compareData.maxScore) : ''}
+      </div>
+    `;
   } else {
     rowHtml = compareData.questions.map(question => {
       const item = question.data;
       if (!item) return '';
       const hideMidpoint = isScaleMidpointHidden(TARGET_SCALE_COMPARE_VIEW_KEY);
       const chartHtml = item.isDerivedScale
-        ? buildDerivedScaleBoxPlotHtml(item, 'mean', { showFooter: false, hideAxis: true })
+        ? buildDerivedScaleBoxPlotHtml(item, 'mean', { hideAxis: true })
         : buildScaleMeanOnlyHtml(
             question.mean,
             compareData.maxScore,
@@ -4835,11 +4873,16 @@ function buildScaleCompareSectionHtml(compareData, hiddenGroups, options = {}) {
         </div>
       `;
     }).join('');
-    chartInnerHtml = rowHtml;
+    chartInnerHtml = `
+      <div class="numeric-whisker-group-chart">
+        <div class="stack100-group-chart">${rowHtml}</div>
+        ${compareData.questions.length > 0 ? buildScaleBottomAxisHtml(compareData.maxScore) : ''}
+      </div>
+    `;
   }
 
   const chartHtml = `
-    <div class="scale-compare-chart ${hasGroups ? 'is-group' : ''}" data-scale-compare-chart="true" data-max-score="${compareData.maxScore}">
+    <div class="scale-compare-chart ${hasGroups ? 'is-group group-compare' : ''}" data-scale-compare-chart="true" data-max-score="${compareData.maxScore}">
       ${chartInnerHtml}
     </div>
   `;
@@ -4919,23 +4962,22 @@ function buildNumericOpenControlsHtml(targetLabel, interval, start, disabled = f
   const noteText = disabled
     ? '그룹별 비교에서는 전체 기준 축을 유지하기 위해 구간 시작값과 간격을 조정할 수 없습니다.'
     : safeMode === 'box'
-      ? ''
-      : '구간 시작값과 간격을 조정해 분포를 원하는 기준으로 확인할 수 있습니다.';
+      ? '박스플롯 차트 보는 법: 수염은 응답값의 전체 범위, 박스는 전체 응답 중 가운데 50%가 모인 구간입니다. Q1, Q2, Q3는 각각 하위 25%값, 중앙값, 상위 25%값을 의미합니다.'
+      : '구간 시작값과 간격을 조정해서 차트를 조정해보세요. 참고로 각 구간은 시작값 \'이상\' 다음 경계값 \'미만\'을 의미하며, 마지막 구간은 최댓값을 포함합니다.';
   return `
     <div class="viz-controls">
       <div class="viz-control-toggle" role="group" aria-label="주관식 숫자 차트 유형">
         <button type="button"
                 class="viz-control-toggle__btn ${safeMode === 'box' ? 'active' : ''}"
                 data-numeric-view="box"
-                data-target="${escapeHtml(targetLabel)}"
-                data-numeric-view-locked="${disabled ? 'true' : 'false'}">요약 보기</button>
+                data-target="${escapeHtml(targetLabel)}">요약 보기</button>
         <button type="button"
                 class="viz-control-toggle__btn ${safeMode === 'histogram' ? 'active' : ''}"
                 data-numeric-view="histogram"
                 data-target="${escapeHtml(targetLabel)}"
-                data-numeric-view-locked="${disabled ? 'true' : 'false'}">분포 보기</button>
+                ${disabled ? `disabled title="${escapeHtml('그룹별 비교에서는 분포 보기를 사용할 수 없습니다. 그룹별 비교는 요약 보기로 표시합니다.')}"` : ''}>분포 보기</button>
       </div>
-      <div class="viz-controls-bin-row">
+      <div class="viz-controls-group">
         <label class="viz-control-number">
           <span>구간 시작값</span>
           <input type="number"
@@ -4956,7 +4998,7 @@ function buildNumericOpenControlsHtml(targetLabel, interval, start, disabled = f
                  value="${clampNumericHistogramStep(interval)}"${disabledAttr}>
         </label>
       </div>
-      ${noteText ? `<div class="viz-controls-note viz-controls-note--padded viz-controls-note--full-row">${noteText}</div>` : ''}
+      ${noteText ? `<div class="viz-controls-note">${noteText}</div>` : ''}
     </div>
   `;
 }
@@ -4986,6 +5028,9 @@ function buildNumericWhiskerTrackHtml(item, axisMin, axisMax, numberUnit = '', g
     ? Number(item.mean).toLocaleString('ko-KR', { minimumFractionDigits: options.meanDecimals ?? 1, maximumFractionDigits: options.meanDecimals ?? 1 })
     : '-';
   const fmtQ = v => Number.isFinite(Number(v)) ? formatNumericValue(v, 1) : '-';
+  const meanStyle = options.mutedMeanMarker
+    ? `left:${meanLeft}%;background:var(--neutral-300);color:transparent;`
+    : `left:${meanLeft}%;`;
   return `
     <div class="numeric-whisker-track-wrap">
       <div class="numeric-whisker-q-tick" style="left:${q1Left}%;" data-tip="${q1Tip}"></div>
@@ -4994,16 +5039,18 @@ function buildNumericWhiskerTrackHtml(item, axisMin, axisMax, numberUnit = '', g
       <div class="numeric-whisker-box-row">
         <div class="numeric-whisker-dead-seg"    style="flex:${deadLeftFlex};"></div>
         <div class="numeric-whisker-whisker-seg" style="flex:${leftWhiskerFlex};"></div>
-        <div class="numeric-whisker-box is-left"  style="flex:${q1q2Flex};  background:var(--color-4);"></div>
-        <div class="numeric-whisker-box is-right" style="flex:${q2q3Flex};  background:var(--color-4);"></div>
+        <div class="numeric-whisker-box is-left"  style="flex:${q1q2Flex};  background:${options.color || 'var(--neutral-400)'};"></div>
+        <div class="numeric-whisker-box is-right" style="flex:${q2q3Flex};  background:${options.color || 'var(--neutral-400)'};"></div>
         <div class="numeric-whisker-whisker-seg" style="flex:${rightWhiskerFlex};"></div>
         <div class="numeric-whisker-dead-seg"    style="flex:${deadRightFlex};"></div>
         <div class="numeric-whisker-end-tick" style="left:${minLeft}%;" data-tip="${minTip}"></div>
         <div class="numeric-whisker-end-tick" style="left:${maxLeft}%;" data-tip="${maxTip}"></div>
-        <div class="numeric-whisker-mean" style="left:${meanLeft}%;" data-tip="${meanTip}">
+        ${options.hideMeanMarker ? '' : `
+        <div class="numeric-whisker-mean" style="${meanStyle}" data-tip="${meanTip}">
           <div class="numeric-whisker-mean-label">평균</div>
-          ${escapeHtml(meanLabel)}
+          ${options.mutedMeanMarker ? '' : escapeHtml(meanLabel)}
         </div>
+        `}
       </div>
       <div class="numeric-whisker-q-label-layer">
         <div class="numeric-whisker-q-item" style="left:${q1Left}%;"  data-tip="${q1Tip}">
@@ -5054,7 +5101,7 @@ function buildIntegerBoxAxisHtml(domainMin, domainMax) {
   return ticks.map((v, i) => {
     const leftPct = ((v - domainMin) / (domainMax - domainMin)) * 100;
     const edgeClass = i === 0 ? ' is-start' : i === ticks.length - 1 ? ' is-end' : '';
-    return `<div class="numeric-whisker-axis-tick${edgeClass}" style="left:${leftPct}%;"></div><span class="numeric-whisker-axis-label${edgeClass}" style="left:${leftPct}%;">${v}</span>`;
+    return `<div class="chart-bottom-axis-tick${edgeClass}" style="left:${leftPct}%;"></div><span class="chart-bottom-axis-label${edgeClass}" style="left:${leftPct}%;">${v}</span>`;
   }).join('');
 }
 
@@ -5062,7 +5109,7 @@ function buildNumericBoxAxisHtml(domainMin, domainMax) {
   const range = domainMax - domainMin;
   if (!Number.isFinite(range) || range <= 0) {
     const label = Number.isFinite(domainMin) ? (Number.isInteger(domainMin) ? String(domainMin) : formatNumericValue(domainMin, 1)) : '-';
-    return `<div class="numeric-whisker-axis-tick is-start" style="left:0%;"></div><span class="numeric-whisker-axis-label is-start" style="left:0%;">${label}</span>`;
+    return `<div class="chart-bottom-axis-tick is-start" style="left:0%;"></div><span class="chart-bottom-axis-label is-start" style="left:0%;">${label}</span>`;
   }
   const rawInterval = range / 4;
   const magnitude = Math.pow(10, Math.floor(Math.log10(rawInterval)));
@@ -5084,8 +5131,13 @@ function buildNumericBoxAxisHtml(domainMin, domainMax) {
   return ticks.map((v, i) => {
     const leftPct = ((v - domainMin) / (domainMax - domainMin)) * 100;
     const edgeClass = i === 0 ? ' is-start' : i === n - 1 ? ' is-end' : '';
-    return `<div class="numeric-whisker-axis-tick${edgeClass}" style="left:${leftPct}%;"></div><span class="numeric-whisker-axis-label${edgeClass}" style="left:${leftPct}%;">${fmt(v)}</span>`;
+    return `<div class="chart-bottom-axis-tick${edgeClass}" style="left:${leftPct}%;"></div><span class="chart-bottom-axis-label${edgeClass}" style="left:${leftPct}%;">${fmt(v)}</span>`;
   }).join('');
+}
+
+function buildScaleBottomAxisHtml(maxScore) {
+  const safeMaxScore = Number.isFinite(Number(maxScore)) && Number(maxScore) >= 1 ? Math.round(Number(maxScore)) : 5;
+  return `<div class="chart-bottom-axis">${buildIntegerBoxAxisHtml(1, safeMaxScore)}</div>`;
 }
 
 function buildNumericBoundaryAxisLabelsHtml(bins, domainMax, className) {
@@ -5159,14 +5211,9 @@ function buildNumericHistogramChartHtml(histogram, options = {}) {
     totalN: histogram.n,
     unit: numberUnit
   }));
-  const footerHtml = `
-    <div class="numeric-open-footer">
-      <div class="numeric-open-note"> 각 구간은 시작값 '이상' 다음 경계값 '미만'을 의미합니다. 단, 마지막 구간은 최댓값을 포함합니다.</div>
-      <div class="numeric-open-unit">${numberUnit ? `단위 : ${escapeHtml(numberUnit)}` : ''}</div>
-    </div>
-  `;
   return `
     <div class="numeric-open-chart">
+      ${numberUnit ? `<div class="numeric-open-unit">단위 : ${escapeHtml(numberUnit)}</div>` : ''}
       <div class="vertical-chart-plot numeric-open-hist-plot">
         <div class="vertical-chart-guides" aria-hidden="true">${guidesHtml}</div>
         <div class="numeric-open-bars">${barsHtml}</div>
@@ -5180,26 +5227,66 @@ function buildNumericHistogramChartHtml(histogram, options = {}) {
         </div>
       </div>
       <div class="numeric-open-boundary-axis">${axisLabelsHtml}</div>
-      ${footerHtml}
     </div>
   `;
 }
 
 function buildNumericOpenBoxChartHtml(data) {
   const numberUnit = data.codebookEntry && data.codebookEntry.numberUnit ? data.codebookEntry.numberUnit : '';
-  const footerHtml = `
-    <div class="numeric-open-footer">
-      <div class="numeric-open-note">박스플롯 차트 보는 법: 수염은 응답값의 전체 범위, 박스는 전체 응답 중 가운데 50%가 모인 구간, 분홍색과 파랑색이 나뉘는 지점은 중앙값입니다.</div>
-      <div class="numeric-open-unit">${numberUnit ? `단위 : ${escapeHtml(numberUnit)}` : ''}</div>
-    </div>
-  `;
   return `
     <div class="numeric-open-summary-whisker">
       <div class="numeric-open-summary-body">
         ${buildNumericWhiskerTrackHtml(data, data.domainMin, data.domainMax, numberUnit, '응답자 전체')}
-        <div class="numeric-whisker-axis">${buildNumericBoxAxisHtml(data.domainMin, data.domainMax)}</div>
+        <div class="chart-bottom-axis">${buildNumericBoxAxisHtml(data.domainMin, data.domainMax)}</div>
       </div>
-      ${footerHtml}
+      ${numberUnit ? `<div class="numeric-open-unit">단위 : ${escapeHtml(numberUnit)}</div>` : ''}
+    </div>
+  `;
+}
+
+function buildScaleCompareGroupedMeanDotHtml(group, point, maxScore) {
+  if (!point || point.n <= 0) return '';
+  const left = getScaleMeanLeftPct(point.mean, maxScore);
+  if (left === null) return '';
+  const tip = encodeURIComponent(JSON.stringify({
+    kind: 'scale-compare-group-dot',
+    groupLabel: group.label,
+    questionLabel: point.questionLabel,
+    mean: point.mean,
+    totalN: point.n
+  }));
+  const labelSide = left > 72 ? 'left' : 'right';
+  return `
+    <div class="group-dot-wrap"
+         style="left:${left}%;"
+         data-tip="${tip}"
+         data-group-key="${escapeHtml(String(group.value))}"
+         data-label-side="${labelSide}">
+      <div class="group-dot" style="background:${group.color};"></div>
+      <span class="group-dot-label">${formatScaleCompareMean(point.mean)}</span>
+    </div>
+  `;
+}
+
+function buildScaleCompareOverallGroupedMeanDotHtml(question, maxScore) {
+  const left = getScaleMeanLeftPct(question.mean, maxScore);
+  if (left === null) return '';
+  const tip = encodeURIComponent(JSON.stringify({
+    kind: 'scale-mean',
+    questionLabel: question.label,
+    groupLabel: '응답자 전체',
+    mean: question.mean,
+    totalN: question.totalN
+  }));
+  const labelSide = left > 72 ? 'left' : 'right';
+  return `
+    <div class="group-dot-wrap"
+         style="left:${left}%;"
+         data-tip="${tip}"
+         data-group-key="__overall__"
+         data-label-side="${labelSide}">
+      <div class="group-dot" style="background:var(--neutral-700);"></div>
+      <span class="group-dot-label">${formatScaleCompareMean(question.mean)}</span>
     </div>
   `;
 }
@@ -5211,41 +5298,93 @@ function buildNumericOpenGroupChartHtml(data, hiddenGroups) {
   }
   const numberUnit = data.codebookEntry && data.codebookEntry.numberUnit ? data.codebookEntry.numberUnit : '';
   const criterionLabel = data.criterionLabel || '';
-  const overallTrackHtml = buildNumericWhiskerTrackHtml(data, data.domainMin, data.domainMax, numberUnit, '응답자 전체');
-  const overallRowHtml = `
-    <div class="numeric-whisker-row total-row">
-      <div class="numeric-whisker-label">응답자 전체</div>
-      <div class="numeric-whisker-main">
-        ${overallTrackHtml}
-      </div>
-    </div>
-  `;
   const groupRowsHtml = displayGroups.map(group => {
     const groupLabel = criterionLabel ? `${criterionLabel}: ${group.value}` : group.label;
     const color = getGroupColor(data.groupResults, group.value);
-    const trackHtml = buildNumericWhiskerTrackHtml(group, data.domainMin, data.domainMax, numberUnit, groupLabel);
+    const trackHtml = buildNumericWhiskerTrackHtml(group, data.domainMin, data.domainMax, numberUnit, groupLabel, { color });
     return `
-      <div class="numeric-whisker-row">
-        <div class="numeric-whisker-label">${escapeHtml(groupLabel)}</div>
-        <div class="numeric-whisker-main">
-          ${trackHtml}
-        </div>
+      <div class="stack100-group-row">
+        <div class="stack100-group-label">${escapeHtml(groupLabel)}</div>
+        <div class="stack100-group-chart-cell">${trackHtml}</div>
       </div>
     `;
   }).join('');
-  const rowHtml = overallRowHtml + groupRowsHtml;
-  const footerHtml = `
-    <div class="numeric-open-footer">
-      <div class="numeric-open-note">박스플롯 차트 보는 법: 수염은 응답값의 전체 범위, 박스는 전체 응답 중 가운데 50%가 모인 구간, 분홍색과 파랑색이 나뉘는 지점은 중앙값입니다.</div>
-      <div class="numeric-open-unit">${numberUnit ? `단위 : ${escapeHtml(numberUnit)}` : ''}</div>
+  const overallTrackHtml = buildNumericWhiskerTrackHtml(data, data.domainMin, data.domainMax, numberUnit, '응답자 전체');
+  const overallRowHtml = `
+    <div class="stack100-group-row">
+      <div class="stack100-group-label">응답자 전체</div>
+      <div class="stack100-group-chart-cell">${overallTrackHtml}</div>
+    </div>
+    <div class="stack100-group-chart-divider"></div>
+  `;
+  return `
+    <div class="numeric-whisker-group-chart">
+      <div class="stack100-group-chart">${overallRowHtml}${groupRowsHtml}</div>
+      <div class="chart-bottom-axis">${buildNumericBoxAxisHtml(data.domainMin, data.domainMax)}</div>
+      ${numberUnit ? `<div class="numeric-open-unit">단위 : ${escapeHtml(numberUnit)}</div>` : ''}
+    </div>
+  `;
+}
+
+function aggregateTextOpen(targetLabel, rowIndexes = []) {
+  const entry = resultState.codebookByLabel.get(targetLabel);
+  if (!entry) return null;
+  const effectiveIndexes = Array.isArray(rowIndexes) && rowIndexes.length > 0
+    ? rowIndexes
+    : getFilteredRowIndexes();
+  if (effectiveIndexes.length === 0) return null;
+  const tIdx = filterState.headerMap ? filterState.headerMap.get(targetLabel) : undefined;
+  if (tIdx === undefined) return null;
+  const activeRows = getRowsByIndexes(filterState.rows || [], effectiveIndexes);
+  const responses = [];
+  activeRows.forEach(row => {
+    const val = cleanCell((row || [])[tIdx]);
+    if (val) responses.push(val);
+  });
+  return {
+    targetLabel,
+    codebookEntry: entry,
+    totalN: activeRows.length,
+    responses,
+    visualType: 'text-open'
+  };
+}
+
+function buildTextOpenSection(data) {
+  if (!data) return '';
+  const { codebookEntry, targetLabel, responses, totalN } = data;
+  const fullText = buildQuestionFullHtml(codebookEntry);
+  const safeTarget = escapeHtml(targetLabel);
+  const searchIcon = 'assets/icons/search_40dp_151515_FILL0_wght400_GRAD0_opsz40.svg';
+  const itemsHtml = responses.map(r => `<div class="text-open-item" data-text="${escapeHtml(r.toLowerCase())}">${escapeHtml(r)}</div>`).join('');
+  const controlsHtml = `
+    <div class="viz-controls">
+      <div class="viz-controls-element">
+        <span class="viz-controls-label">키워드 검색</span>
+        <label class="viz-control-search" for="viz-control-search-${safeTarget}">
+          <input class="viz-control-search__input" id="viz-control-search-${safeTarget}" type="text" placeholder="단어를 입력해보세요" data-viz-control-search data-target="${safeTarget}">
+          <img class="viz-control-search__icon" src="${searchIcon}" alt="" aria-hidden="true">
+        </label>
+      </div>
+    </div>
+  `;
+  const chartHtml = `
+    <div class="text-open-box">
+      <div class="text-open-header">응답 ${responses.length}건 / 전체 ${totalN}명</div>
+      <div class="text-open-responses" data-text-open-responses data-target="${safeTarget}">${itemsHtml}</div>
     </div>
   `;
   return `
-    <div class="numeric-whisker-chart">
-      <div class="numeric-whisker-rows">${rowHtml}</div>
-      <div class="numeric-whisker-axis">${buildNumericBoxAxisHtml(data.domainMin, data.domainMax)}</div>
-      ${footerHtml}
-    </div>
+    <section class="result-section" data-target="${safeTarget}" data-type="text-open">
+      <div class="result-header">
+        <div class="result-title">${escapeHtml(targetLabel)}</div>
+        ${fullText}
+        ${controlsHtml}
+      </div>
+      <div class="result-visual">
+        <div class="result-chart-col">${chartHtml}</div>
+      </div>
+    </section>
   `;
 }
 
@@ -5263,13 +5402,11 @@ function buildNumericOpenSection(data) {
           maxBinCount: data.maxBinCount,
           numberUnit: codebookEntry && codebookEntry.numberUnit
         });
-  const compareMode = groupResults ? getGroupCompareViewMode(targetLabel) : 'composition';
-  const compareChartHtml = groupResults && compareMode === 'item'
-    ? buildGroupedHorizontalCompareChartHtml(data, hiddenGroups)
-    : chartHtml;
   const tableHtml = showTable ? buildDataTableHtml(data, hiddenGroups) : '';
   const fullText = buildQuestionFullHtml(codebookEntry);
-  const controlsHtml = buildNumericOpenControlsHtml(targetLabel, data.interval, data.start, !!groupResults, viewMode);
+  const controlsHtml = groupResults
+    ? `<div class="viz-controls"><div class="viz-controls-note">박스플롯 차트 보는 법: 수염은 응답값의 전체 범위, 박스는 전체 응답 중 가운데 50%가 모인 구간, 분홍색과 파랑색이 나뉘는 지점은 중앙값입니다.</div></div>`
+    : buildNumericOpenControlsHtml(targetLabel, data.interval, data.start, false, viewMode);
   const legendHtml = groupResults ? buildLegendHtml(data, hiddenGroups) : '';
   const sidePanelHtml = buildResultSidePanelHtml(legendHtml, targetLabel);
   return `
@@ -5279,9 +5416,8 @@ function buildNumericOpenSection(data) {
         ${fullText}
         ${controlsHtml}
       </div>
-      ${groupResults ? buildGroupCompareViewToggleHtml(data) : ''}
       <div class="result-visual has-legend numeric-open-visual">
-        <div class="result-chart-col">${compareChartHtml}</div>
+        <div class="result-chart-col">${chartHtml}</div>
         ${sidePanelHtml}
       </div>
       ${tableHtml}
@@ -5322,13 +5458,14 @@ function buildDerivedScaleGroupRowHtml(group, scoreRange, viewMode) {
     q3: group.q3,
     max: group.max,
     scoreRange,
-    groupLabel: group.label
+    groupLabel: group.label,
+    color: group.color
   };
   return `
     <div class="stack100-group-row${viewMode === 'mean' ? ' scale-compare-mean-row' : ''}">
       <div class="stack100-group-label">${escapeHtml(group.label)}</div>
       <div class="stack100-group-chart-cell">
-        ${buildDerivedScaleBoxPlotHtml(chartData, viewMode, { showFooter: false })}
+        ${buildDerivedScaleBoxPlotHtml(chartData, viewMode, { hideAxis: true })}
       </div>
     </div>
   `;
@@ -5339,21 +5476,33 @@ function buildScaleGroupChartHtml(data, hiddenGroups, viewMode) {
   const maxScore = data.scoreRange.length;
   const hideMidpoint = isScaleMidpointHidden(data.targetLabel);
   if (data.isDerivedScale) {
-    const footerNote = `
-      <div class="numeric-open-footer">
-        <div class="numeric-open-note">박스플롯 차트 보는 법: 수염은 응답값의 전체 범위, 박스는 전체 응답 중 가운데 50%가 모인 구간, 분홍색과 파랑색이 나뉘는 지점은 중앙값입니다.</div>
-      </div>
+    const axisMin = 1;
+    const axisMax = data.scoreRange.length;
+    const overallGroup = { label: '응답자 전체', values: data.values || [], n: data.totalN, mean: data.mean, min: data.min, q1: data.q1, median: data.median, q3: data.q3, max: data.max };
+    const overallRowHtml = `
+      ${buildDerivedScaleGroupRowHtml(overallGroup, data.scoreRange, viewMode)}
+      <div class="stack100-group-chart-divider"></div>
     `;
     return `
-      <div class="stack100-group-chart">
-        ${displayGroups.length === 0 ? '<div class="result-empty">표시할 그룹이 없습니다.</div>' : displayGroups.map(group => buildDerivedScaleGroupRowHtml(group, data.scoreRange, viewMode)).join('')}
-        ${displayGroups.length > 0 ? footerNote : ''}
+      <div class="numeric-whisker-group-chart">
+        <div class="stack100-group-chart">
+          ${displayGroups.length === 0 ? '<div class="result-empty">표시할 그룹이 없습니다.</div>' : overallRowHtml + displayGroups.map(group => buildDerivedScaleGroupRowHtml({ ...group, color: getGroupColor(data.groupResults, group.value) }, data.scoreRange, viewMode)).join('')}
+        </div>
+        ${displayGroups.length > 0 ? `<div class="chart-bottom-axis">${buildIntegerBoxAxisHtml(axisMin, axisMax)}</div>` : ''}
       </div>
     `;
   }
+  const overallGroup = { label: '응답자 전체', mean: data.mean, scoreResults: data.scoreResults, n: data.totalN };
+  const overallRowHtml = `
+    ${buildScaleGroupRowHtml(overallGroup, maxScore, viewMode, hideMidpoint)}
+    <div class="stack100-group-chart-divider"></div>
+  `;
   return `
-    <div class="stack100-group-chart">
-      ${displayGroups.length === 0 ? '<div class="result-empty">표시할 그룹이 없습니다.</div>' : displayGroups.map(group => buildScaleGroupRowHtml(group, maxScore, viewMode, hideMidpoint)).join('')}
+    <div class="numeric-whisker-group-chart">
+      <div class="stack100-group-chart">
+        ${displayGroups.length === 0 ? '<div class="result-empty">표시할 그룹이 없습니다.</div>' : overallRowHtml + displayGroups.map(group => buildScaleGroupRowHtml(group, maxScore, viewMode, hideMidpoint)).join('')}
+      </div>
+      ${displayGroups.length > 0 && viewMode === 'mean' ? buildScaleBottomAxisHtml(maxScore) : ''}
     </div>
   `;
 }
@@ -5479,11 +5628,11 @@ function buildScaleDataTableHtml(data, hiddenGroups = new Set()) {
   const displayGroups = getDisplayGroupResults(data.groupResults, hiddenGroups);
   const topRow = [
     `<th rowspan="2">점수</th>`,
-    buildGroupedCountHeader("응답자 전체", data.totalN, 3),
+    `<th colspan="3">응답자 전체</th>`,
     ...displayGroups.map(group => buildGroupedCountHeader(group.label, group.n, 3))
   ].join("");
   const subRow = [
-    `<th class="num group-col">응답 비율(%)</th><th class="num">응답 수(명)</th><th class="num group-col">평균</th>`,
+    `<th class="num">응답 비율(%)</th><th class="num">응답 수(명)</th><th class="num">평균</th>`,
     ...displayGroups.map(() => `<th class="num group-col">응답 비율(%)</th><th class="num">응답 수(명)</th><th class="num group-col">평균</th>`)
   ].join("");
   const bodyRows = data.scoreResults.map(result => {
@@ -5494,9 +5643,9 @@ function buildScaleDataTableHtml(data, hiddenGroups = new Set()) {
     return `
       <tr>
         <td>${formatScaleScoreLabel(result)}</td>
-        <td class="num group-col">${formatPercent(result.pct)}</td>
+        <td class="num">${formatPercent(result.pct)}</td>
         <td class="num">${result.count.toLocaleString()}</td>
-        <td class="num group-col">-</td>
+        <td class="num">-</td>
         ${groupCells}
       </tr>
     `;
@@ -5512,9 +5661,9 @@ function buildScaleDataTableHtml(data, hiddenGroups = new Set()) {
         ${bodyRows}
         <tr class="total-row">
           <td>합계</td>
-          <td class="num group-col">${formatPercent(100)}</td>
+          <td class="num">${formatPercent(100)}</td>
           <td class="num">${data.totalN.toLocaleString()}</td>
-          <td class="num group-col">${data.mean.toFixed(2)}점</td>
+          <td class="num">${data.mean.toFixed(2)}점</td>
           ${totalCells}
         </tr>
       </tbody>
@@ -5560,7 +5709,7 @@ function buildNumericOpenDataTableHtml(data, hiddenGroups = new Set()) {
         max: data.max
       }];
   const rowsHtml = rows.map(row => `
-    <tr class="${row.total ? "total-row" : ""}">
+    <tr>
       <td>${escapeHtml(row.label)}</td>
       <td class="num metric">${formatNumericValue(row.min)}</td>
       <td class="num metric">${formatNumericValue(row.q1)}</td>
@@ -5875,35 +6024,38 @@ function buildRankControlsHtml(targetLabel, options = {}) {
   const {
     chartType = 'lollipop',
     viewMode = 'horizontal',
-    sortByScore = false
+    sortByScore = false,
+    formulaNoteHtml = '',
+    groupMode = false
   } = options;
   const safeTarget = escapeHtml(targetLabel);
   const isMenuOpen = resultState.openRankMenus.has(targetLabel);
   const directionLabel = viewMode === 'vertical' ? '세로' : '가로';
   const directionHtml = `
-    <div class="viz-controls-group">
+    <div class="viz-controls-element">
       <span class="viz-controls-label">그래프 방향 선택</span>
-      <div class="choice-chart-type-select ${isMenuOpen ? 'is-open' : ''}" data-rank-view-mode-select="true">
+      <div class="viz-control-dropdown ${isMenuOpen ? 'is-open' : ''}" data-rank-view-mode-select="true">
         <button type="button"
-                class="choice-chart-type-trigger"
+                class="viz-control-dropdown__trigger"
                 data-rank-view-mode-trigger="true"
                 data-target="${safeTarget}"
                 aria-haspopup="listbox"
                 aria-expanded="${isMenuOpen ? 'true' : 'false'}">
-          <span class="choice-chart-type-current">${directionLabel}</span>
-          <img class="choice-chart-type-chevron" src="assets/icons/keyboard_arrow_down_40dp_151515_FILL0_wght400_GRAD0_opsz40.svg" alt="" aria-hidden="true">
+          <span class="viz-control-dropdown__current">${directionLabel}</span>
+          <img class="viz-control-dropdown__chevron" src="assets/icons/keyboard_arrow_down_40dp_151515_FILL0_wght400_GRAD0_opsz40.svg" alt="" aria-hidden="true">
         </button>
-        <div class="choice-chart-type-menu" role="listbox" ${isMenuOpen ? '' : 'hidden'}>
+        <div class="viz-control-dropdown__menu" role="listbox" ${isMenuOpen ? '' : 'hidden'}>
           ${[
             { mode: 'horizontal', label: '가로' },
             { mode: 'vertical', label: '세로' }
           ].map(item => `
             <button type="button"
-                    class="choice-chart-type-option"
+                    class="viz-control-dropdown__option"
                     data-rank-view-mode-option="${item.mode}"
                     data-target="${safeTarget}"
                     role="option"
-                    aria-selected="${item.mode === viewMode ? 'true' : 'false'}">
+                    aria-selected="${item.mode === viewMode ? 'true' : 'false'}"
+                    ${groupMode && item.mode === 'vertical' ? 'disabled' : ''}>
               ${item.label}
             </button>
           `).join('')}
@@ -5912,7 +6064,7 @@ function buildRankControlsHtml(targetLabel, options = {}) {
     </div>
   `;
   const chartTypeHtml = `
-    <div class="viz-controls-group">
+    <div class="viz-controls-element">
       <div class="viz-control-toggle" role="tablist" aria-label="순위 그래프 형태">
         ${RANK_CHART_TYPES.map(type => `
           <button type="button"
@@ -5920,7 +6072,8 @@ function buildRankControlsHtml(targetLabel, options = {}) {
                   data-rank-chart-type="${type}"
                   data-target="${safeTarget}"
                   role="tab"
-                  aria-selected="${type === chartType ? 'true' : 'false'}">
+                  aria-selected="${type === chartType ? 'true' : 'false'}"
+                  ${groupMode && type === 'stacked' ? 'disabled' : ''}>
             ${escapeHtml(RANK_CHART_TYPE_LABELS[type])}
           </button>
         `).join('')}
@@ -5933,7 +6086,7 @@ function buildRankControlsHtml(targetLabel, options = {}) {
       <span class="viz-control-checkbox__label">가중 평균 높은 순서로 정렬</span>
     </label>
   `;
-  return `<div class="viz-controls viz-controls--uniform-gap">${directionHtml}${chartTypeHtml}${sortHtml}</div>`;
+  return `<div class="viz-controls">${directionHtml}${chartTypeHtml}${sortHtml}${formulaNoteHtml}</div>`;
 }
 
 function buildRankSummaryHtml(data) {
@@ -5957,7 +6110,7 @@ function buildRankSummaryHtml(data) {
 
 function buildRankFormulaNoteHtml(data) {
   return `
-    <div class="viz-controls-note viz-controls-note--padded">
+    <div class="viz-controls-note">
       ${escapeHtml(buildRankWeightFormulaText(data.rankCount))}
     </div>
   `;
@@ -6007,6 +6160,156 @@ function buildRankLollipopChartHtml(data) {
   }).join('');
   return `
     <div class="lollipop-h-chart">
+      <div class="lollipop-h-guides-overlay" style="height:${overlayHeight}px;" aria-hidden="true">${guideOverlayHtml}</div>
+      ${rowHtml}
+      <div class="lollipop-h-axis-row" aria-hidden="true">
+        <div class="lollipop-h-axis-spacer"></div>
+        <div class="lollipop-h-axis">
+          ${axisTicks.map(tick => {
+            const leftPct = pctFor(tick);
+            const cls = tick === axisMin ? 'is-start' : (tick === axisMax ? 'is-end' : 'is-mid');
+            return `<span class="lollipop-h-axis-label ${cls}" style="left:${leftPct}%;">${tick}</span>`;
+          }).join('')}
+        </div>
+        <div class="lollipop-h-axis-rank-spacer"></div>
+      </div>
+    </div>
+  `;
+}
+
+function buildRankLollipopGroupCompareChartHtml(data, hiddenGroups = new Set()) {
+  const rows = [...(data.totalResults || [])];
+  const axisMin = 0;
+  const axisMax = Math.max(axisMin, ...((data.rankWeights || []).map(Number)));
+  const axisTicks = [];
+  for (let tick = axisMin; tick <= axisMax; tick += 1) axisTicks.push(tick);
+  const pctFor = (value) => {
+    const safeValue = Math.max(axisMin, Math.min(axisMax, Number(value) || 0));
+    if (axisMax === axisMin) return 0;
+    return ((safeValue - axisMin) / (axisMax - axisMin)) * 100;
+  };
+  const displayGroups = getDisplayGroupResults(data.groupResults, hiddenGroups);
+  const overlayHeight = rows.length * 40 - 8;
+  const guideOverlayHtml = axisTicks.map(tick => {
+    const tickPct = pctFor(tick);
+    return `<span class="lollipop-h-guide" style="left:${tickPct}%;"></span>`;
+  }).join('');
+  const rowHtml = rows.map((r) => {
+    const rankObj = data.ranking.find(item => item.option === r.option);
+    const posText = rankObj ? `${rankObj.position}위` : '-';
+    const color = 'var(--neutral-300)';
+    const leftPct = pctFor(r.weightedAverage);
+    const tip = encodeURIComponent(JSON.stringify({
+      kind: 'rank-lollipop',
+      option: r.option,
+      weightedAverage: r.weightedAverage,
+      rankPosition: posText
+    }));
+    const groupDotsHtml = displayGroups.map(g => {
+      const perOpt = Array.isArray(g.perOption) ? g.perOption.find(x => x.option === r.option) : null;
+      if (!perOpt) return '';
+      const groupColor = getGroupColor(data.groupResults, g.value);
+      const groupLeft = pctFor(perOpt.weightedAverage);
+      const labelSide = groupLeft > 50 ? 'left' : 'right';
+      const groupTip = encodeURIComponent(JSON.stringify({
+        kind: 'rank-lollipop-group',
+        groupLabel: g.label,
+        option: r.option,
+        weightedAverage: perOpt.weightedAverage
+      }));
+      return `<div class="group-dot-wrap" style="left:${groupLeft}%;" data-tip="${groupTip}" data-group-key="${escapeHtml(String(g.value))}" data-label-side="${labelSide}"><div class="group-dot" style="background:${groupColor};"></div><span class="group-dot-label">${formatRankAverage(perOpt.weightedAverage)}</span></div>`;
+    }).join('');
+    return `
+      <div class="lollipop-h-row">
+        <div class="lollipop-h-label" title="${escapeHtml(r.option)}" data-tip="${tip}">${escapeHtml(r.option)}</div>
+        <div class="lollipop-h-track" data-tip="${tip}">
+          <div class="lollipop-h-line" style="width:${leftPct}%;background:${color};"></div>
+          <div class="lollipop-h-dot" style="left:${leftPct}%;background:${color};"></div>
+          ${groupDotsHtml}
+        </div>
+        <div class="lollipop-h-rank">${escapeHtml(posText)}</div>
+      </div>
+    `;
+  }).join('');
+  return `
+    <div class="lollipop-h-chart group-compare">
+      <div class="lollipop-h-guides-overlay" style="height:${overlayHeight}px;" aria-hidden="true">${guideOverlayHtml}</div>
+      ${rowHtml}
+      <div class="lollipop-h-axis-row" aria-hidden="true">
+        <div class="lollipop-h-axis-spacer"></div>
+        <div class="lollipop-h-axis">
+          ${axisTicks.map(tick => {
+            const leftPct = pctFor(tick);
+            const cls = tick === axisMin ? 'is-start' : (tick === axisMax ? 'is-end' : 'is-mid');
+            return `<span class="lollipop-h-axis-label ${cls}" style="left:${leftPct}%;">${tick}</span>`;
+          }).join('')}
+        </div>
+        <div class="lollipop-h-axis-rank-spacer"></div>
+      </div>
+    </div>
+  `;
+}
+
+function buildRankDualLollipopChartHtml(data, hiddenGroups = new Set()) {
+  const rows = [...(data.totalResults || [])];
+  const axisMin = 0;
+  const axisMax = Math.max(axisMin, ...((data.rankWeights || []).map(Number)));
+  const axisTicks = [];
+  for (let tick = axisMin; tick <= axisMax; tick += 1) axisTicks.push(tick);
+  const pctFor = (value) => {
+    const safeValue = Math.max(axisMin, Math.min(axisMax, Number(value) || 0));
+    if (axisMax === axisMin) return 0;
+    return ((safeValue - axisMin) / (axisMax - axisMin)) * 100;
+  };
+  const displayGroups = getDisplayGroupResults(data.groupResults, hiddenGroups);
+  const trackH = 32;
+  const trackGap = 4;
+  const rowGap = 16;
+  const overlayHeight = rows.length * (displayGroups.length * trackH + (displayGroups.length - 1) * trackGap) + (rows.length - 1) * rowGap;
+  const guideOverlayHtml = axisTicks.map(tick => {
+    const tickPct = pctFor(tick);
+    return `<span class="lollipop-h-guide" style="left:${tickPct}%;"></span>`;
+  }).join('');
+  const rowHtml = rows.map((r) => {
+    const rankObj = data.ranking.find(item => item.option === r.option);
+    const posText = rankObj ? `${rankObj.position}위` : '-';
+    const labelTip = encodeURIComponent(JSON.stringify({
+      kind: 'rank-lollipop',
+      option: r.option,
+      weightedAverage: r.weightedAverage,
+      rankPosition: posText
+    }));
+    const tracksHtml = displayGroups.map(g => {
+      const perOpt = Array.isArray(g.perOption) ? g.perOption.find(x => x.option === r.option) : null;
+      const avg = perOpt ? (perOpt.weightedAverage || 0) : 0;
+      const color = getGroupColor(data.groupResults, g.value);
+      const leftPct = pctFor(avg);
+      const groupTip = encodeURIComponent(JSON.stringify({
+        kind: 'rank-lollipop-group',
+        groupLabel: g.label,
+        option: r.option,
+        weightedAverage: avg
+      }));
+      return `
+        <div class="lollipop-h-track" data-tip="${groupTip}">
+          <div class="lollipop-h-line" style="width:${leftPct}%;background:${color};"></div>
+          <div class="lollipop-h-dot" style="left:${leftPct}%;background:${color};"></div>
+          <div class="lollipop-h-inline-label" style="left:calc(${leftPct}% + 17px);" aria-hidden="true">
+            <span class="lollipop-h-value">${formatRankAverage(avg)}</span>
+          </div>
+        </div>
+      `;
+    }).join('');
+    return `
+      <div class="dual-lollipop-h-row">
+        <div class="lollipop-h-label" title="${escapeHtml(r.option)}" data-tip="${labelTip}">${escapeHtml(r.option)}</div>
+        <div class="dual-lollipop-h-bars">${tracksHtml}</div>
+        <div class="lollipop-h-rank">${escapeHtml(posText)}</div>
+      </div>
+    `;
+  }).join('');
+  return `
+    <div class="dual-lollipop-h-chart">
       <div class="lollipop-h-guides-overlay" style="height:${overlayHeight}px;" aria-hidden="true">${guideOverlayHtml}</div>
       ${rowHtml}
       <div class="lollipop-h-axis-row" aria-hidden="true">
@@ -6240,8 +6543,9 @@ function buildRankLegendHtml(data, hiddenRanks) {
   `;
 }
 
-function buildRankGroupLegendHtml(data, hiddenGroups) {
+function buildRankGroupLegendHtml(data, hiddenGroups, opts = {}) {
   if (!data.groupResults) return '';
+  const { showDualBar = false, isDualBar = false } = opts;
   const criterionLabel = data.criterionLabel || '';
   const items = data.groupResults.map((g, i) => {
     const color = GROUP_PALETTE[i % GROUP_PALETTE.length];
@@ -6254,13 +6558,19 @@ function buildRankGroupLegendHtml(data, hiddenGroups) {
       </label>
     `;
   }).join('');
+  const dualBarBtnHtml = showDualBar
+    ? `<button type="button" class="two-compare-btn${isDualBar ? ' is-active' : ''}" data-dual-bar-toggle="${escapeHtml(data.targetLabel)}">${isDualBar ? '기본 그래프로 보기' : '두 그룹만 비교하기'}</button>`
+    : '';
   return `
     <aside class="legend-panel">
       <div class="legend" data-target="${escapeHtml(data.targetLabel)}" data-mode="group">${items}</div>
-      <div class="legend-actions" data-target="${escapeHtml(data.targetLabel)}" data-mode="group">
-        <button type="button" class="legend-action-btn" data-legend-action="all-on">전체 선택</button>
-        <button type="button" class="legend-action-btn" data-legend-action="all-off">전체 해제</button>
-        ${criterionLabel ? `<button type="button" class="legend-action-btn" data-open-group-config="true" data-target="${escapeHtml(data.targetLabel)}" data-criterion="${escapeHtml(criterionLabel)}">그룹 편집</button>` : ''}
+      <div class="legend-btn-group">
+        <div class="legend-actions" data-target="${escapeHtml(data.targetLabel)}" data-mode="group">
+          <button type="button" class="legend-action-btn" data-legend-action="all-on">전체 선택</button>
+          <button type="button" class="legend-action-btn" data-legend-action="all-off">전체 해제</button>
+          ${criterionLabel ? `<button type="button" class="legend-action-btn" data-open-group-config="true" data-target="${escapeHtml(data.targetLabel)}" data-criterion="${escapeHtml(criterionLabel)}">그룹 편집</button>` : ''}
+        </div>
+        ${dualBarBtnHtml}
       </div>
     </aside>
   `;
@@ -6531,18 +6841,24 @@ function buildRankSection(data, rows) {
   const displayData = !groupResults && sortByScore ? applyRankSortToData(data, true) : data;
   const chartType = !groupResults ? getRankChartType(targetLabel) : 'lollipop';
   const viewMode = groupResults ? 'horizontal' : getRankChartViewMode(targetLabel);
-  const controlsHtml = !groupResults
-    ? buildRankControlsHtml(targetLabel, {
-        chartType,
-        viewMode,
-        sortByScore
-      })
-    : '';
+  const formulaNoteHtml = buildRankFormulaNoteHtml(displayData);
+  const controlsHtml = buildRankControlsHtml(targetLabel, {
+    chartType,
+    viewMode,
+    sortByScore,
+    formulaNoteHtml,
+    groupMode: !!groupResults
+  });
+  const displayGroups = groupResults ? getDisplayGroupResults(groupResults, hiddenGroups) : [];
+  const canDualBar = !!groupResults && displayGroups.length >= 1 && displayGroups.length <= 2;
+  const isDualBar = canDualBar && !!resultState.dualBarModes.get(targetLabel);
   let chartHtml = '';
   let legendHtml = '';
   if (groupResults) {
-    chartHtml = buildRankFirstChoiceGroupCompareChartHtml(displayData, hiddenGroups);
-    legendHtml = buildRankGroupLegendHtml(displayData, hiddenGroups);
+    chartHtml = isDualBar
+      ? buildRankDualLollipopChartHtml(displayData, hiddenGroups)
+      : buildRankLollipopGroupCompareChartHtml(displayData, hiddenGroups);
+    legendHtml = buildRankGroupLegendHtml(displayData, hiddenGroups, { showDualBar: canDualBar, isDualBar });
   } else {
     if (chartType === 'stacked') {
       chartHtml = viewMode === 'vertical'
@@ -6557,11 +6873,6 @@ function buildRankSection(data, rows) {
     }
   }
   const tableHtml = buildRankDataTableHtml(displayData, hiddenGroups);
-  const compareMode = groupResults ? getGroupCompareViewMode(targetLabel) : 'composition';
-  const compareChartHtml = groupResults && compareMode === 'item'
-    ? buildGroupedHorizontalCompareChartHtml(displayData, hiddenGroups)
-    : chartHtml;
-  const formulaNoteHtml = buildRankFormulaNoteHtml(displayData);
   const otherTexts = getOtherResponseTexts(targetLabel, rows);
   resultState.otherResponseTexts.set(targetLabel, otherTexts);
   const fullText = buildQuestionFullHtml(codebookEntry);
@@ -6575,11 +6886,9 @@ function buildRankSection(data, rows) {
         </div>
         ${fullText}
         ${controlsHtml}
-        ${!groupResults ? formulaNoteHtml : ''}
       </div>
-      ${groupResults ? buildGroupCompareViewToggleHtml(displayData) : ''}
       <div class="result-visual has-legend">
-        <div class="result-chart-col">${compareChartHtml}</div>
+        <div class="result-chart-col">${chartHtml}</div>
         ${sidePanelHtml}
       </div>
       ${tableHtml}
@@ -6853,25 +7162,25 @@ function buildChoiceControlsHtml(targetLabel, options) {
   const chevron = 'assets/icons/keyboard_arrow_down_40dp_151515_FILL0_wght400_GRAD0_opsz40.svg';
 
   const chartTypeHtml = showChartType ? `
-    <div class="viz-controls-group">
+    <div class="viz-controls-element">
       <span class="viz-controls-label">그래프 모양 선택</span>
-      <div class="choice-chart-type-select ${isMenuOpen ? 'is-open' : ''}" data-choice-chart-type-select data-target="${safeTarget}">
-        <button type="button" class="choice-chart-type-trigger" data-choice-chart-type-trigger data-target="${safeTarget}" aria-haspopup="listbox" aria-expanded="${isMenuOpen ? 'true' : 'false'}">
-          <span class="choice-chart-type-current">${escapeHtml(CHOICE_CHART_TYPE_LABELS[chartType] || CHOICE_CHART_TYPE_LABELS.bar_horizontal)}</span>
-          <img class="choice-chart-type-chevron" src="${chevron}" alt="" aria-hidden="true">
+      <div class="viz-control-dropdown ${isMenuOpen ? 'is-open' : ''}" data-choice-chart-type-select data-target="${safeTarget}">
+        <button type="button" class="viz-control-dropdown__trigger" data-choice-chart-type-trigger data-target="${safeTarget}" aria-haspopup="listbox" aria-expanded="${isMenuOpen ? 'true' : 'false'}">
+          <span class="viz-control-dropdown__current">${escapeHtml(CHOICE_CHART_TYPE_LABELS[chartType] || CHOICE_CHART_TYPE_LABELS.bar_horizontal)}</span>
+          <img class="viz-control-dropdown__chevron" src="${chevron}" alt="" aria-hidden="true">
         </button>
-        <div class="choice-chart-type-menu" role="listbox" ${isMenuOpen ? '' : 'hidden'}>
+        <div class="viz-control-dropdown__menu" role="listbox" ${isMenuOpen ? '' : 'hidden'}>
           ${chartTypes.map(type => {
             const isDisabled = disabledTypes.includes(type);
             return `
               <button type="button"
-                      class="choice-chart-type-option${isDisabled ? ' is-disabled' : ''}"
+                      class="viz-control-dropdown__option${isDisabled ? ' is-disabled' : ''}"
                       data-choice-chart-type="${type}"
                       data-choice-chart-scope="${escapeHtml(stateScope)}"
                       data-target="${safeTarget}"
                       role="option"
                       aria-selected="${type === chartType ? 'true' : 'false'}"
-                      ${isDisabled ? 'disabled aria-disabled="true"' : ''}>
+                      ${isDisabled ? 'disabled' : ''}>
                 ${escapeHtml(CHOICE_CHART_TYPE_LABELS[type])}
               </button>
             `;
@@ -6888,7 +7197,7 @@ function buildChoiceControlsHtml(targetLabel, options) {
     </label>
   ` : '';
 
-  return `<div class="viz-controls viz-controls--uniform-gap">${chartTypeHtml}${sortHtml}</div>`;
+  return `<div class="viz-controls">${chartTypeHtml}${sortHtml}</div>`;
 }
 
 /* ---------- 객관식 단일: 세로 막대 차트 ---------- */
@@ -6989,6 +7298,7 @@ function buildStack100GroupLegendHtml(data, hiddenGroups) {
   }
 
   const criterionLabel = data.criterionLabel || null;
+  const isCustomGroupView = !!data.isCustomGroupView;
   const defs = criterionLabel ? (resultState.customGroupDefs.get(criterionLabel) || []) : [];
   const assignments = criterionLabel ? (resultState.customGroupAssignments.get(criterionLabel) || new Map()) : new Map();
 
@@ -6997,7 +7307,7 @@ function buildStack100GroupLegendHtml(data, hiddenGroups) {
     const isHidden = hiddenGroups.has(g.value);
     const assignedId = assignments.get(g.value) || '';
     const assignedDef = defs.find(def => def.id === assignedId) || null;
-    const assignedBadge = assignedDef
+    const assignedBadge = !isCustomGroupView && assignedDef
       ? `<span class="legend-group-badge"><span class="legend-swatch" style="background:${getCustomGroupColor(criterionLabel, assignedDef.id)}"></span>${escapeHtml(assignedDef.name)}</span>`
       : '';
     return `
@@ -7219,28 +7529,94 @@ function ensureGroupConfigModal() {
     <div class="modal-backdrop" id="group-config-modal" role="dialog" aria-modal="true" aria-labelledby="group-config-modal-title">
       <div class="modal">
         <div class="modal-header">
-          <div class="modal-title" id="group-config-modal-title">그룹 설정</div>
+          <div class="modal-title" id="group-config-modal-title">범례 그룹 편집</div>
           <button class="modal-close" id="close-group-config-btn" aria-label="닫기">
             <img class="modal-close-icon" src="assets/icons/close_wght600fill1_40px.svg" alt="">
           </button>
         </div>
         <div class="modal-body">
-          <div class="group-config-note">범례 항목을 원하는 그룹으로 지정한 뒤 적용하면 묶음 보기로 전환됩니다.</div>
-          <div id="group-config-list"></div>
-          <div class="group-config-divider"></div>
-          <div class="group-config-heading">그룹 이름</div>
-          <div id="group-config-defs"></div>
-          <button type="button" class="legend-action-btn" id="group-config-add-btn">+ 그룹 추가</button>
+          <div id="group-config-list" class="legend group-config-list"></div>
         </div>
-        <div class="modal-footer">
-          <button type="button" class="modal-action-btn" id="group-config-reset-btn">원래대로 보기</button>
-          <button type="button" class="modal-action-btn primary" id="group-config-apply-btn">적용</button>
+        <div class="modal-footer group-config-footer">
+          <button type="button" class="modal-action-btn group-config-create-btn" id="group-config-add-btn">
+            <img class="group-config-create-icon" src="assets/icons/add_40dp_151515_FILL0_wght400_GRAD0_opsz40.svg" alt="">
+            <span>그룹 만들기</span>
+          </button>
+          <div class="group-config-footer-actions">
+            <button type="button" class="modal-action-btn group-config-reset-btn" id="group-config-reset-btn">전체 해제</button>
+            <button type="button" class="modal-action-btn primary group-config-apply-btn" id="group-config-apply-btn">편집 완료</button>
+          </div>
         </div>
       </div>
     </div>
   `;
   document.body.appendChild(wrapper.firstElementChild);
   return document.getElementById('group-config-modal');
+}
+
+function cloneGroupDefs(defs) {
+  return Array.isArray(defs) ? defs.map(def => ({ ...def })) : [];
+}
+
+function cloneGroupAssignments(assignments) {
+  return new Map(assignments ? Array.from(assignments.entries()) : []);
+}
+
+function getDefaultGroupName(defs) {
+  const used = new Set((defs || []).map(def => String(def.name || '').trim()).filter(Boolean));
+  let index = 1;
+  while (used.has(`그룹${index}`)) index += 1;
+  return `그룹${index}`;
+}
+
+function buildComparableGroupConfigState(defs, assignments) {
+  const normalizedDefs = (defs || []).map((def, index) => ({
+    id: String(def.id || ''),
+    name: String(def.name || '').trim() || `그룹${index + 1}`
+  }));
+  const allowedIds = new Set(normalizedDefs.map(def => def.id));
+  const normalizedAssignments = Array.from(assignments ? assignments.entries() : [])
+    .filter(([groupValue, groupId]) => groupValue && groupId && allowedIds.has(groupId))
+    .sort((a, b) => String(a[0]).localeCompare(String(b[0]), 'ko'));
+  return JSON.stringify({
+    defs: normalizedDefs,
+    assignments: normalizedAssignments
+  });
+}
+
+function getGroupMembers(state, groupId) {
+  if (!state || !groupId) return [];
+  return (state.groupOptions || []).filter(option => state.draftAssignments.get(option.value) === groupId);
+}
+
+function getDraftGroupColor(state, groupId) {
+  if (!state || !groupId) return CUSTOM_GROUP_PALETTE[0];
+  const defs = state.draftDefs || [];
+  const index = defs.findIndex(def => def.id === groupId);
+  return CUSTOM_GROUP_PALETTE[(index < 0 ? 0 : index) % CUSTOM_GROUP_PALETTE.length];
+}
+
+function finalizeGroupConfigGroupName(state, groupId) {
+  if (!state || !groupId) return;
+  const target = (state.draftDefs || []).find(def => def.id === groupId);
+  if (!target) return;
+  const trimmed = String(target.name || '').trim();
+  target.name = trimmed || getDefaultGroupName((state.draftDefs || []).filter(def => def.id !== groupId));
+}
+
+function hasGroupConfigChanges(state) {
+  if (!state) return false;
+  return buildComparableGroupConfigState(state.initialDefs, state.initialAssignments) !== buildComparableGroupConfigState(state.draftDefs, state.draftAssignments);
+}
+
+function focusGroupConfigNameInput(state) {
+  if (!state || !state.focusGroupId) return;
+  const input = document.querySelector(`#group-config-list input[data-group-name-input="${CSS.escape(state.focusGroupId)}"]`);
+  if (!input) return;
+  input.focus();
+  if (state.selectOnFocus !== false) input.select();
+  state.focusGroupId = null;
+  state.selectOnFocus = false;
 }
 
 function closeGroupConfigModal() {
@@ -7250,92 +7626,269 @@ function closeGroupConfigModal() {
   resultState.groupConfigModalState = null;
 }
 
+function clearGroupConfigDropHighlight(root = document) {
+  root.querySelectorAll('.group-config-group.is-drop-target').forEach(el => {
+    el.classList.remove('is-drop-target');
+  });
+}
+
 function renderGroupConfigModal() {
   const state = resultState.groupConfigModalState;
   const modal = ensureGroupConfigModal();
   const listEl = document.getElementById('group-config-list');
-  const defsEl = document.getElementById('group-config-defs');
-  if (!modal || !listEl || !defsEl || !state) return;
+  const addBtn = document.getElementById('group-config-add-btn');
+  const applyBtn = document.getElementById('group-config-apply-btn');
+  const resetBtn = document.getElementById('group-config-reset-btn');
+  if (!modal || !listEl || !state) return;
 
-  const defs = resultState.customGroupDefs.get(state.criterionLabel) || [];
-  const assignments = resultState.customGroupAssignments.get(state.criterionLabel) || new Map();
-  const optionRows = state.groupOptions.map(groupValue => {
-    const selectedId = assignments.get(groupValue) || '';
-    const optionsHtml = [
-      `<option value="">—</option>`,
-      ...defs.map(def => `<option value="${escapeHtml(def.id)}" ${selectedId === def.id ? 'selected' : ''}>${escapeHtml(def.name)}</option>`),
-      `<option value="__new__">+ 새 그룹</option>`
-    ].join('');
-    return `
-      <div class="group-config-row">
-        <div class="group-config-label">${escapeHtml(groupValue)}</div>
-        <select class="group-config-select" data-group-value="${escapeHtml(groupValue)}">${optionsHtml}</select>
+  const assignedByGroupId = new Map();
+  for (const def of (state.draftDefs || [])) {
+    assignedByGroupId.set(def.id, getGroupMembers(state, def.id));
+  }
+  const groupedOptionValues = new Set();
+  const listParts = [];
+
+  (state.groupOptions || []).forEach(option => {
+    const groupId = state.draftAssignments.get(option.value);
+    if (groupId) {
+      if (groupedOptionValues.has(option.value)) return;
+      const def = (state.draftDefs || []).find(item => item.id === groupId);
+      const members = assignedByGroupId.get(groupId) || [];
+      members.forEach(member => groupedOptionValues.add(member.value));
+      if (!def || members.length === 0) return;
+
+      const isEditing = state.editingGroupId === def.id;
+      const isCollapsed = state.collapsedGroupIds.has(def.id);
+      const nameValue = escapeHtml(String(def.name || ''));
+      const groupColor = getDraftGroupColor(state, def.id);
+      const membersHtml = members.map(member => `
+        <div class="group-config-group-member legend-item is-static">
+          <span class="group-config-group-member-main">
+            <span class="legend-swatch" style="background:${member.color}"></span>
+            <span title="${escapeHtml(member.label)}">${escapeHtml(member.label)}</span>
+          </span>
+          <button type="button" class="group-config-member-remove-btn" data-group-config-remove-member="${escapeHtml(def.id)}" data-group-config-member-value="${escapeHtml(member.value)}" aria-label="항목 삭제" title="그룹에서 제외하기">
+            <img src="assets/icons/remove_40dp_151515_FILL0_wght400_GRAD0_opsz40.svg" alt="">
+          </button>
+        </div>
+      `).join('');
+
+      listParts.push(`
+        <div class="group-config-group ${isCollapsed ? 'is-collapsed' : ''}" data-group-id="${escapeHtml(def.id)}">
+          <div class="group-config-group-header">
+            <div class="group-config-group-main">
+              <button type="button" class="group-config-accordion-btn" data-group-config-toggle="${escapeHtml(def.id)}" aria-label="그룹 접기">
+                <img class="group-config-accordion-icon" src="assets/icons/keyboard_arrow_down_40dp_151515_FILL0_wght400_GRAD0_opsz40.svg" alt="">
+              </button>
+              <span class="legend-swatch group-config-group-swatch" style="background:${groupColor}"></span>
+              ${isEditing
+                ? `<input type="text" class="group-config-group-name-input" data-group-name-input="${escapeHtml(def.id)}" value="${nameValue}" maxlength="20">`
+                : `<div class="group-config-group-name" title="${nameValue}">${nameValue || escapeHtml(getDefaultGroupName((state.draftDefs || []).filter(item => item.id !== def.id)))}</div>`}
+              <button type="button" class="group-config-icon-btn" data-group-config-edit="${escapeHtml(def.id)}" aria-label="이름 수정" title="이름 수정">
+                <img src="assets/icons/edit_40dp_151515_FILL0_wght400_GRAD0_opsz40.svg" alt="">
+              </button>
+            </div>
+            <button type="button" class="group-config-icon-btn" data-group-config-delete="${escapeHtml(def.id)}" aria-label="그룹 해제" title="그룹 해제하기">
+              <img src="assets/icons/link_off_40dp_151515_FILL0_wght400_GRAD0_opsz40.svg" alt="">
+            </button>
+          </div>
+          <div class="group-config-group-body">
+            ${membersHtml}
+          </div>
+        </div>
+      `);
+      return;
+    }
+
+    const selected = state.selectedValues.has(option.value);
+    listParts.push(`
+      <div class="group-config-option-row" draggable="true" data-group-config-drag-option="${escapeHtml(option.value)}">
+        <label class="legend-item" data-group-config-option="${escapeHtml(option.value)}">
+          <input type="checkbox" data-group-config-select="${escapeHtml(option.value)}" ${selected ? 'checked' : ''}>
+          <span class="legend-swatch" style="background:${option.color}"></span>
+          <span title="${escapeHtml(option.label)}">${escapeHtml(option.label)}</span>
+        </label>
       </div>
-    `;
-  }).join('');
-  listEl.innerHTML = optionRows || '<div class="group-config-empty">지정할 수 있는 항목이 없습니다.</div>';
-
-  const defsRows = defs.map(def => `
-    <div class="group-config-def-row">
-      <span class="legend-swatch" style="background:${getCustomGroupColor(state.criterionLabel, def.id)}"></span>
-      <input type="text" class="group-config-name-input" data-group-id="${escapeHtml(def.id)}" value="${escapeHtml(def.name)}" maxlength="20">
-      <button type="button" class="group-config-del-btn" data-group-id="${escapeHtml(def.id)}">×</button>
-    </div>
-  `).join('');
-  defsEl.innerHTML = defsRows || '<div class="group-config-empty">생성된 그룹이 없습니다.</div>';
-
-  listEl.querySelectorAll('.group-config-select').forEach(sel => {
-    sel.addEventListener('change', () => {
-      const groupValue = sel.dataset.groupValue;
-      if (!groupValue) return;
-      let selectedId = sel.value;
-      const defsNow = resultState.customGroupDefs.get(state.criterionLabel) || [];
-      if (selectedId === '__new__') {
-        const newId = nextCustomGroupId(state.criterionLabel);
-        defsNow.push({ id: newId, name: `그룹 ${defsNow.length + 1}` });
-        resultState.customGroupDefs.set(state.criterionLabel, defsNow);
-        selectedId = newId;
-      }
-      const nextAssignments = resultState.customGroupAssignments.get(state.criterionLabel) || new Map();
-      if (selectedId) nextAssignments.set(groupValue, selectedId);
-      else nextAssignments.delete(groupValue);
-      resultState.customGroupAssignments.set(state.criterionLabel, nextAssignments);
-      renderGroupConfigModal();
-    });
+    `);
   });
 
-  defsEl.querySelectorAll('.group-config-name-input').forEach(input => {
+  listEl.innerHTML = listParts.join('') || '<div class="group-config-empty">표시할 범례 항목이 없습니다.</div>';
+
+  listEl.querySelectorAll('[data-group-config-select]').forEach(input => {
     input.addEventListener('change', () => {
-      const groupId = input.dataset.groupId;
-      const defsNow = resultState.customGroupDefs.get(state.criterionLabel) || [];
-      const target = defsNow.find(def => def.id === groupId);
-      if (target) target.name = input.value.trim() || target.name;
+      const groupValue = input.dataset.groupConfigSelect;
+      if (!groupValue) return;
+      if (input.checked) state.selectedValues.add(groupValue);
+      else state.selectedValues.delete(groupValue);
       renderGroupConfigModal();
     });
   });
-  defsEl.querySelectorAll('.group-config-del-btn').forEach(btn => {
+
+  listEl.querySelectorAll('[data-group-config-toggle]').forEach(btn => {
     btn.addEventListener('click', () => {
-      const groupId = btn.dataset.groupId;
+      const groupId = btn.dataset.groupConfigToggle;
       if (!groupId) return;
-      const defsNow = (resultState.customGroupDefs.get(state.criterionLabel) || []).filter(def => def.id !== groupId);
-      resultState.customGroupDefs.set(state.criterionLabel, defsNow);
-      const nextAssignments = resultState.customGroupAssignments.get(state.criterionLabel) || new Map();
-      for (const [key, val] of nextAssignments) {
-        if (val === groupId) nextAssignments.delete(key);
-      }
-      resultState.customGroupAssignments.set(state.criterionLabel, nextAssignments);
+      if (state.collapsedGroupIds.has(groupId)) state.collapsedGroupIds.delete(groupId);
+      else state.collapsedGroupIds.add(groupId);
       renderGroupConfigModal();
     });
   });
+
+  listEl.querySelectorAll('[data-group-config-edit]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const groupId = btn.dataset.groupConfigEdit;
+      if (!groupId) return;
+      if (state.editingGroupId && state.editingGroupId !== groupId) {
+        finalizeGroupConfigGroupName(state, state.editingGroupId);
+      }
+      state.editingGroupId = groupId;
+      state.focusGroupId = groupId;
+      state.selectOnFocus = true;
+      state.collapsedGroupIds.delete(groupId);
+      renderGroupConfigModal();
+    });
+  });
+
+  listEl.querySelectorAll('[data-group-config-delete]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const groupId = btn.dataset.groupConfigDelete;
+      if (!groupId) return;
+      state.draftDefs = (state.draftDefs || []).filter(def => def.id !== groupId);
+      for (const [groupValue, assignedId] of Array.from(state.draftAssignments.entries())) {
+        if (assignedId === groupId) state.draftAssignments.delete(groupValue);
+      }
+      state.selectedValues.clear();
+      state.collapsedGroupIds.delete(groupId);
+      if (state.editingGroupId === groupId) state.editingGroupId = null;
+      renderGroupConfigModal();
+    });
+  });
+
+  listEl.querySelectorAll('[data-group-config-remove-member]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const groupId = btn.dataset.groupConfigRemoveMember;
+      const groupValue = btn.dataset.groupConfigMemberValue;
+      if (!groupId || !groupValue) return;
+      state.draftAssignments.delete(groupValue);
+      state.selectedValues.delete(groupValue);
+      if (getGroupMembers(state, groupId).length === 0) {
+        state.draftDefs = (state.draftDefs || []).filter(def => def.id !== groupId);
+        state.collapsedGroupIds.delete(groupId);
+        if (state.editingGroupId === groupId) state.editingGroupId = null;
+      }
+      renderGroupConfigModal();
+    });
+  });
+
+  listEl.querySelectorAll('[data-group-config-drag-option]').forEach(row => {
+    row.addEventListener('dragstart', e => {
+      const optionValue = row.dataset.groupConfigDragOption;
+      if (!optionValue) return;
+      state.draggingOptionValue = optionValue;
+      row.classList.add('is-dragging');
+      if (e.dataTransfer) {
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', optionValue);
+      }
+    });
+    row.addEventListener('dragend', () => {
+      state.draggingOptionValue = null;
+      row.classList.remove('is-dragging');
+      clearGroupConfigDropHighlight(listEl);
+    });
+  });
+
+  listEl.querySelectorAll('.group-config-group').forEach(groupEl => {
+    groupEl.addEventListener('dragover', e => {
+      if (!state.draggingOptionValue) return;
+      e.preventDefault();
+      clearGroupConfigDropHighlight(listEl);
+      groupEl.classList.add('is-drop-target');
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+    });
+    groupEl.addEventListener('dragleave', e => {
+      if (!groupEl.contains(e.relatedTarget)) {
+        groupEl.classList.remove('is-drop-target');
+      }
+    });
+    groupEl.addEventListener('drop', e => {
+      if (!state.draggingOptionValue) return;
+      e.preventDefault();
+      const groupId = groupEl.dataset.groupId;
+      const optionValue = state.draggingOptionValue;
+      clearGroupConfigDropHighlight(listEl);
+      if (!groupId || !optionValue) return;
+      state.draftAssignments.set(optionValue, groupId);
+      state.selectedValues.delete(optionValue);
+      state.draggingOptionValue = null;
+      state.collapsedGroupIds.delete(groupId);
+      renderGroupConfigModal();
+    });
+  });
+
+  listEl.querySelectorAll('[data-group-name-input]').forEach(input => {
+    const groupId = input.dataset.groupNameInput;
+    if (!groupId) return;
+    input.addEventListener('input', () => {
+      const target = (state.draftDefs || []).find(def => def.id === groupId);
+      if (target) target.name = input.value;
+    });
+    input.addEventListener('keydown', e => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      finalizeGroupConfigGroupName(state, groupId);
+      state.editingGroupId = null;
+      renderGroupConfigModal();
+    });
+    input.addEventListener('blur', () => {
+      finalizeGroupConfigGroupName(state, groupId);
+      if (state.editingGroupId === groupId) state.editingGroupId = null;
+      renderGroupConfigModal();
+    });
+  });
+
+  if (addBtn) addBtn.disabled = state.selectedValues.size === 0;
+  if (applyBtn) applyBtn.disabled = !hasGroupConfigChanges(state);
+  if (resetBtn) resetBtn.disabled = ((state.draftDefs || []).length === 0 && state.draftAssignments.size === 0);
+
+  setTimeout(() => focusGroupConfigNameInput(state), 0);
 }
 
 function openGroupConfigModal(targetLabel, criterionLabel) {
   if (!targetLabel || !criterionLabel) return;
   const data = aggregateResultQuestion(targetLabel, criterionLabel, getFilteredLabelDataRows(), getFilteredValueDataRows(), getFilteredRowIndexes());
   const groupOptions = (data && Array.isArray(data.groupResults))
-    ? data.groupResults.map(group => group.value).filter(Boolean)
+    ? data.groupResults
+        .filter(group => group && group.value)
+        .map(group => ({
+          value: group.value,
+          label: group.label || group.value,
+          color: getGroupColor(data.groupResults, group.value)
+        }))
     : [];
-  resultState.groupConfigModalState = { targetLabel, criterionLabel, groupOptions };
+  const defs = cloneGroupDefs(resultState.customGroupDefs.get(criterionLabel) || []);
+  const assignments = cloneGroupAssignments(resultState.customGroupAssignments.get(criterionLabel) || new Map());
+  const validOptionValues = new Set(groupOptions.map(option => option.value));
+  for (const [groupValue, groupId] of Array.from(assignments.entries())) {
+    if (!validOptionValues.has(groupValue) || !defs.some(def => def.id === groupId)) assignments.delete(groupValue);
+  }
+  const usedGroupIds = new Set(assignments.values());
+  const activeDefs = defs.filter(def => usedGroupIds.has(def.id));
+  resultState.groupConfigModalState = {
+    targetLabel,
+    criterionLabel,
+    groupOptions,
+    initialDefs: cloneGroupDefs(activeDefs),
+    initialAssignments: cloneGroupAssignments(assignments),
+    draftDefs: cloneGroupDefs(activeDefs),
+    draftAssignments: cloneGroupAssignments(assignments),
+    selectedValues: new Set(),
+    editingGroupId: null,
+    draggingOptionValue: null,
+    collapsedGroupIds: new Set(),
+    focusGroupId: null,
+    selectOnFocus: false
+  };
   const modal = ensureGroupConfigModal();
   renderGroupConfigModal();
   modal.classList.add('show');
@@ -7357,27 +7910,59 @@ function setupGroupConfigModal() {
   if (addBtn) addBtn.addEventListener('click', () => {
     const state = resultState.groupConfigModalState;
     if (!state) return;
-    const defs = resultState.customGroupDefs.get(state.criterionLabel) || [];
-    defs.push({ id: nextCustomGroupId(state.criterionLabel), name: `그룹 ${defs.length + 1}` });
-    resultState.customGroupDefs.set(state.criterionLabel, defs);
+    if (state.editingGroupId) {
+      finalizeGroupConfigGroupName(state, state.editingGroupId);
+      state.editingGroupId = null;
+    }
+    if (state.selectedValues.size === 0) return;
+    const nextId = nextCustomGroupId(state.criterionLabel, state.draftDefs);
+    const nextName = getDefaultGroupName(state.draftDefs);
+    state.draftDefs.push({ id: nextId, name: nextName });
+    state.selectedValues.forEach(groupValue => state.draftAssignments.set(groupValue, nextId));
+    state.selectedValues.clear();
+    state.collapsedGroupIds.delete(nextId);
+    state.editingGroupId = nextId;
+    state.focusGroupId = nextId;
+    state.selectOnFocus = true;
+    renderGroupConfigModal();
+  });
+
+  if (resetBtn) resetBtn.addEventListener('click', () => {
+    const state = resultState.groupConfigModalState;
+    if (!state) return;
+    state.draftDefs = [];
+    state.draftAssignments = new Map();
+    state.selectedValues.clear();
+    state.editingGroupId = null;
+    state.draggingOptionValue = null;
+    state.collapsedGroupIds.clear();
+    state.focusGroupId = null;
+    state.selectOnFocus = false;
     renderGroupConfigModal();
   });
 
   if (applyBtn) applyBtn.addEventListener('click', () => {
     const state = resultState.groupConfigModalState;
     if (!state) return;
-    const assignments = resultState.customGroupAssignments.get(state.criterionLabel) || new Map();
-    const hasAny = [...assignments.values()].some(Boolean);
+    if (state.editingGroupId) {
+      finalizeGroupConfigGroupName(state, state.editingGroupId);
+      state.editingGroupId = null;
+    }
+    const appliedDefs = cloneGroupDefs(state.draftDefs).filter(def => getGroupMembers(state, def.id).length > 0);
+    appliedDefs.forEach(def => {
+      def.name = String(def.name || '').trim() || getDefaultGroupName(appliedDefs.filter(item => item.id !== def.id));
+    });
+    const allowedIds = new Set(appliedDefs.map(def => def.id));
+    const appliedAssignments = new Map();
+    for (const [groupValue, groupId] of state.draftAssignments.entries()) {
+      if (allowedIds.has(groupId)) appliedAssignments.set(groupValue, groupId);
+    }
+    resultState.customGroupDefs.set(state.criterionLabel, appliedDefs);
+    resultState.customGroupAssignments.set(state.criterionLabel, appliedAssignments);
+    const hasAny = appliedAssignments.size > 0;
     if (hasAny) resultState.customGroupModes.add(state.targetLabel);
     else resultState.customGroupModes.delete(state.targetLabel);
-    closeGroupConfigModal();
-    renderResults();
-  });
-
-  if (resetBtn) resetBtn.addEventListener('click', () => {
-    const state = resultState.groupConfigModalState;
-    if (!state) return;
-    resultState.customGroupModes.delete(state.targetLabel);
+    resultState.hiddenGroupKeys.set(state.targetLabel, new Set());
     closeGroupConfigModal();
     renderResults();
   });
@@ -7388,7 +7973,7 @@ function setupGroupConfigModal() {
  * 사용자 정의 그룹으로 groupResults를 합산하는 헬퍼
  * - single-choice: group.results 합산
  * - multi-choice:  group.perOption 합산
- * - 그룹에 배정되지 않은 항목은 합산에서 제외됨
+ * - 그룹에 배정되지 않은 항목은 원본 범례로 유지됨
  */
 function buildCustomGroupData(data) {
   const { criterionLabel, groupResults, optionOrder } = data;
@@ -7400,7 +7985,7 @@ function buildCustomGroupData(data) {
   const hasAny = [...assignments.values()].some(v => v);
   if (!hasAny) return null;
 
-  function mergeIntoGroup(groups, label, color) {
+  function mergeIntoGroup(groups, groupValue, label, color) {
     if (groups.length === 0) return null;
     const n = groups.reduce((s, g) => s + (g.n || 0), 0);
     const opts = optionOrder || [];
@@ -7413,7 +7998,7 @@ function buildCustomGroupData(data) {
         }, 0);
         return { option: opt, count, pct: n > 0 ? (count / n) * 100 : 0 };
       });
-      return { value: label, label, n, results, _customColor: color };
+      return { value: groupValue, label, n, results, _customColor: color };
     }
     // multi-choice
     if (groups[0] && Array.isArray(groups[0].perOption)) {
@@ -7424,16 +8009,32 @@ function buildCustomGroupData(data) {
         }, 0);
         return { option: opt, count, pct: n > 0 ? (count / n) * 100 : 0 };
       });
-      return { value: label, label, n, perOption, _customColor: color };
+      return { value: groupValue, label, n, perOption, _customColor: color };
     }
     return null;
   }
 
-  const mergedGroupResults = defs.map(def => {
+  const mergedById = new Map(defs.map(def => {
     const color = getCustomGroupColor(criterionLabel, def.id);
     const members = groupResults.filter(g => assignments.get(g.value) === def.id);
-    return mergeIntoGroup(members, def.name, color);
-  }).filter(Boolean);
+    return [def.id, mergeIntoGroup(members, def.id, def.name, color)];
+  }).filter(([, group]) => !!group));
+
+  const insertedGroupIds = new Set();
+  const mergedGroupResults = groupResults.reduce((acc, group) => {
+    const assignedId = assignments.get(group.value);
+    if (!assignedId) {
+      acc.push(group);
+      return acc;
+    }
+    if (insertedGroupIds.has(assignedId)) return acc;
+    const merged = mergedById.get(assignedId);
+    if (merged) {
+      acc.push(merged);
+      insertedGroupIds.add(assignedId);
+    }
+    return acc;
+  }, []);
 
   if (mergedGroupResults.length === 0) return null;
   return { ...data, groupResults: mergedGroupResults, isCustomGroupView: true };
@@ -7450,8 +8051,7 @@ function buildChoiceSectionHtml(data, rows) {
   const baseData = customGroupData || data;
 
   const hiddenGroups = resultState.hiddenGroupKeys.get(targetLabel) || new Set();
-  // 그룹 묶기 뷰에서는 숨김 그룹 필터 미적용 (그룹 단위로 통합됐으므로)
-  const displayHidden = customGroupData ? new Set() : hiddenGroups;
+  const displayHidden = hiddenGroups;
 
   const isSingleWithoutGroup = !data.isMulti && !groupResults;
   const sortByRate = !data.isMulti ? getSingleChoiceSortByRate(targetLabel) : false;
@@ -7474,7 +8074,8 @@ function buildChoiceSectionHtml(data, rows) {
       })
     : '';
 
-  const displayGroupsForBtn = groupResults ? getDisplayGroupResults(groupResults, displayHidden) : [];
+  const legendData = customGroupData || data;
+  const displayGroupsForBtn = legendData.groupResults ? getDisplayGroupResults(legendData.groupResults, displayHidden) : [];
   const canDualBar = !!groupResults && chartType === 'bar_horizontal' && displayGroupsForBtn.length >= 1 && displayGroupsForBtn.length <= 2;
   const isDualBar = canDualBar && !!resultState.dualBarModes.get(targetLabel);
 
@@ -7485,11 +8086,10 @@ function buildChoiceSectionHtml(data, rows) {
           ? buildDualHbarChartHtml(displayData, displayHidden)
           : buildGroupCompareChartHtml(displayData, displayHidden))
     : buildSingleChoiceChartByType(displayData, chartType);
-  // legend는 항상 원본 data 기준으로 (그룹 설정 버튼/체크 유지)
   const legendHtml = groupResults
     ? (chartType === 'bar_horizontal_100'
-        ? buildStack100GroupLegendHtml(data, hiddenGroups)
-        : buildLegendHtml(data, hiddenGroups, { showDualBar: canDualBar, isDualBar }))
+        ? buildStack100GroupLegendHtml(legendData, hiddenGroups)
+        : buildLegendHtml(legendData, hiddenGroups, { showDualBar: canDualBar, isDualBar }))
     : (isSingleWithoutGroup && chartType === 'pie' ? buildChoiceOptionLegendHtml(displayData) : '');
   const sidePanelHtml = buildResultSidePanelHtml(legendHtml, targetLabel);
   const tableNoteHtml = data.isMulti
@@ -7533,12 +8133,14 @@ function buildScaleSection(data, rows) {
     : (showLegend ? buildScaleLegendHtml(data) : '');
   const tableHtml = showTable ? buildDataTableHtml(data, hiddenGroups) : '';
   const fullText = buildQuestionFullHtml(codebookEntry);
-  const toggleHtml = data.isDerivedScale ? '' : buildScaleToggleHtml(targetLabel, viewMode, {
-    showMidpointOption: canHideScaleMidpoint(data),
-    hideMidpoint,
-    showChartType,
-    chartType
-  });
+  const toggleHtml = data.isDerivedScale
+    ? `<div class="viz-controls"><div class="viz-controls-note">박스플롯 차트 보는 법: 수염은 응답값의 전체 범위, 박스는 전체 응답 중 가운데 50%가 모인 구간, 분홍색과 파랑색이 나뉘는 지점은 중앙값입니다.</div></div>`
+    : buildScaleToggleHtml(targetLabel, viewMode, {
+      showMidpointOption: canHideScaleMidpoint(data),
+      hideMidpoint,
+      showChartType,
+      chartType
+    });
   const sidePanelHtml = buildResultSidePanelHtml(legendHtml, targetLabel);
   const visualClass = getResultVisualClass(true);
 
@@ -7597,6 +8199,7 @@ function buildResultSection(data, rows) {
   if (data.visualType === 'scale') return buildScaleSection(data, rows);
   if (data.visualType === 'numeric-open') return buildNumericOpenSection(data, rows);
   if (data.visualType === 'ratio-allocation') return buildRatioAllocationSection(data);
+  if (data.visualType === 'text-open') return buildTextOpenSection(data);
   return buildChoiceSectionHtml(data, rows);
 }
 
@@ -7782,13 +8385,13 @@ function ensureHbarDotOutsideReset() {
   if (resultState._hbarDotOutsideBound) return;
   resultState._hbarDotOutsideBound = true;
   document.addEventListener('click', (e) => {
-    if (!document.querySelector('.hbar-group-dot-wrap.is-dimmed')) return;
-    if (e.target && e.target.closest && e.target.closest('.hbar-group-dot-wrap')) return;
-    document.querySelectorAll('.hbar-group-dot-wrap').forEach(w => {
+    if (!document.querySelector('.group-dot-wrap.is-dimmed')) return;
+    if (e.target && e.target.closest && e.target.closest('.group-dot-wrap')) return;
+    document.querySelectorAll('.group-dot-wrap').forEach(w => {
       w.classList.remove('is-dimmed');
       w.classList.remove('is-highlighted');
     });
-    document.querySelectorAll('.single-hbar-chart.group-compare').forEach(c => {
+    document.querySelectorAll('.group-compare').forEach(c => {
       c.classList.remove('has-highlight');
     });
   });
@@ -7847,6 +8450,18 @@ function attachResultEventListeners(container) {
       applyDataTableCollapsed(wrapper, btn, next);
     });
   });
+  container.querySelectorAll('[data-viz-control-search]').forEach(input => {
+    input.addEventListener('input', () => {
+      const query = input.value.toLowerCase();
+      const target = input.dataset.target;
+      const responsesEl = container.querySelector(`[data-text-open-responses][data-target="${target}"]`);
+      if (!responsesEl) return;
+      responsesEl.querySelectorAll('.text-open-item').forEach(item => {
+        const text = item.dataset.text || '';
+        item.classList.toggle('is-hidden', query.length > 0 && !text.includes(query));
+      });
+    });
+  });
   container.querySelectorAll('[data-scale-mode]').forEach(btn => {
     btn.addEventListener('click', e => {
       e.preventDefault();
@@ -7854,12 +8469,6 @@ function attachResultEventListeners(container) {
       const mode = btn.dataset.scaleMode;
       const targetLabel = btn.dataset.target;
       if (!mode || !targetLabel) return;
-      if (btn.dataset.scaleModeDisabled === 'true') {
-        if (targetLabel === TARGET_SCALE_COMPARE_VIEW_KEY && mode === 'distribution') {
-          alert('그룹별 비교 기준이 적용된 상태에서는 분포 보기를 사용할 수 없습니다. 분포 보기를 보려면 그룹별 비교 기준을 해제해 주세요.');
-        }
-        return;
-      }
       resultState.scaleViewModes.set(targetLabel, mode);
       renderResults();
     });
@@ -7906,12 +8515,6 @@ function attachResultEventListeners(container) {
       const targetLabel = btn.dataset.target;
       const mode = btn.dataset.numericView;
       if (!targetLabel || !mode) return;
-      if (btn.dataset.numericViewLocked === 'true') {
-        if (mode === 'histogram') {
-          alert('그룹별 비교에서는 분포 보기를 사용할 수 없습니다. 그룹별 비교는 요약 보기로 표시합니다.');
-        }
-        return;
-      }
       resultState.numericOpenViewModes.set(targetLabel, mode === 'box' ? 'box' : 'histogram');
       renderResults();
     });
@@ -8121,12 +8724,12 @@ function attachResultEventListeners(container) {
       renderResults();
     });
   });
-  container.querySelectorAll('.hbar-group-dot-wrap').forEach(wrap => {
+  container.querySelectorAll('.group-dot-wrap').forEach(wrap => {
     wrap.addEventListener('click', e => {
       e.stopPropagation();
-      const chart = wrap.closest('.single-hbar-chart.group-compare');
+      const chart = wrap.closest('.group-compare');
       if (!chart) return;
-      const allWraps = chart.querySelectorAll('.hbar-group-dot-wrap');
+      const allWraps = chart.querySelectorAll('.group-dot-wrap');
       const clickedKey = wrap.dataset.groupKey;
       const isActive = wrap.classList.contains('is-highlighted');
       if (isActive) {

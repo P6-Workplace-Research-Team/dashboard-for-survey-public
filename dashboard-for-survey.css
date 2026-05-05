@@ -104,7 +104,7 @@
   --viz-control-gap: 32px;
   --viz-control-item-gap: 16px;
   --viz-controls-padding-x: 16px;
-  --viz-controls-row-gap: 8px;
+  --viz-controls-row-gap: 16px;
   --viz-control-bottom-gap: 40px;
   --viz-chart-table-gap: 40px;
   --viz-chart-legend-gap: 52px;
@@ -1946,7 +1946,8 @@ body.filter-dragging .filter-add-btn:hover {
 }
 
 /* ================ 컨트롤 바 ================ */
-/* 공통 래퍼(.viz-controls): 동일 padding·열 간격. 행 간격만 기본 8px → 단일 갭은 .viz-controls--uniform-gap */
+
+/* -- 공통 -- */
 
 .viz-controls {
   display: flex;
@@ -1958,11 +1959,7 @@ body.filter-dragging .filter-add-btn:hover {
   margin-bottom: 0;
 }
 
-.viz-controls--uniform-gap {
-  gap: var(--viz-control-gap);
-}
-
-.viz-controls-group {
+.viz-controls-element {
   display: inline-flex;
   align-items: center;
   gap: var(--viz-control-item-gap);
@@ -1975,14 +1972,7 @@ body.filter-dragging .filter-add-btn:hover {
   line-height: var(--body-line-height);
 }
 
-.viz-controls-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--viz-control-gap);
-}
-
-.viz-controls-bin-row {
+.viz-controls-group {
   display: flex;
   align-items: center;
   gap: 16px;
@@ -1993,7 +1983,7 @@ body.filter-dragging .filter-add-btn:hover {
 .viz-control-toggle {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
   padding: 4px;
   border: 1px solid var(--neutral-300);
   border-radius: var(--radius-12);
@@ -2004,7 +1994,7 @@ body.filter-dragging .filter-add-btn:hover {
 .viz-control-toggle__btn {
   border: none;
   background: transparent;
-  color: var(--neutral-900);
+  color: var(--neutral-700);
   font-size: var(--label-1-size);
   font-weight: var(--font-weight-semibold);
   line-height: var(--body-line-height);
@@ -2019,19 +2009,13 @@ body.filter-dragging .filter-add-btn:hover {
 }
 
 .viz-control-toggle__btn:disabled {
-  color: var(--neutral-300);
-  font-weight: var(--font-weight-regular);
-  cursor: default;
-}
-
-.viz-control-toggle__btn[aria-disabled="true"] {
+  background: transparent;
   color: var(--neutral-300);
   font-weight: var(--font-weight-regular);
   cursor: not-allowed;
 }
 
-.viz-control-toggle__btn:disabled:hover,
-.viz-control-toggle__btn[aria-disabled="true"]:hover {
+.viz-control-toggle__btn:disabled:hover {
   background: transparent;
   color: var(--neutral-300);
 }
@@ -2046,21 +2030,23 @@ body.filter-dragging .filter-add-btn:hover {
 .viz-control-toggle.is-disabled .viz-control-toggle__btn.active {
   background: transparent;
   color: var(--neutral-300);
+  font-weight: var(--font-weight-regular);
+  cursor: not-allowed;
 }
 
-/* ======== 드롭다운 (그래프 유형 등; 향후 .viz-control-dropdown 으로 이름 정리 가능) ======== */
+/* -- 드롭다운 -- */
 
-.choice-chart-type-select {
+.viz-control-dropdown {
   position: relative;
   display: inline-block;
 }
 
-.choice-chart-type-trigger {
+.viz-control-dropdown__trigger {
   display: inline-flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  min-width: 190px;
+  min-width: 180px;
   padding: 8px 10px 8px 16px;
   border: 1px solid var(--neutral-300);
   border-radius: var(--radius-12);
@@ -2073,7 +2059,7 @@ body.filter-dragging .filter-add-btn:hover {
   line-height: var(--body-line-height);
 }
 
-.choice-chart-type-current {
+.viz-control-dropdown__current {
   flex: 1;
   white-space: nowrap;
   overflow: hidden;
@@ -2084,7 +2070,7 @@ body.filter-dragging .filter-add-btn:hover {
   color: var(--neutral-900);
 }
 
-.choice-chart-type-chevron {
+.viz-control-dropdown__chevron {
   width: 16px;
   height: 16px;
   flex-shrink: 0;
@@ -2092,16 +2078,16 @@ body.filter-dragging .filter-add-btn:hover {
   transition: transform .15s ease;
 }
 
-.choice-chart-type-select.is-open .choice-chart-type-trigger {
+.viz-control-dropdown.is-open .viz-control-dropdown__trigger {
   border-color: var(--neutral-900);
 }
 
-.choice-chart-type-select.is-open .choice-chart-type-chevron {
+.viz-control-dropdown.is-open .viz-control-dropdown__chevron {
   opacity: 1;
   transform: rotate(180deg);
 }
 
-.choice-chart-type-menu {
+.viz-control-dropdown__menu {
   position: absolute;
   top: calc(100% + 8px);
   left: 0;
@@ -2119,11 +2105,11 @@ body.filter-dragging .filter-add-btn:hover {
   gap: 0;
 }
 
-.choice-chart-type-menu[hidden] {
+.viz-control-dropdown__menu[hidden] {
   display: none;
 }
 
-.choice-chart-type-option {
+.viz-control-dropdown__option {
   display: block;
   width: 100%;
   text-align: left;
@@ -2137,21 +2123,19 @@ body.filter-dragging .filter-add-btn:hover {
   color: var(--neutral-700);
   cursor: pointer;
   white-space: nowrap;
-  line-height: var(--body-line-height);
 }
 
-.choice-chart-type-option:hover {
+.viz-control-dropdown__option:hover {
   background: var(--neutral-50);
 }
 
-.choice-chart-type-option:disabled,
-.choice-chart-type-option[aria-disabled="true"] {
-  color: var(--neutral-400);
+.viz-control-dropdown__option:disabled {
+  color: var(--neutral-300);
   cursor: not-allowed;
   background: transparent;
 }
 
-/* ======== 체크박스 (레이블 + 커스텀 박스) ======== */
+/* -- 체크박스 -- */
 
 .viz-control-checkbox {
   display: inline-flex;
@@ -2200,28 +2184,28 @@ body.filter-dragging .filter-add-btn:hover {
   line-height: var(--body-line-height);
 }
 
-.scale-view-option {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: var(--label-1-size);
-  font-weight: var(--font-weight-semibold);
-  color: var(--neutral-700);
-  cursor: pointer;
-  user-select: none;
-}
-
-.scale-view-option input {
-  margin: 0;
-}
-
-.scale-view-option.is-disabled {
+.viz-control-checkbox.is-disabled {
   color: var(--neutral-300);
   cursor: not-allowed;
   pointer-events: none;
 }
 
-/* ======== 레이블 + 숫자 입력 ======== */
+.viz-control-checkbox.is-disabled .viz-control-checkbox__label {
+  color: var(--neutral-300);
+}
+
+.viz-control-checkbox input[type="checkbox"]:disabled {
+  border-color: var(--neutral-300);
+  background: var(--neutral-100);
+  cursor: not-allowed;
+}
+
+.viz-control-checkbox input[type="checkbox"]:disabled:checked {
+  background: var(--neutral-300);
+  border-color: var(--neutral-300);
+}
+
+/* -- 레이블 + 숫자 입력 -- */
 
 .viz-control-number {
   display: inline-flex;
@@ -2257,28 +2241,14 @@ body.filter-dragging .filter-add-btn:hover {
   cursor: not-allowed;
 }
 
-/* ======== 컨트롤 바 하단·전행 안내글 ======== */
+/* -- 컨트롤 바 안내글 -- */
 
-.viz-controls-note {
-  font-size: var(--caption-1-size);
-  line-height: var(--body-line-height);
-  font-weight: var(--font-weight-regular);
-  color: var(--neutral-600);
-}
-
-.viz-controls-note--padded {
-  margin-top: 8px;
-  padding: 0 var(--viz-controls-padding-x);
-}
-
-.viz-controls-note--full-row {
+.viz-controls .viz-controls-note {
   flex: 0 0 100%;
   width: 100%;
-}
-
-.result-table-note.allocation-note {
-  padding: 0px;
-  margin-top: 8px;
+  box-sizing: border-box;
+  text-align: left;
+  align-self: flex-start;
   font-size: var(--caption-1-size);
   line-height: var(--body-line-height);
   font-weight: var(--font-weight-regular);
@@ -2286,7 +2256,7 @@ body.filter-dragging .filter-add-btn:hover {
 }
 
 
-/* ======================== 차트 및 범례 영역 ======================== */
+/* ======================== 차트+범례 영역 ======================== */
 
 .result-visual {
   display: grid;
@@ -2341,6 +2311,7 @@ body.filter-dragging .filter-add-btn:hover {
   padding: 0;
 }
 
+/* -- 범례 항목 -- */
 .legend-item {
   display: inline-flex;
   align-items: center;
@@ -2418,7 +2389,8 @@ body.filter-dragging .filter-add-btn:hover {
   opacity: 0.28;
 }
 
-/*버튼 영역*/
+/* -- 범례 버튼 영역 -- */
+
 .legend-actions {
   display: flex;
   align-items: center;
