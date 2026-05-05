@@ -2546,29 +2546,6 @@ body.filter-dragging .filter-add-btn:hover {
 .legend-row > .legend-item {
   flex: 1;
 }
-
-/*
-.legend-group-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  color: var(--neutral-600);
-  border: 1px solid var(--neutral-300);
-  border-radius: var(--radius-pill);
-  padding: 2px 8px;
-  white-space: nowrap;
-  flex-shrink: 0;
-  background: #fff;
-}
-
-.legend-group-badge .legend-swatch {
-  width: 10px;
-  height: 10px;
-  border-radius: 2px;
-}
-*/
-
 .legend-group-members {
   display: flex;
   flex-direction: column;
@@ -2590,92 +2567,6 @@ body.filter-dragging .filter-add-btn:hover {
   opacity: 0.3;
 }
 
-.legend-group-select-cell {
-  flex-shrink: 0;
-}
-
-.legend-group-select {
-  font-size: 11px;
-  color: var(--neutral-600);
-  border: 1px solid var(--neutral-300);
-  border-radius: var(--radius-pill);
-  background: #fff;
-  padding: 2px 4px;
-  cursor: pointer;
-  max-width: 72px;
-  appearance: none;
-  -webkit-appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23999'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 5px center;
-  padding-right: 16px;
-}
-
-.legend-group-select:focus {
-  outline: none;
-  border-color: var(--neutral-900);
-}
-
-.legend-custom-groups {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  padding-top: 8px;
-  border-top: 1px solid var(--neutral-300);
-  margin-top: 4px;
-}
-
-.legend-custom-groups-label {
-  font-size: 11px;
-  color: var(--neutral-600);
-  margin-bottom: 2px;
-}
-
-.legend-custom-group-row {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.legend-group-name-input {
-  flex: 1;
-  min-width: 0;
-  font-size: 11px;
-  border: 1px solid var(--neutral-300);
-  border-radius: 4px;
-  padding: 3px 6px;
-  background: #fff;
-  color: var(--neutral-900);
-}
-
-.legend-group-name-input:focus {
-  outline: none;
-  border-color: var(--neutral-900);
-}
-
-.legend-group-delete-btn {
-  font-size: 13px;
-  color: var(--neutral-600);
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0 3px;
-  line-height: 1;
-  flex-shrink: 0;
-}
-
-.legend-group-delete-btn:hover {
-  color: var(--error-text);
-}
-
-.legend-group-add-btn {
-  align-self: flex-start;
-}
-
-.legend-group-view-btn {
-  align-self: flex-start;
-}
-
 .legend-action-btn.is-active {
   background: var(--neutral-900);
   color: var(--White);
@@ -2685,11 +2576,6 @@ body.filter-dragging .filter-add-btn:hover {
 .legend-action-btn.is-active:hover {
   background: var(--neutral-700);
   border-color: var(--neutral-700);
-}
-
-.legend-footer {
-  margin-top: auto;
-  padding-top: 12px;
 }
 
 .result-table-toggle-panel {
