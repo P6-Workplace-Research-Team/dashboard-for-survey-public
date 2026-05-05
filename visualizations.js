@@ -3615,19 +3615,9 @@ function buildGroupedLegendRowsHtml(data, hiddenGroups = new Set()) {
   const displayGroups = getDisplayGroupResults(data.groupResults);
   if (displayGroups.length === 0) return '';
 
-  const criterionLabel = data.criterionLabel || null;
-  const isCustomGroupView = !!data.isCustomGroupView;
-  const defs = criterionLabel ? (resultState.customGroupDefs.get(criterionLabel) || []) : [];
-  const assignments = criterionLabel ? (resultState.customGroupAssignments.get(criterionLabel) || new Map()) : new Map();
-
   return displayGroups.map((group) => {
     const color = getGroupColor(data.groupResults, group.value);
     const isHidden = hiddenGroups.has(group.value);
-    const assignedId = assignments.get(group.value) || '';
-    const assignedDef = defs.find(def => def.id === assignedId) || null;
-    const assignedBadge = !isCustomGroupView && assignedDef
-      ? `<span class="legend-group-badge"><span class="legend-swatch" style="background:${getCustomGroupColor(criterionLabel, assignedDef.id)}"></span>${escapeHtml(assignedDef.name)}</span>`
-      : '';
     const members = getCustomGroupLegendMembers(data, group.value);
     const membersHtml = members.length > 0
       ? `
@@ -3649,7 +3639,6 @@ function buildGroupedLegendRowsHtml(data, hiddenGroups = new Set()) {
           <span class="legend-swatch" style="background:${color}"></span>
           <span>${escapeHtml(group.label)}</span>
         </label>
-        ${assignedBadge}
         ${membersHtml}
       </div>
     `;
@@ -8229,7 +8218,7 @@ function buildChoiceSectionHtml(data, rows) {
   const { codebookEntry, targetLabel, groupResults } = data;
 
   // 사용자 정의 그룹 보기 모드: 활성화 시 그룹을 사용자 정의 그룹으로 합산
-  const customGroupOn = resultState.customGroupModes.has(targetLabel);
+  const customGroupOn = shouldApplyCustomGroup(data);
   const customGroupData = (customGroupOn && groupResults) ? buildCustomGroupData(data) : null;
   const baseData = customGroupData || data;
 
