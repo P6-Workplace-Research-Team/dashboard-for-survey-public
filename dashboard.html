@@ -65,7 +65,7 @@
       </button>
     </div>
 
-    <main class="main-area">
+    <div class="main-shell">
       <div class="filter-bar">
         <span class="filter-label">필터</span>
         <div id="filter-list" class="filter-list"></div>
@@ -76,6 +76,7 @@
         <div class="n-count">N = <strong id="n-count">0</strong></div>
       </div>
 
+      <main class="main-area">
       <div class="zones-row">
         <div class="zone-card">
           <div class="zone-header">
@@ -116,10 +117,17 @@
           <div class="result-empty">보고 싶은 문항을 드래그하면 차트가 생성됩니다</div>
         </div>
       </div>
-    </main>
+      <div class="main-copyright">(주)퍼시스 Copyright 2026 fursys Inc.</div>
+      </main>
+    </div>
   </div>
 
-  <footer class="dash-footer">(주)퍼시스 Copyright 2026 fursys Inc.</footer>
+  <footer class="dash-footer">
+    <button class="dashboard-header-btn is-button-1-black" type="button" id="export-all-pptx-btn">
+      <img class="dashboard-header-btn-icon" src="assets/icons/arrow_downward_40dp_151515_FILL0_wght400_GRAD0_opsz40.svg" alt="">
+      전체 문항 PPT로 내보내기
+    </button>
+  </footer>
 </div>
 
 <div class="modal-backdrop" id="list-modal" role="dialog" aria-modal="true" aria-labelledby="list-modal-title">
@@ -212,6 +220,7 @@
 
 <script src="assets/libs/dom-to-image-more.min.js"></script>
 <script src="assets/libs/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <script src="visualizations.js"></script>
 </body>
 </html>

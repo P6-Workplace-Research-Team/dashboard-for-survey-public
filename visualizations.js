@@ -1552,6 +1552,8 @@ function setupSavedModal() {
   refreshCount();
 
   if (newBtn) newBtn.addEventListener('click', () => { window.location.href = 'home.html'; });
+  const exportAllPptxBtn = document.getElementById('export-all-pptx-btn');
+  if (exportAllPptxBtn) exportAllPptxBtn.addEventListener('click', () => exportAllSingleChoiceAsPptx(exportAllPptxBtn));
   if (openListBtn && listModal) {
     openListBtn.addEventListener('click', () => {
       renderList();
@@ -7338,7 +7340,12 @@ function buildStacked100ChartHtml(data) {
 }
 
 function buildChoiceOptionLegendHtml(data) {
-  const items = (data.totalResults || []).map((row, index) => {
+  const baseOrder = data.originalOptionOrder || data.optionOrder || [];
+  const rowsByOption = new Map((data.totalResults || []).map(row => [row.option, row]));
+  const legendRows = baseOrder
+    .map(option => rowsByOption.get(option))
+    .filter(Boolean);
+  const items = legendRows.map((row) => {
     const color = getOptionPaletteColor(data, row.option);
     return `
       <div class="legend-item is-static">
@@ -7433,11 +7440,11 @@ function buildPieChartFromRows(rows) {
 
 /* ---------- 객관식 단일: 원/파이 ---------- */
 function buildPieChartHtml(data) {
-  const rows = (data.totalResults || []).map((row, index) => ({
+  const rows = (data.totalResults || []).map((row) => ({
     label: row.option,
     pct: row.pct,
     count: row.count,
-    color: GROUP_PALETTE[index % GROUP_PALETTE.length]
+    color: getOptionPaletteColor(data, row.option)
   }));
   return buildPieChartFromRows(rows);
 }
@@ -8890,15 +8897,16 @@ function attachResultEventListeners(container) {
         e.preventDefault();
         e.stopPropagation();
         const action = btn.dataset.legendAction;
+        const legendPanel = actions.closest('.legend-panel');
         if (mode === 'rank') {
-          const legend = actions.parentElement ? actions.parentElement.querySelector('.legend[data-mode="rank"]') : null;
+          const legend = legendPanel ? legendPanel.querySelector('.legend[data-mode="rank"]') : null;
           const rankIndexes = legend
             ? Array.from(legend.querySelectorAll('.legend-item')).map(item => Number(item.dataset.rank)).filter(Number.isFinite)
             : [];
           const nextHidden = action === 'all-off' ? new Set(rankIndexes) : new Set();
           resultState.hiddenRankKeys.set(targetLabel, nextHidden);
         } else {
-          const legend = actions.parentElement ? actions.parentElement.querySelector('.legend[data-mode="group"]') : null;
+          const legend = legendPanel ? legendPanel.querySelector('.legend[data-mode="group"]') : null;
           const groupValues = legend
             ? Array.from(legend.querySelectorAll('.legend-item, .scale-compare-legend-item')).map(item => item.dataset.group).filter(Boolean)
             : [];
@@ -9204,17 +9212,274 @@ function addExportButtons(container) {
     if (header.querySelector('.export-img-btn')) return;
     var titleEl = header.querySelector('.result-title');
     if (!titleEl) return;
-    var btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'export-img-btn';
-    btn.innerHTML = '<img class="result-export-icon" src="assets/icons/arrow_downward_40dp_151515_FILL0_wght400_GRAD0_opsz40.svg" alt="" aria-hidden="true"> 이미지로 저장';
-    btn.addEventListener('click', function() { exportSectionAsImage(section, btn); });
     var row = document.createElement('div');
     row.className = 'result-header-top';
     titleEl.replaceWith(row);
     row.appendChild(titleEl);
-    row.appendChild(btn);
+
+    var imgBtn = document.createElement('button');
+    imgBtn.type = 'button';
+    imgBtn.className = 'export-img-btn';
+    imgBtn.innerHTML = '<img class="result-export-icon" src="assets/icons/add_photo_alternate_40dp_151515_FILL0_wght400_GRAD0_opsz40.svg" alt="" aria-hidden="true"> 이미지로 저장';
+    imgBtn.addEventListener('click', function() { exportSectionAsImage(section, imgBtn); });
+    row.appendChild(imgBtn);
+
+    if (section.dataset.type === 'single') {
+      var pptBtn = document.createElement('button');
+      pptBtn.type = 'button';
+      pptBtn.className = 'export-img-btn export-ppt-btn';
+      pptBtn.innerHTML = '<img class="result-export-icon" src="assets/icons/add_chart_40dp_151515_FILL0_wght400_GRAD0_opsz40.svg" alt="" aria-hidden="true"> PPT로 내보내기';
+      pptBtn.addEventListener('click', function() { exportSingleChoiceAsPptx(section, pptBtn); });
+      row.appendChild(pptBtn);
+    }
   });
+}
+
+async function exportAllSingleChoiceAsPptx(btn) {
+  if (typeof PptxGenJS === 'undefined') {
+    alert('[오류] PptxGenJS 라이브러리가 로드되지 않았습니다.');
+    return;
+  }
+
+  const container = document.getElementById('result-container');
+  if (!container) return;
+
+  const sections = Array.from(container.querySelectorAll('.result-section[data-type="single"]'));
+  if (sections.length === 0) {
+    alert('현재 화면에 객관식 단일 문항이 없습니다.');
+    return;
+  }
+
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<img class="dashboard-header-btn-icon" src="assets/icons/autorenew_40dp_151515_FILL0_wght400_GRAD0_opsz40.svg" alt=""> 저장 중...';
+  }
+
+  try {
+    const pptx = new PptxGenJS();
+    pptx.layout = 'LAYOUT_WIDE';
+
+    const criterionLabel = getCriterionChipLabel();
+    const filteredRows = getFilteredLabelDataRows();
+
+    for (const section of sections) {
+      const targetLabel = section.dataset.target;
+      if (!targetLabel) continue;
+
+      const entry = resultState.codebookByLabel.get(targetLabel);
+      if (!entry) continue;
+
+      const data = aggregateSingle(targetLabel, criterionLabel, filteredRows);
+      if (!data || !data.totalResults || data.totalResults.length === 0) continue;
+
+      const chartType = getSingleChoiceChartType(targetLabel);
+      const sortByRate = getSingleChoiceSortByRate(targetLabel);
+      const displayData = sortByRate ? applyChoiceSortToData(data, true) : data;
+      const rows = displayData.totalResults;
+
+      const slide = pptx.addSlide();
+      slide.background = { color: 'FFFFFF' };
+
+      slide.addText(targetLabel, {
+        x: 0.4, y: 0.3, w: 12, h: 0.4,
+        fontSize: 13, bold: true, color: '151515',
+      });
+
+      if (entry.full && entry.full.trim()) {
+        slide.addText('Q. ' + entry.full, {
+          x: 0.4, y: 0.75, w: 12, h: 0.35,
+          fontSize: 10, color: '555555',
+        });
+      }
+
+      slide.addText('N = ' + data.totalN, {
+        x: 0.4, y: 1.1, w: 3, h: 0.3,
+        fontSize: 9, color: '888888',
+      });
+
+      addSingleChoiceChartToSlide(pptx, slide, chartType, rows, displayData, targetLabel);
+    }
+
+    const projectTitle = (document.getElementById('project-title') || {}).textContent || '대시보드';
+    const safeTitle = projectTitle.replace(/[\\/:*?"<>|]/g, '_').slice(0, 40);
+    await pptx.writeFile({ fileName: safeTitle + '.pptx' });
+  } catch (e) {
+    console.error('[PPT 전체 내보내기 오류]', e);
+    alert('PPT 저장 중 오류가 발생했습니다: ' + e.message);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<img class="dashboard-header-btn-icon" src="assets/icons/arrow_downward_40dp_151515_FILL0_wght400_GRAD0_opsz40.svg" alt=""> 전체 문항 PPT로 내보내기';
+    }
+  }
+}
+
+const PPTX_PALETTE = [
+  '577a9a','c67b7b','6e9a78','9a82bc','b89a62',
+  '5e9898','bc8098','62906e','8284bc','a8924e',
+  '5e88a8','a87cb0','82986a','7a7ab8','b88868',
+  '5a9488','b07a9a','c08878','6a9880','7a9870'
+];
+
+function pptxPaletteColor(index) {
+  return PPTX_PALETTE[index % PPTX_PALETTE.length];
+}
+
+function addSingleChoiceChartToSlide(pptx, slide, chartType, rows, displayData, targetLabel) {
+  const CHART_X = 0.4, CHART_Y = 1.5, CHART_W = 12;
+
+  if (chartType === 'bar_horizontal') {
+    const chartData = [{
+      name: targetLabel,
+      labels: rows.map(r => r.option),
+      values: rows.map(r => Math.round(r.pct * 10) / 10),
+    }];
+    slide.addChart(pptx.ChartType.bar, chartData, {
+      x: CHART_X, y: CHART_Y, w: CHART_W,
+      h: Math.max(2.5, Math.min(5.5, rows.length * 0.55 + 0.8)),
+      barDir: 'bar', barGrouping: 'clustered',
+      chartColors: ['525252'],
+      showValue: true, dataLabelFormatCode: '0.0"%"',
+      dataLabelFontSize: 9, dataLabelColor: '151515',
+      valAxisMaxVal: 100, valAxisMajorUnit: 20,
+      valGridLine: { style: 'none' },
+      catAxisLabelFontSize: 10, catAxisLabelColor: '151515',
+      showLegend: false, plotAreaBorderColor: 'FFFFFF',
+    });
+
+  } else if (chartType === 'bar_vertical') {
+    const maxPct = rows.reduce((m, r) => Math.max(m, r.pct), 0);
+    const axisMax = Math.max(20, Math.ceil(maxPct / 20) * 20);
+    const chartData = [{
+      name: targetLabel,
+      labels: rows.map(r => r.option),
+      values: rows.map(r => Math.round(r.pct * 10) / 10),
+    }];
+    slide.addChart(pptx.ChartType.bar, chartData, {
+      x: CHART_X, y: CHART_Y, w: CHART_W,
+      h: Math.max(3, Math.min(5, 4.5 - rows.length * 0.05)),
+      barDir: 'col', barGrouping: 'clustered',
+      chartColors: ['525252'],
+      showValue: true, dataLabelFormatCode: '0.0"%"',
+      dataLabelFontSize: 9, dataLabelColor: '151515',
+      valAxisMaxVal: axisMax, valAxisMajorUnit: 20,
+      valGridLine: { style: 'none' },
+      catAxisLabelFontSize: 10, catAxisLabelColor: '151515',
+      showLegend: false, plotAreaBorderColor: 'FFFFFF',
+    });
+
+  } else if (chartType === 'bar_horizontal_100') {
+    const baseOrder = displayData.originalOptionOrder || displayData.optionOrder || [];
+    const chartData = rows.map(r => ({
+      name: r.option,
+      labels: ['전체'],
+      values: [Math.round(r.pct * 10) / 10],
+    }));
+    const colors = rows.map((r, i) => {
+      const idx = baseOrder.indexOf(r.option);
+      return pptxPaletteColor(idx < 0 ? i : idx);
+    });
+    slide.addChart(pptx.ChartType.bar, chartData, {
+      x: CHART_X, y: CHART_Y, w: CHART_W, h: 1.4,
+      barDir: 'bar', barGrouping: 'percentStacked',
+      chartColors: colors,
+      showValue: true, dataLabelFormatCode: '0.0"%"',
+      dataLabelFontSize: 9, dataLabelColor: 'FFFFFF',
+      valAxisHidden: true, catAxisHidden: true,
+      valGridLine: { style: 'none' }, catGridLine: { style: 'none' },
+      showLegend: true, legendPos: 'b', legendFontSize: 9,
+      plotAreaBorderColor: 'FFFFFF',
+    });
+
+  } else if (chartType === 'pie') {
+    const baseOrder = displayData.originalOptionOrder || displayData.optionOrder || [];
+    const chartData = [{
+      name: targetLabel,
+      labels: rows.map(r => r.option),
+      values: rows.map(r => Math.round(r.pct * 10) / 10),
+    }];
+    const colors = rows.map((r, i) => {
+      const idx = baseOrder.indexOf(r.option);
+      return pptxPaletteColor(idx < 0 ? i : idx);
+    });
+    slide.addChart(pptx.ChartType.pie, chartData, {
+      x: CHART_X, y: CHART_Y, w: 5.5, h: 4.5,
+      chartColors: colors,
+      showValue: false, showPercent: true,
+      dataLabelFormatCode: '0.0%',
+      dataLabelFontSize: 9, dataLabelColor: 'FFFFFF',
+      dataLabelPosition: 'ctr',
+      showLegend: true, legendPos: 'r', legendFontSize: 9,
+      plotAreaBorderColor: 'FFFFFF',
+    });
+  }
+}
+
+async function exportSingleChoiceAsPptx(section, btn) {
+  if (typeof PptxGenJS === 'undefined') {
+    alert('[오류] PptxGenJS 라이브러리가 로드되지 않았습니다.');
+    return;
+  }
+
+  const targetLabel = section.dataset.target;
+  if (!targetLabel) return;
+
+  const entry = resultState.codebookByLabel.get(targetLabel);
+  if (!entry) return;
+
+  const criterionLabel = getCriterionChipLabel();
+  const filteredRows = getFilteredLabelDataRows();
+  const data = aggregateSingle(targetLabel, criterionLabel, filteredRows);
+  if (!data || !data.totalResults || data.totalResults.length === 0) {
+    alert('차트 데이터가 없습니다.');
+    return;
+  }
+
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<img class="result-export-icon" src="assets/icons/autorenew_40dp_151515_FILL0_wght400_GRAD0_opsz40.svg" alt="" aria-hidden="true"> 저장 중...';
+  }
+
+  try {
+    const chartType = getSingleChoiceChartType(targetLabel);
+    const sortByRate = getSingleChoiceSortByRate(targetLabel);
+    const displayData = sortByRate ? applyChoiceSortToData(data, true) : data;
+    const rows = displayData.totalResults;
+
+    const pptx = new PptxGenJS();
+    pptx.layout = 'LAYOUT_WIDE';
+
+    const slide = pptx.addSlide();
+    slide.background = { color: 'FFFFFF' };
+
+    slide.addText(targetLabel, {
+      x: 0.4, y: 0.3, w: 12, h: 0.4,
+      fontSize: 13, bold: true, color: '151515',
+    });
+    if (entry.full && entry.full.trim()) {
+      slide.addText('Q. ' + entry.full, {
+        x: 0.4, y: 0.75, w: 12, h: 0.35,
+        fontSize: 10, color: '555555',
+      });
+    }
+    slide.addText('N = ' + data.totalN, {
+      x: 0.4, y: 1.1, w: 3, h: 0.3,
+      fontSize: 9, color: '888888',
+    });
+
+    addSingleChoiceChartToSlide(pptx, slide, chartType, rows, displayData, targetLabel);
+
+    const safeLabel = targetLabel.replace(/[\\/:*?"<>|]/g, '_').slice(0, 40);
+    await pptx.writeFile({ fileName: safeLabel + '.pptx' });
+  } catch (e) {
+    console.error('[PPT 내보내기 오류]', e);
+    alert('PPT 저장 중 오류가 발생했습니다: ' + e.message);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<img class="result-export-icon" src="assets/icons/arrow_downward_40dp_151515_FILL0_wght400_GRAD0_opsz40.svg" alt="" aria-hidden="true"> PPT로 내보내기';
+    }
+  }
 }
 
 async function exportSectionAsImage(section, btn) {
@@ -9308,7 +9573,7 @@ async function exportSectionAsImage(section, btn) {
   } finally {
     if (btn) {
       btn.disabled = false;
-      btn.innerHTML = '<img class="result-export-icon" src="assets/icons/arrow_downward_40dp_151515_FILL0_wght400_GRAD0_opsz40.svg" alt="" aria-hidden="true"> 이미지로 저장';
+    btn.innerHTML = '<img class="result-export-icon" src="assets/icons/add_photo_alternate_40dp_151515_FILL0_wght400_GRAD0_opsz40.svg" alt="" aria-hidden="true"> 이미지로 저장';
     }
   }
 }
