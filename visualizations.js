@@ -606,7 +606,7 @@ function setupPanelToggle() {
 
 function setupSelectionAndDragDrop() {
   const host = document.getElementById('question-tree');
-  const zones = document.querySelectorAll('#drop-target.drop-area, #drop-criterion.drop-area');
+  const zones = document.querySelectorAll('#drop-target.question-drop-area, #drop-criterion.question-drop-area');
   const statusEl = document.getElementById('selection-status');
   const countEl = document.getElementById('selection-count');
   const clearBtn = document.getElementById('selection-clear-btn');
@@ -701,7 +701,7 @@ function setupSelectionAndDragDrop() {
   const limit = parseInt(zone.dataset.limit, 10) || 20;
       const zoneName = zone.dataset.zone === 'target' ? '보고 싶은 문항' : '그룹별 비교';
       const existingLabels = new Set(
-        Array.from(zone.querySelectorAll('.chip')).map(c => c.dataset.label)
+        Array.from(zone.querySelectorAll('.question-chip')).map(c => c.dataset.label)
       );
 
       let added = 0;
@@ -713,7 +713,7 @@ function setupSelectionAndDragDrop() {
           if (!entry || entry.role !== 'raw' || !isSingleChoiceType(entry.type)) continue;
         }
         if (existingLabels.has(data.label)) continue;
-        const current = zone.querySelectorAll('.chip').length;
+        const current = zone.querySelectorAll('.question-chip').length;
         if (current >= limit) { blockedByLimit = true; break; }
         addChip(zone, data);
         existingLabels.add(data.label);
@@ -731,12 +731,12 @@ function setupSelectionAndDragDrop() {
 
   function addChip(zone, data) {
     const chip = document.createElement('span');
-    chip.className = 'chip';
+    chip.className = 'question-chip';
     chip.dataset.label = data.label;
     chip.dataset.key = data.key || data.label;
     chip.dataset.qno = data.qno || '';
     chip.innerHTML = `
-      <span class="chip-label">${escapeHtml(data.label)}</span>
+      <span class="question-chip-label">${escapeHtml(data.label)}</span>
       <button type="button" class="remove-btn" aria-label="제거">×</button>
     `;
     chip.querySelector('.remove-btn').addEventListener('click', () => {
@@ -748,7 +748,7 @@ function setupSelectionAndDragDrop() {
   }
 
   function refreshZoneState(zone) {
-    const chips = zone.querySelectorAll('.chip');
+    const chips = zone.querySelectorAll('.question-chip');
     zone.classList.toggle('has-chip', chips.length > 0);
     if (zone.dataset.zone === 'target') refreshTargetScaleCompareControl();
   }
@@ -1836,12 +1836,12 @@ function buildCodebookIndex(codebookRows) {
 }
 
 function getTargetChipLabels() {
-  return Array.from(document.querySelectorAll('#drop-target .chip'))
+  return Array.from(document.querySelectorAll('#drop-target .question-chip'))
     .map(c => c.dataset.label)
     .filter(Boolean);
 }
 function getCriterionChipLabel() {
-  const chip = document.querySelector('#drop-criterion .chip');
+  const chip = document.querySelector('#drop-criterion .question-chip');
   return chip ? (chip.dataset.key || chip.dataset.label) : null;
 }
 
@@ -1889,7 +1889,7 @@ function refreshTargetScaleCompareControl() {
 function clearDropZone(zoneId) {
   const zone = document.getElementById(zoneId);
   if (!zone) return;
-  zone.querySelectorAll('.chip').forEach(chip => chip.remove());
+  zone.querySelectorAll('.question-chip').forEach(chip => chip.remove());
   zone.classList.remove('has-chip');
   if (zoneId === 'drop-target') refreshTargetScaleCompareControl();
 }
@@ -5267,7 +5267,7 @@ function buildNumericHistogramChartHtml(histogram, options = {}) {
     unit: numberUnit
   }));
   return `
-    <div class="numeric-open-chart">
+    <div class="vertical-chart numeric-open-chart">
       ${numberUnit ? `<div class="numeric-open-unit">단위 : ${escapeHtml(numberUnit)}</div>` : ''}
       <div class="vertical-chart-plot numeric-open-hist-plot">
         <div class="vertical-chart-guides" aria-hidden="true">${guidesHtml}</div>
@@ -6390,7 +6390,7 @@ function buildRankVerticalAxisMeta(maxValue, step, suffix = '') {
   const safeMax = Math.max(safeStep, Number(maxValue) || 0);
   const topValue = Math.ceil(safeMax / safeStep) * safeStep;
   const ticks = [];
-  for (let value = topValue; value >= 0; value -= safeStep) {
+  for (let value = topValue; value > 0; value -= safeStep) {
     const bottomPct = topValue === 0 ? 0 : (value / topValue) * 100;
     ticks.push({
       value,
@@ -6406,7 +6406,6 @@ function buildRankVerticalLollipopChartHtml(data) {
   const n = rows.length;
   const axisMax = Math.max(0, ...((data.rankWeights || []).map(Number)));
   const axisMeta = buildRankVerticalAxisMeta(axisMax, 1, '');
-  const colsStyle = `grid-template-columns: repeat(${n}, 1fr);`;
   const itemsHtml = rows.map(row => {
     const rankObj = data.ranking.find(item => item.option === row.option);
     const posText = rankObj ? `${rankObj.position}위` : '-';
@@ -6420,15 +6419,15 @@ function buildRankVerticalLollipopChartHtml(data) {
       rankPosition: posText
     }));
     return `
-      <div class="rank-vertical-item rank-vertical-lollipop-item">
-        <div class="rank-vertical-metric-slot">
-          <div class="rank-vertical-marker-label" style="bottom:calc(${bottomPct}% + 11px);">
-            <span class="rank-vertical-rank">${escapeHtml(posText)}</span>
-            <span class="rank-vertical-value">${valueText}</span>
+      <div class="vertical-chart-col">
+        <div class="vertical-chart-metric-slot">
+          <div class="lollipop-v-marker-label" style="bottom:calc(${bottomPct}% + 11px);">
+            <span class="lollipop-v-rank">${escapeHtml(posText)}</span>
+            <span class="lollipop-v-value">${valueText}</span>
           </div>
-          <div class="rank-vertical-track" data-tip="${tip}">
-            <div class="rank-vertical-lollipop-line" style="height:${bottomPct}%;"></div>
-            <div class="rank-vertical-lollipop-dot" style="bottom:${bottomPct}%;"></div>
+          <div class="lollipop-v-track" data-tip="${tip}">
+            <div class="lollipop-v-line" style="height:${bottomPct}%;"></div>
+            <div class="lollipop-v-dot" style="bottom:${bottomPct}%;"></div>
           </div>
         </div>
       </div>
@@ -6439,7 +6438,7 @@ function buildRankVerticalLollipopChartHtml(data) {
       kind: 'option-label',
       option: row.option
     }));
-    return `<div class="rank-vertical-label" title="${escapeHtml(row.option)}" data-tip="${labelTip}">${escapeHtml(row.option)}</div>`;
+    return `<div class="vertical-chart-label" title="${escapeHtml(row.option)}" data-tip="${labelTip}">${escapeHtml(row.option)}</div>`;
   }).join('');
 
   const guidesHtml = axisMeta.ticks.map(tick => `
@@ -6450,12 +6449,14 @@ function buildRankVerticalLollipopChartHtml(data) {
   `).join('');
 
   return `
-    <div class="rank-vertical-lollipop-chart">
-      <div class="vertical-chart-plot rank-vertical-plot" style="${colsStyle}">
+    <div class="vertical-chart lollipop-v-chart">
+      <div class="vertical-chart-plot">
         <div class="vertical-chart-guides" aria-hidden="true">${guidesHtml}</div>
-        ${itemsHtml}
+        <div class="vertical-chart-track-row">
+          ${itemsHtml}
+        </div>
       </div>
-      <div class="rank-vertical-labels-row" style="${colsStyle}">
+      <div class="vertical-chart-label-row">
         ${labelsHtml}
       </div>
     </div>
@@ -6512,7 +6513,6 @@ function buildRankVerticalStackChartHtml(data, hiddenRanks) {
     return Math.max(max, visiblePct);
   }, 0);
   const axisMeta = buildRankVerticalAxisMeta(Math.max(20, maxDisplayedPct), 20, '%');
-  const colsStyle = `grid-template-columns: repeat(${n}, 1fr);`;
   const rowHtml = rows.map(r => {
     let cumulativePct = 0;
     const segments = r.perRank.map((pr, ri) => {
@@ -6532,19 +6532,19 @@ function buildRankVerticalStackChartHtml(data, hiddenRanks) {
         count: pr.count
       }));
       const labelHtml = heightPct >= 6
-        ? `<span class="rank-vertical-stack-seg-value" style="top:4px; color:${labelColor};">${formatPercent(pr.pct)}</span>`
+        ? `<span class="stack-v-seg-value" style="top:4px; color:${labelColor};">${formatPercent(pr.pct)}</span>`
         : '';
-      return `<div class="rank-vertical-stack-seg"
+      return `<div class="stack-v-seg"
                    style="height:${heightPct}%; background:${color};"
                    data-tip="${tip}">${labelHtml}</div>`;
     }).join("");
     const displayedPct = r.perRank.reduce((sum, pr, ri) => sum + (hiddenRanks.has(ri) ? 0 : (pr.pct || 0)), 0);
     const totalBottomPct = axisMeta.topValue > 0 ? (displayedPct / axisMeta.topValue) * 100 : 0;
     return `
-      <div class="rank-vertical-item rank-vertical-stack-item">
-        <div class="rank-vertical-metric-slot">
-          <div class="rank-vertical-track rank-vertical-stack-track">
-            <div class="rank-vertical-total-label" style="bottom:calc(${totalBottomPct}% + 2px);">${formatPercent(displayedPct)}</div>
+      <div class="vertical-chart-col">
+        <div class="vertical-chart-metric-slot">
+          <div class="stack-v-track">
+            <div class="stack-v-total-label" style="bottom:calc(${totalBottomPct}% + 2px);">${formatPercent(displayedPct)}</div>
             ${segments}
           </div>
         </div>
@@ -6556,7 +6556,7 @@ function buildRankVerticalStackChartHtml(data, hiddenRanks) {
       kind: 'option-label',
       option: r.option
     }));
-    return `<div class="rank-vertical-label" title="${escapeHtml(r.option)}" data-tip="${labelTip}">${escapeHtml(r.option)}</div>`;
+    return `<div class="vertical-chart-label" title="${escapeHtml(r.option)}" data-tip="${labelTip}">${escapeHtml(r.option)}</div>`;
   }).join('');
   const guidesHtml = axisMeta.ticks.map(tick => `
     <div class="vertical-chart-guide" style="bottom:${tick.bottomPct}%;" aria-hidden="true">
@@ -6566,12 +6566,14 @@ function buildRankVerticalStackChartHtml(data, hiddenRanks) {
   `).join('');
 
   return `
-    <div class="rank-vertical-stack-chart">
-      <div class="vertical-chart-plot rank-vertical-plot" style="${colsStyle}">
+    <div class="vertical-chart stack-v-chart">
+      <div class="vertical-chart-plot">
         <div class="vertical-chart-guides" aria-hidden="true">${guidesHtml}</div>
-        ${rowHtml}
+        <div class="vertical-chart-track-row">
+          ${rowHtml}
+        </div>
       </div>
-      <div class="rank-vertical-labels-row" style="${colsStyle}">
+      <div class="vertical-chart-label-row">
         ${labelsHtml}
       </div>
     </div>
@@ -7269,7 +7271,7 @@ function buildSingleChoiceVerticalBarChartHtml(data) {
       count: r.count
     }));
     return `
-      <div class="single-vbar-col" style="--single-vbar-pct:${scaledPct}%; --single-vbar-raw-pct:${pct}%;">
+      <div class="vertical-chart-col single-vbar-col" style="--single-vbar-pct:${scaledPct}%; --single-vbar-raw-pct:${pct}%;">
         <div class="single-vbar-value">${formatPercent(r.pct)}</div>
         <div class="single-vbar-track">
           <div class="single-vbar-fill" data-tip="${tip}"></div>
@@ -7282,7 +7284,7 @@ function buildSingleChoiceVerticalBarChartHtml(data) {
       kind: 'option-label',
       option: r.option
     }));
-    return `<div class="single-vbar-label" title="${escapeHtml(r.option)}" data-tip="${labelTip}">${escapeHtml(r.option)}</div>`;
+    return `<div class="vertical-chart-label" title="${escapeHtml(r.option)}" data-tip="${labelTip}">${escapeHtml(r.option)}</div>`;
   }).join('');
   const guidesHtml = guideMarks.map(mark => `
     <div class="vertical-chart-guide" style="bottom:${(mark / axisMax) * 100}%;">
@@ -7291,12 +7293,12 @@ function buildSingleChoiceVerticalBarChartHtml(data) {
     </div>
   `).join('');
   return `
-    <div class="single-vbar-chart">
+    <div class="vertical-chart single-vbar-chart">
       <div class="vertical-chart-plot single-vbar-plot">
         <div class="vertical-chart-guides" aria-hidden="true">${guidesHtml}</div>
-        <div class="single-vbar-track-row">${colsHtml}</div>
+        <div class="vertical-chart-track-row">${colsHtml}</div>
       </div>
-      <div class="single-vbar-label-row">${labelsHtml}</div>
+      <div class="vertical-chart-label-row">${labelsHtml}</div>
     </div>
   `;
 }

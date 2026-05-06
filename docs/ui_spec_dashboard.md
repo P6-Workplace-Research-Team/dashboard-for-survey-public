@@ -47,7 +47,7 @@
 ├── .dash-body (grid: panel-shell-width 1fr) ──────────────┤
 │  [left-panel-shell]  [main-area]                         │
 │   ? .left-panel       ? .filter-bar (sticky top)         │
-│   ? .panel-toggle     ? .zones-row (target | criterion)  │
+│   ? .panel-toggle     ? .questions-selected-row (target | criterion)  │
 │                       ? .data-area (TBD)                 │
 ├── .dash-footer ──────────────────────────────────────────┤ 64px
 ```
@@ -70,12 +70,12 @@
 | 패널 확장 시 (`.panel-expanded`) | `.left-panel-shell`이 absolute로 떠올라 `width: calc(min(780px, 100vw - 56px) + var(--panel-handle-width))`, 그림자 `var(--shadow)`, `z-index: 6` (오버레이형) |
 | `.main-area` | grid 두 번째 컬럼, `padding: 0 var(--main-area-pad) var(--main-area-pad)`, `flex column`, `gap: 20px`, 자체 세로 스크롤 |
 | `.filter-bar` | `position: sticky; top: 0; z-index: 3`, 메인 영역 좌우 가장자리에 닿게 `margin: 0 calc(var(--main-area-pad) * -1)` |
-| `.zones-row` | grid `minmax(0, 1fr) var(--criterion-col-width)`, gap 20px |
+| `.questions-selected-row` | grid `minmax(0, 1fr) var(--criterion-col-width)`, gap 20px |
 | `.data-area` | 흰 배경 카드, border-radius 12px, padding `24px 24px 32px` |
 | `.dash-footer` | `min-height: 64px`, 흰 배경, 상단 1px `--neutral-300`, color `--neutral-400`, caption-1 |
 
 ### 2.4 반응형
-- `max-width: ~` 구간에서 `.zones-row { grid-template-columns: 1fr; }`, `.data-area { width: 100%; }` 등으로 1열 fallback (자세한 break는 4900~5000 라인대)
+- `max-width: ~` 구간에서 `.questions-selected-row { grid-template-columns: 1fr; }`, `.data-area { width: 100%; }` 등으로 1열 fallback (자세한 break는 4900~5000 라인대)
 
 ---
 
@@ -191,13 +191,13 @@
 - 초기 `n-count` 값: `0` (실데이터/필터 적용 결과로 갱신)
 
 #### 3.3.2 Zone 1 ? 보고 싶은 문항
-- 컨테이너 `.zone-card`: 흰 배경, border 1px `--neutral-300`, border-radius 16px, padding 16px
-- 헤더 `.zone-header`
-  - 좌: `.zone-title` `보고 싶은 문항` (heading-5 semibold)
-  - 우 `.zone-actions`
-    - `#target-scale-compare-btn` `.zone-action-btn` ? `여러 문항 한 번에 비교하기` (기본 `disabled`. 같은 척도 길이 문항이 2개 이상 모이면 활성)
-    - `#target-clear-btn` `.zone-action-btn.is-delete` ? `모두 삭제` (`--neutral-100` 배경, hover `--neutral-200`)
-- 드롭존 `#drop-target` (`.drop-area`)
+- 컨테이너 `.questions-selected-card`: 흰 배경, border 1px `--neutral-300`, border-radius 16px, padding 16px
+- 헤더 `.questions-selected-header`
+  - 좌: `.questions-selected-title` `보고 싶은 문항` (heading-5 semibold)
+  - 우 `.questions-selected-actions`
+    - `#target-scale-compare-btn` `.questions-selected-action-btn` ? `여러 문항 한 번에 비교하기` (기본 `disabled`. 같은 척도 길이 문항이 2개 이상 모이면 활성)
+    - `#target-clear-btn` `.questions-selected-action-btn.is-delete` ? `모두 삭제` (`--neutral-100` 배경, hover `--neutral-200`)
+- 드롭존 `#drop-target` (`.question-drop-area`)
   - `data-zone="target"`, **`data-limit="20"`**
   - 기본: border 1.5px dashed `--neutral-300`, border-radius 8px, padding 12px, `min-height: 54px`, 배경 `--neutral-50`
   - 드래그 호버 (`.drag-over`): 테두리 `--neutral-600`, 배경 `--neutral-100`
@@ -209,15 +209,15 @@
 - 동일 카드/헤더 구조
 - 타이틀: `그룹별 비교`
 - 액션
-  - `#criterion-year-btn` `.zone-action-btn` ? `연도별 비교하기` (기본 `hidden`. 연도 관련 필터 활성 시 노출)
-  - `#criterion-clear-btn` `.zone-action-btn.is-delete` ? `삭제`
+  - `#criterion-year-btn` `.questions-selected-action-btn` ? `연도별 비교하기` (기본 `hidden`. 연도 관련 필터 활성 시 노출)
+  - `#criterion-clear-btn` `.questions-selected-action-btn.is-delete` ? `삭제`
 - 드롭존 `#drop-criterion` ? `data-zone="criterion"`, **`data-limit="1"`**
 - 빈 상태: `좌측 문항을 여기로 드래그해 주세요.`
 
-#### 3.3.4 칩 `.chip`
+#### 3.3.4 칩 `.question-chip`
 - 검정 배경, 흰 글자 pill (`border-radius: var(--radius-pill)`)
 - `min-height: 30px`, padding `4px 8px 4px 12px`, label-1 regular
-- 좌측 라벨 `.chip-label`, 우측 `× remove-btn` (12×12, hover 시 옅은 배경)
+- 좌측 라벨 `.question-chip-label`, 우측 `× remove-btn` (12×12, hover 시 옅은 배경)
 - 텍스트는 `question_label`만 사용
 
 #### 3.3.5 결과 영역 `.data-area` / `#result-container` ? **차트 영역 (TBD, 확인 예정)**
@@ -326,8 +326,8 @@
 | --- | --- | --- |
 | `.panel-expanded` | `.dashboard-page .page` | 좌측 패널 오버레이 확장 |
 | `.modal-backdrop.show` | 각 모달 | 표시 |
-| `.drag-over` | `.drop-area` / `.filter-control` 등 | 드래그 호버 강조 |
-| `.has-chip` | `.drop-area` | 칩이 1개 이상 들어있는 상태 |
+| `.drag-over` | `.question-drop-area` / `.filter-control` 등 | 드래그 호버 강조 |
+| `.has-chip` | `.question-drop-area` | 칩이 1개 이상 들어있는 상태 |
 | `.selected` | `.question-item` | 이미 zone에 배치된 문항 |
 | `.dragging` / `.drop-before` / `.drop-after` | `.filter-control` | 필터 칩 재정렬 인디케이터 |
 | `body.filter-dragging` | body | 필터 드래그 중 hover 강조 약화 |
