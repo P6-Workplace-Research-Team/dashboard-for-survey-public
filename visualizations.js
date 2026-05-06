@@ -1771,6 +1771,7 @@ const resultState = {
   customGroupModes: new Set(),       // Set<targetLabel> - 그룹으로 묶어보기 활성화된 문항
   groupConfigModalState: null,
   dualBarModes: new Map(),           // Map<targetLabel, boolean> - 이중 막대 모드
+  rank1stCardOpen: new Set(),        // Set<targetLabel> - 1순위 단독 카드 펼침 여부
 };
 
 const TARGET_SCALE_COMPARE_VIEW_KEY = '__target_scale_compare__';
@@ -2048,10 +2049,18 @@ function isPinnedSortOption(option) {
 /* =========================================================
    [객관식 단일] 집계 / 렌더
    ========================================================= */
-function aggregateSingle(targetLabel, criterionLabel, rows) {
-  const entry = resultState.codebookByLabel.get(targetLabel);
+function aggregateSingleFromColumn(targetLabel, criterionLabel, rows, options = {}) {
+  const {
+    sourceLabel = targetLabel,
+    displayLabel = targetLabel,
+    columnLabel = sourceLabel,
+    columnIndex,
+    entry = resultState.codebookByLabel.get(sourceLabel)
+  } = options;
   if (!entry) return null;
-  const tIdx = filterState.headerMap ? filterState.headerMap.get(targetLabel) : undefined;
+  const tIdx = Number.isFinite(columnIndex)
+    ? columnIndex
+    : (filterState.headerMap ? filterState.headerMap.get(columnLabel) : undefined);
   if (tIdx === undefined) return null;
 
   const optionOrder = [...entry.options];
@@ -2133,6 +2142,8 @@ function aggregateSingle(targetLabel, criterionLabel, rows) {
 
   return {
     targetLabel,
+    sourceLabel,
+    displayLabel,
     codebookEntry: entry,
     totalN,
     optionOrder: visibleOptionOrder,
@@ -2142,6 +2153,10 @@ function aggregateSingle(targetLabel, criterionLabel, rows) {
     groupResults,
     isMulti: false
   };
+}
+
+function aggregateSingle(targetLabel, criterionLabel, rows) {
+  return aggregateSingleFromColumn(targetLabel, criterionLabel, rows);
 }
 
 function aggregateMulti(targetLabel, criterionLabel, rows) {
@@ -6595,9 +6610,11 @@ function buildRankLegendHtml(data, hiddenRanks) {
   return `
     <aside class="legend-panel">
       <div class="legend" data-target="${escapeHtml(data.targetLabel)}" data-mode="rank">${items}</div>
-      <div class="legend-actions" data-target="${escapeHtml(data.targetLabel)}" data-mode="rank">
-        <button type="button" class="legend-action-btn" data-legend-action="all-on">전체 선택</button>
-        <button type="button" class="legend-action-btn" data-legend-action="all-off">전체 해제</button>
+      <div class="legend-btn-group">
+        <div class="legend-actions" data-target="${escapeHtml(data.targetLabel)}" data-mode="rank">
+          <button type="button" class="legend-action-btn" data-legend-action="all-on">전체 선택</button>
+          <button type="button" class="legend-action-btn" data-legend-action="all-off">전체 해제</button>
+        </div>
       </div>
     </aside>
   `;
@@ -6883,7 +6900,39 @@ function buildRankDataTableHtml(data, hiddenGroups = new Set()) {
   );
 }
 
+/* ---------- 순위형 1순위만 보기 ---------- */
+
+function getRank1stSyntheticLabel(targetLabel) {
+  return `${targetLabel}__rank1st`;
+}
+
+function aggregateRank1stSingle(targetLabel, criterionLabel, rows) {
+  const entry = resultState.codebookByLabel.get(targetLabel);
+  if (!entry) return null;
+  const firstRankColumn = findRankExpandedColumns(targetLabel)[0];
+  if (!firstRankColumn) return null;
+  const syntheticLabel = getRank1stSyntheticLabel(targetLabel);
+  const data = aggregateSingleFromColumn(syntheticLabel, criterionLabel, rows, {
+    sourceLabel: targetLabel,
+    displayLabel: `${targetLabel}_1순위`,
+    columnLabel: firstRankColumn.label,
+    columnIndex: firstRankColumn.colIdx,
+    entry
+  });
+  if (!data) return null;
+  return {
+    ...data,
+    rank1stSourceLabel: targetLabel,
+    rank1stColumnLabel: firstRankColumn.label
+  };
+}
+
 function buildRankSection(data, rows) {
+  if (resultState.rank1stCardOpen.has(data.targetLabel)) {
+    const rank1stData = aggregateRank1stSingle(data.targetLabel, data.criterionLabel, rows);
+    if (rank1stData) return buildChoiceSectionHtml(rank1stData, rows);
+  }
+
   const { codebookEntry, targetLabel, groupResults } = data;
   const hiddenRanks = resultState.hiddenRankKeys.get(targetLabel) || new Set();
   const hiddenGroups = resultState.hiddenGroupKeys.get(targetLabel) || new Set();
@@ -6893,11 +6942,12 @@ function buildRankSection(data, rows) {
   const hasGroupResults = !!baseData.groupResults;
   const sortByScore = getRankSortByScore(targetLabel);
   const displayData = sortByScore ? applyRankSortToData(baseData, true) : baseData;
-  const chartType = !hasGroupResults ? getRankChartType(targetLabel) : 'lollipop';
+  const chartType = getRankChartType(targetLabel);
+  const chartTypeForDisplay = hasGroupResults ? 'lollipop' : chartType; // 그룹 모드 UI는 lollipop 고정
   const viewMode = hasGroupResults ? 'horizontal' : getRankChartViewMode(targetLabel);
   const formulaNoteHtml = buildRankFormulaNoteHtml(displayData);
   const controlsHtml = buildRankControlsHtml(targetLabel, {
-    chartType,
+    chartType: chartTypeForDisplay,
     viewMode,
     sortByScore,
     formulaNoteHtml,
@@ -6931,12 +6981,20 @@ function buildRankSection(data, rows) {
   resultState.otherResponseTexts.set(targetLabel, otherTexts);
   const fullText = buildQuestionFullHtml(codebookEntry);
   const sidePanelHtml = buildResultSidePanelHtml(legendHtml, targetLabel);
+  const titleHtml = `
+    <div class="result-title">
+      <span>${escapeHtml(targetLabel)}</span>
+      <button type="button" class="rank1st-card-btn" data-rank1st-card-toggle="${escapeHtml(targetLabel)}">
+        1순위만 보기
+      </button>
+    </div>
+  `;
 
   return `
     <section class="result-section" data-target="${escapeHtml(targetLabel)}" data-type="rank">
       <div class="result-header">
-        <div class="result-title">
-          ${escapeHtml(targetLabel)}
+        <div class="result-header-top">
+          ${titleHtml}
         </div>
         ${fullText}
         ${controlsHtml}
@@ -7307,20 +7365,20 @@ function buildSingleChoiceVerticalBarChartHtml(data) {
 function buildGroupCompareStack100ChartHtml(data, hiddenGroups = new Set()) {
   const displayGroups = getDisplayGroupResults(data.groupResults, hiddenGroups);
   const options = data.totalResults || [];
-
-  const rowHtml = displayGroups.map(group => {
+  const buildRowHtml = (groupLabel, results, totalN, isOverall = false) => {
     const widths = options.map(opt => {
-      const result = (group.results || []).find(r => r.option === opt.option) || { pct: 0, count: 0 };
+      const result = (results || []).find(r => r.option === opt.option) || { pct: 0, count: 0 };
       return Math.max(0, Math.min(100, result.pct || 0));
     });
     const firstNonZero = widths.findIndex(width => width > 0);
     const lastNonZero = widths.reduce((acc, width, index) => width > 0 ? index : acc, -1);
     const segmentsHtml = options.map((opt, i) => {
       const color = getOptionPaletteColor(data, opt.option);
-      const result = (group.results || []).find(r => r.option === opt.option) || { pct: 0, count: 0 };
+      const result = (results || []).find(r => r.option === opt.option) || { pct: 0, count: 0 };
       const width = widths[i];
       const tip = encodeURIComponent(JSON.stringify({
-        kind: 'basic-bar',
+        kind: 'compare-bar',
+        groupLabel,
         option: opt.option,
         pct: result.pct || 0,
         count: result.count || 0
@@ -7331,17 +7389,22 @@ function buildGroupCompareStack100ChartHtml(data, hiddenGroups = new Set()) {
     }).join('');
     return `
       <div class="stack100-group-row">
-        <div class="stack100-group-label">${escapeHtml(group.label)}</div>
+        <div class="stack100-group-label">${escapeHtml(groupLabel)}</div>
         <div class="stack100-group-chart-cell">
           <div class="stack100-track">${segmentsHtml}</div>
         </div>
       </div>
     `;
-  }).join('');
+  };
+
+  const overallRowHtml = buildRowHtml('응답자 전체', data.totalResults || [], data.totalN, true);
+  const groupRowsHtml = displayGroups.map(group => buildRowHtml(group.label, group.results || [], group.n || 0)).join('');
 
   return `
     <div class="stack100-group-chart">
-      ${displayGroups.length === 0 ? '<div class="result-empty">표시할 그룹이 없습니다.</div>' : rowHtml}
+      ${displayGroups.length === 0
+        ? '<div class="result-empty">표시할 그룹이 없습니다.</div>'
+        : `${overallRowHtml}<div class="stack100-group-chart-divider"></div>${groupRowsHtml}`}
     </div>
   `;
 }
@@ -8320,6 +8383,8 @@ function shouldApplyCustomGroup(data) {
 function buildChoiceSectionHtml(data, rows) {
   if (!data) return '';
   const { codebookEntry, targetLabel, groupResults } = data;
+  const displayLabel = data.displayLabel || targetLabel;
+  const rank1stSourceLabel = data.rank1stSourceLabel || '';
 
   // 사용자 정의 그룹 보기 모드: 활성화 시 그룹을 사용자 정의 그룹으로 합산
   const customGroupOn = shouldApplyCustomGroup(data);
@@ -8372,15 +8437,26 @@ function buildChoiceSectionHtml(data, rows) {
     ? '<div class="result-table-note">객관식 중복 응답 문항으로, 보기별 비율 합계는 100%를 초과할 수 있습니다.</div>'
     : '';
   const tableHtml = buildDataTableHtml(displayData, displayHidden, tableNoteHtml);
-  const otherTexts = getOtherResponseTexts(targetLabel, rows);
+  const otherResponseTarget = rank1stSourceLabel || targetLabel;
+  const otherTexts = getOtherResponseTexts(otherResponseTarget, rows);
   resultState.otherResponseTexts.set(targetLabel, otherTexts);
   const fullText = buildQuestionFullHtml(codebookEntry);
   const visualClass = getResultVisualClass(!!groupResults || (isSingleWithoutGroup && chartType === 'pie'));
+  const titleHtml = rank1stSourceLabel
+    ? `<div class="result-title rank1st-derived-title"><span>${escapeHtml(displayLabel)}</span><button type="button" class="rank1st-card-btn is-active" data-rank1st-card-toggle="${escapeHtml(rank1stSourceLabel)}">모든 순위 보기</button></div>`
+    : `<div class="result-title">${escapeHtml(displayLabel)}</div>`;
+  const rank1stToggleHtml = rank1stSourceLabel
+    ? ''
+    : '';
+  const topActionsHtml = `<div class="result-header-actions">${rank1stToggleHtml}</div>`;
 
   return `
-    <section class="result-section" data-target="${escapeHtml(targetLabel)}" data-type="${data.isMulti ? 'multiple' : 'single'}">
+    <section class="result-section${rank1stSourceLabel ? ' rank1st-derived-section' : ''}" data-target="${escapeHtml(targetLabel)}" data-type="${data.isMulti ? 'multiple' : 'single'}"${rank1stSourceLabel ? ` data-rank1st-source="${escapeHtml(rank1stSourceLabel)}"` : ''}>
       <div class="result-header">
-        <div class="result-title">${escapeHtml(targetLabel)}</div>
+        <div class="result-header-top">
+          ${titleHtml}
+          ${topActionsHtml}
+        </div>
         ${fullText}
         ${controlsHtml}
       </div>
@@ -9010,6 +9086,20 @@ function attachResultEventListeners(container) {
       renderResults();
     });
   });
+  container.querySelectorAll('[data-rank1st-card-toggle]').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      const targetLabel = btn.dataset.rank1stCardToggle;
+      if (!targetLabel) return;
+      if (resultState.rank1stCardOpen.has(targetLabel)) {
+        resultState.rank1stCardOpen.delete(targetLabel);
+      } else {
+        resultState.rank1stCardOpen.add(targetLabel);
+      }
+      renderResults();
+    });
+  });
   container.querySelectorAll('.group-dot-wrap').forEach(wrap => {
     wrap.addEventListener('click', e => {
       e.stopPropagation();
@@ -9287,19 +9377,28 @@ function addExportButtons(container) {
     var header = section.querySelector('.result-header');
     if (!header) return;
     if (header.querySelector('.export-img-btn')) return;
-    var titleEl = header.querySelector('.result-title');
-    if (!titleEl) return;
-    var row = document.createElement('div');
-    row.className = 'result-header-top';
-    titleEl.replaceWith(row);
-    row.appendChild(titleEl);
+    var row = header.querySelector('.result-header-top');
+    if (!row) {
+      var titleEl = header.querySelector('.result-title');
+      if (!titleEl) return;
+      row = document.createElement('div');
+      row.className = 'result-header-top';
+      titleEl.replaceWith(row);
+      row.appendChild(titleEl);
+    }
+    var actions = row.querySelector('.result-header-actions');
+    if (!actions) {
+      actions = document.createElement('div');
+      actions.className = 'result-header-actions';
+      row.appendChild(actions);
+    }
 
     var imgBtn = document.createElement('button');
     imgBtn.type = 'button';
     imgBtn.className = 'export-img-btn';
     imgBtn.innerHTML = '<img class="result-export-icon" src="assets/icons/add_photo_alternate_40dp_151515_FILL0_wght400_GRAD0_opsz40.svg" alt="" aria-hidden="true"> 이미지로 저장';
     imgBtn.addEventListener('click', function() { exportSectionAsImage(section, imgBtn); });
-    row.appendChild(imgBtn);
+    actions.appendChild(imgBtn);
 
     if (section.dataset.type === 'single') {
       var pptBtn = document.createElement('button');
@@ -9307,9 +9406,20 @@ function addExportButtons(container) {
       pptBtn.className = 'export-img-btn export-ppt-btn';
       pptBtn.innerHTML = '<img class="result-export-icon" src="assets/icons/add_chart_40dp_151515_FILL0_wght400_GRAD0_opsz40.svg" alt="" aria-hidden="true"> PPT로 내보내기';
       pptBtn.addEventListener('click', function() { exportSingleChoiceAsPptx(section, pptBtn); });
-      row.appendChild(pptBtn);
+      actions.appendChild(pptBtn);
     }
   });
+}
+
+function getSingleChoiceSectionData(section, filteredRows, criterionLabel) {
+  if (!section) return null;
+  const targetLabel = section.dataset.target;
+  if (!targetLabel) return null;
+  const rank1stSourceLabel = section.dataset.rank1stSource;
+  if (rank1stSourceLabel) {
+    return aggregateRank1stSingle(rank1stSourceLabel, criterionLabel, filteredRows);
+  }
+  return aggregateSingle(targetLabel, criterionLabel, filteredRows);
 }
 
 async function exportAllSingleChoiceAsPptx(btn) {
@@ -9342,11 +9452,12 @@ async function exportAllSingleChoiceAsPptx(btn) {
     for (const section of sections) {
       const targetLabel = section.dataset.target;
       if (!targetLabel) continue;
+      const sourceLabel = section.dataset.rank1stSource || targetLabel;
 
-      const entry = resultState.codebookByLabel.get(targetLabel);
+      const entry = resultState.codebookByLabel.get(sourceLabel);
       if (!entry) continue;
 
-      const data = aggregateSingle(targetLabel, criterionLabel, filteredRows);
+      const data = getSingleChoiceSectionData(section, filteredRows, criterionLabel);
       if (!data || !data.totalResults || data.totalResults.length === 0) continue;
 
       const chartType = getSingleChoiceChartType(targetLabel);
@@ -9357,7 +9468,7 @@ async function exportAllSingleChoiceAsPptx(btn) {
       const slide = pptx.addSlide();
       slide.background = { color: 'FFFFFF' };
 
-      slide.addText(targetLabel, {
+      slide.addText(data.displayLabel || sourceLabel, {
         x: 0.4, y: 0.3, w: 12, h: 0.4,
         fontSize: 13, bold: true, color: '151515',
       });
@@ -9500,13 +9611,14 @@ async function exportSingleChoiceAsPptx(section, btn) {
 
   const targetLabel = section.dataset.target;
   if (!targetLabel) return;
+  const sourceLabel = section.dataset.rank1stSource || targetLabel;
 
-  const entry = resultState.codebookByLabel.get(targetLabel);
+  const entry = resultState.codebookByLabel.get(sourceLabel);
   if (!entry) return;
 
   const criterionLabel = getCriterionChipLabel();
   const filteredRows = getFilteredLabelDataRows();
-  const data = aggregateSingle(targetLabel, criterionLabel, filteredRows);
+  const data = getSingleChoiceSectionData(section, filteredRows, criterionLabel);
   if (!data || !data.totalResults || data.totalResults.length === 0) {
     alert('차트 데이터가 없습니다.');
     return;
@@ -9529,7 +9641,7 @@ async function exportSingleChoiceAsPptx(section, btn) {
     const slide = pptx.addSlide();
     slide.background = { color: 'FFFFFF' };
 
-    slide.addText(targetLabel, {
+    slide.addText(data.displayLabel || sourceLabel, {
       x: 0.4, y: 0.3, w: 12, h: 0.4,
       fontSize: 13, bold: true, color: '151515',
     });
@@ -9546,7 +9658,8 @@ async function exportSingleChoiceAsPptx(section, btn) {
 
     addSingleChoiceChartToSlide(pptx, slide, chartType, rows, displayData, targetLabel);
 
-    const safeLabel = targetLabel.replace(/[\\/:*?"<>|]/g, '_').slice(0, 40);
+    const exportLabel = data.displayLabel || sourceLabel;
+    const safeLabel = exportLabel.replace(/[\\/:*?"<>|]/g, '_').slice(0, 40);
     await pptx.writeFile({ fileName: safeLabel + '.pptx' });
   } catch (e) {
     console.error('[PPT 내보내기 오류]', e);
