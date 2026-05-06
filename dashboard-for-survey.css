@@ -3231,7 +3231,7 @@ body.filter-dragging .filter-add-btn:hover {
   pointer-events: none;
 }
 
-/* ================ 차트 상세 : 롤리팝 세로 (객관식 순위) (TBD 분리 필요) ================ */
+/* ================ 차트 상세 : 롤리팝 세로 (객관식 순위) ================ */
 
 .lollipop-v-chart {
   width: 100%;
@@ -3293,7 +3293,7 @@ body.filter-dragging .filter-add-btn:hover {
   background: var(--neutral-600);
 }
 
-/* ================ 차트 상세 : 세로 막대 누적형 (객관식 순위) (TBD 분리 필요) ================ */
+/* ================ 차트 상세 : 세로 막대 누적형 (객관식 순위) ================ */
 
 .stack-v-chart {
   width: 100%;
@@ -3362,7 +3362,7 @@ body.filter-dragging .filter-add-btn:hover {
 
 /* ================ 차트 상세 : 히스토그램 (주관식 숫자) ================ */
 
-/* TBD : 이름 바꾸기 */
+/* TBD : 이름 바꾸기, 통일 안 된 거 있는지 확인 */
 
 .numeric-open-chart {
   display: flex;
@@ -4100,6 +4100,8 @@ body.filter-dragging .filter-add-btn:hover {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+
+/* ================ 가로 한 줄 그래프 공통으로 쓸 수 있는 눈금축 ================ */
 
 .chart-bottom-axis {
   position: relative;
@@ -5432,8 +5434,8 @@ body.filter-dragging .filter-add-btn:hover {
 }
 
 .result-export-icon {
-  width: 15px;
-  height: 15px;
+  width: 14px;
+  height: 14px;
   display: block;
   flex-shrink: 0;
 }
