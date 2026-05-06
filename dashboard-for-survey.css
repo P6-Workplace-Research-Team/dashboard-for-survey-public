@@ -2598,7 +2598,6 @@ body.filter-dragging .filter-add-btn:hover {
 } 
 
 /* ================ 차트 상세 : 가로 막대 (객관식 단일/중복) ================ */
-/* TBD : 가로 차트도 공통 있어야 할까? 혹은 있을 수 있을까? */
 
 .single-hbar-chart {
   position: relative;
@@ -2693,7 +2692,7 @@ body.filter-dragging .filter-add-btn:hover {
 }
 
 
-/* ================ 차트 상세(변형) : 이중 가로 막대  ================ */
+/* ================ 차트 상세 : 가로 막대 이중 (객관식 단일/중복 - 그룹별 보기 - 2개만 비교 시)  ================ */
 
 .dual-hbar-chart {
   position: relative;
@@ -2751,7 +2750,6 @@ body.filter-dragging .filter-add-btn:hover {
 .dual-hbar-fill:hover {
   opacity: 0.85;
 }
-
 
 
 /* ================ 차트 상세 : 롤리팝 가로 (객관식 순위) ================ */
@@ -2882,7 +2880,7 @@ body.filter-dragging .filter-add-btn:hover {
   transform: translateX(-50%);
 }
 
-/* ================ 차트 상세(변형) : 이중 롤리팝 가로 ================ */
+/* ================ 차트 상세 : 이중 롤리팝 가로 (객관식 순위 - 그룹별 보기 - 2개만 비교 시) ================ */
 
 .dual-lollipop-h-chart {
   position: relative;
@@ -2908,7 +2906,7 @@ body.filter-dragging .filter-add-btn:hover {
 }
 
 
-/* ================ 차트 상세 : 가로 막대/롤리팝 가로 공통 = 그룹별 데이터 (dot type) ================ */
+/* ================ 차트 상세 : dot 중첩 - 가로 막대 및 롤리팝 가로 그룹별 비교 시 ================ */
 
 .group-dot-wrap {
   position: absolute;
@@ -3071,12 +3069,20 @@ body.filter-dragging .filter-add-btn:hover {
 
 /* ================ 차트 상세 : 세로 차트 공통 ================ */
 
-.vertical-chart-plot {
-  position: relative;
-  height: calc(var(--viz-vertical-top-space) + var(--viz-vertical-track-height));
-  padding-right: 40px;
+.vertical-chart {
+  --vertical-axis-pad-right: 40px;
+  --vertical-col-gap: 4px;
 }
 
+/* 세로 차트가 그려지는 영역 */
+.vertical-chart-plot {
+  position: relative;
+  display: flow-root;
+  height: calc(var(--viz-vertical-top-space) + var(--viz-vertical-track-height));
+  padding-right: var(--vertical-axis-pad-right);
+}
+
+/* 세로 차트 가로 축 */
 .vertical-chart-plot::after {
   content: "";
   position: absolute;
@@ -3087,6 +3093,7 @@ body.filter-dragging .filter-add-btn:hover {
   pointer-events: none;
 }
 
+/* 세로 차트 가로 눈금선 */
 .vertical-chart-guides {
   position: absolute;
   left: 0;
@@ -3121,53 +3128,47 @@ body.filter-dragging .filter-add-btn:hover {
   padding-left: 8px;
 }
 
-
-.rank-vertical-labels-row {
-  display: grid;
-  column-gap: 4px;
-  padding: 8px 8px 0;
-  padding-right: 40px;
-}
-
-.rank-vertical-plot {
-  display: grid;
-  column-gap: 4px;
-}
-
-.rank-vertical-item {
-  position: relative;
-  margin-top: var(--viz-vertical-top-space);
-  z-index: 1;
-  min-width: 0;
-}
-
-/*이거 원래 롤리팝이랑 세로 누적만 쓰던 건데 그냥 세로도 공유할 수 있을지 확인*/
-
-.rank-vertical-metric-slot {
-  position: relative;
-  height: var(--viz-vertical-track-height);
-}
-
-.rank-vertical-track {
-  position: absolute;
-  left: 50%;
-  bottom: 0;
-  width: 100%;
-  height: var(--viz-vertical-track-height);
-  transform: translateX(-50%);
+/* 세로 차트 세그먼트 영역 */
+.vertical-chart-track-row {
   display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  overflow: visible;
+  align-items: stretch;
+  height: var(--viz-vertical-track-height);
+  margin-top: var(--viz-vertical-top-space);
+  gap: var(--vertical-col-gap);
+  position: relative;
+  z-index: 1;
 }
 
-.rank-vertical-label {
+.vertical-chart-col {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: stretch;
+}
+
+.vertical-chart-metric-slot {
+  position: relative;
+  height: var(--viz-vertical-track-height);
+}
+
+/* 세로 차트 축 라벨 영역 */
+.vertical-chart-label-row {
+  display: flex;
+  gap: var(--vertical-col-gap);
+  padding: 8px var(--vertical-axis-pad-right) 0 0;
+}
+
+.vertical-chart-label {
   min-width: 0;
   font-size: var(--label-1-size);
-  line-height: var(--body-line-height);
   font-weight: var(--font-weight-regular);
   color: var(--neutral-900);
   text-align: center;
+  line-height: var(--body-line-height);
+  padding: 0 8px;
   word-break: keep-all;
   overflow-wrap: anywhere;
   display: -webkit-box;
@@ -3175,47 +3176,20 @@ body.filter-dragging .filter-add-btn:hover {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  flex: 1 1 0;
+  white-space: normal;
 }
-
-.rank-vertical-marker-label {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  white-space: nowrap;
-}
-
 
 /* ================ 차트 상세 : 세로 막대 (객관식 단일/중복) ================ */
 
 .single-vbar-chart {
   display: flex;
   flex-direction: column;
-  gap: 8px;
   padding: 0;
 }
 
-.single-vbar-track-row {
-  display: flex;
-  align-items: stretch;
-  height: var(--viz-vertical-track-height);
-  margin-top: var(--viz-vertical-top-space);
-  gap: 4px;
-  position: relative;
-  z-index: 1;
-}
-
 .single-vbar-col {
-  position: relative;
-  flex: 1 1 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
   align-items: center;
-  min-width: 0;
   --single-vbar-pct: 0%;
 }
 
@@ -3257,40 +3231,55 @@ body.filter-dragging .filter-add-btn:hover {
   pointer-events: none;
 }
 
-.single-vbar-label-row {
-  display: flex;
-  gap: 4px;
-  padding-right: 40px;
-}
-
-.single-vbar-label {
-  flex: 1 1 0;
-  text-align: center;
-  font-size: var(--label-1-size);
-  font-weight: var(--font-weight-regular);
-  color: var(--neutral-900);
-  white-space: normal;
-  line-height: var(--body-line-height);
-  min-width: 0;
-  padding: 0 8px;
-}
-
-
 /* ================ 차트 상세 : 롤리팝 세로 (객관식 순위) (TBD 분리 필요) ================ */
 
-.rank-vertical-lollipop-chart {
+.lollipop-v-chart {
   width: 100%;
   overflow-x: auto;
   overflow-y: hidden;
   padding: 0;
 }
 
-.rank-vertical-lollipop-line {
+.lollipop-v-track {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 100%;
+  height: var(--viz-vertical-track-height);
+  transform: translateX(-50%);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  overflow: visible;
+}
+
+.lollipop-v-marker-label {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  white-space: nowrap;
+}
+
+.lollipop-v-value,
+.lollipop-v-rank {
+  font-size: var(--label-1-size);
+  line-height: var(--body-line-height);
+  font-weight: var(--font-weight-semibold);
+  color: var(--neutral-700);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.lollipop-v-line {
   width: var(--lollipop-stem-width);
   background: var(--neutral-700);
 }
 
-.rank-vertical-lollipop-dot {
+.lollipop-v-dot {
   position: absolute;
   left: 50%;
   width: var(--lollipop-dot-size);
@@ -3300,27 +3289,35 @@ body.filter-dragging .filter-add-btn:hover {
   transform: translate(-50%, 50%);
 }
 
-.rank-vertical-lollipop-dot:hover {
+.lollipop-v-dot:hover {
   background: var(--neutral-600);
 }
 
 /* ================ 차트 상세 : 세로 막대 누적형 (객관식 순위) (TBD 분리 필요) ================ */
 
-.rank-vertical-stack-chart {
+.stack-v-chart {
   width: 100%;
   overflow-x: auto;
   overflow-y: hidden;
   padding: 0;
 }
 
-.rank-vertical-stack-track {
+.stack-v-track {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 100%;
+  height: var(--viz-vertical-track-height);
+  transform: translateX(-50%);
+  display: flex;
   flex-direction: column-reverse;
   justify-content: flex-start;
   align-items: center;
+  overflow: visible;
   max-width: 120px;
 }
 
-.rank-vertical-stack-seg {
+.stack-v-seg {
   position: relative;
   width: 100%;
   display: flex;
@@ -3330,17 +3327,17 @@ body.filter-dragging .filter-add-btn:hover {
   transition: opacity .15s ease;
 }
 
-.rank-vertical-stack-seg:hover {
+.stack-v-seg:hover {
   opacity: 0.85;
 }
 
-.rank-vertical-stack-track .rank-vertical-stack-seg:last-child {
+.stack-v-track .stack-v-seg:last-child {
   border-top-left-radius: var(--radius-4);
   border-top-right-radius: var(--radius-4);
 }
 
-.rank-vertical-total-label,
-.rank-vertical-stack-seg-value {
+.stack-v-total-label,
+.stack-v-seg-value {
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
@@ -3348,9 +3345,7 @@ body.filter-dragging .filter-add-btn:hover {
   pointer-events: none;
 }
 
-.rank-vertical-value,
-.rank-vertical-rank,
-.rank-vertical-total-label {
+.stack-v-total-label {
   font-size: var(--label-1-size);
   line-height: var(--body-line-height);
   font-weight: var(--font-weight-semibold);
@@ -3359,12 +3354,11 @@ body.filter-dragging .filter-add-btn:hover {
   white-space: nowrap;
 }
 
-.rank-vertical-stack-seg-value {
+.stack-v-seg-value {
   font-size: var(--label-2-size);
   line-height: var(--body-line-height);
   font-weight: var(--font-weight-regular);
 }
-
 
 /* ================ 차트 상세 : 히스토그램 (주관식 숫자) ================ */
 
