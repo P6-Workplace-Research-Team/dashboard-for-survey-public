@@ -125,6 +125,8 @@
   --viz-chart-soft-bg: var(--neutral-50);
   --viz-single-color: var(--neutral-700);
   --viz-compare-color: var(--neutral-300);
+  --lollipop-stem-width: 8px;
+  --lollipop-dot-size: 16px;
 
   /* color */
   --Black: #000000;
@@ -2826,15 +2828,15 @@ body.filter-dragging .filter-add-btn:hover {
   position: absolute;
   left: 0;
   top: 50%;
-  height: 4px;
+  height: var(--lollipop-stem-width);
   transform: translateY(-50%);
 }
 
 .lollipop-h-dot {
   position: absolute;
   top: 50%;
-  width: 16px;
-  height: 16px;
+  width: var(--lollipop-dot-size);
+  height: var(--lollipop-dot-size);
   border-radius: 50%;
   transform: translate(-50%, -50%);
 }
@@ -3285,15 +3287,15 @@ body.filter-dragging .filter-add-btn:hover {
 }
 
 .rank-vertical-lollipop-line {
-  width: 4px;
+  width: var(--lollipop-stem-width);
   background: var(--neutral-700);
 }
 
 .rank-vertical-lollipop-dot {
   position: absolute;
   left: 50%;
-  width: 16px;
-  height: 16px;
+  width: var(--lollipop-dot-size);
+  height: var(--lollipop-dot-size);
   border-radius: 50%;
   background: var(--neutral-700);
   transform: translate(-50%, 50%);
@@ -3518,7 +3520,6 @@ body.filter-dragging .filter-add-btn:hover {
   cursor: pointer;
   overflow: hidden;
   transition: opacity .2s ease;
-  border-right: 1px solid var(--neutral-300);
 }
 
 .stack100-track .stack100-segment:first-child,
@@ -3613,7 +3614,6 @@ body.filter-dragging .filter-add-btn:hover {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-right: 1px solid var(--neutral-300);
   color: var(--White);
   cursor: help;
 }
@@ -3749,7 +3749,6 @@ body.filter-dragging .filter-add-btn:hover {
   align-items: center;
   justify-content: center;
   min-width: 0;
-  border-right: 1px solid var(--white);
 }
 
 .scale-track .scale-segment:last-child {
@@ -3846,9 +3845,6 @@ body.filter-dragging .filter-add-btn:hover {
   z-index: 0;
 }
 
-.scale-mean-background .scale-segment {
-  border-right-color: color-mix(in srgb, var(--neutral-300) 30%, transparent);
-}
 
 .scale-mean-row {
   position: absolute;
@@ -4302,6 +4298,76 @@ body.filter-dragging .filter-add-btn:hover {
 
 .scale-compare-chart.group-compare .group-dot-wrap.is-highlighted {
   z-index: 6;
+}
+
+.scale-compare-dual-tracks {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.scale-compare-dual-row {
+  align-items: center;
+}
+
+.scale-compare-lollipop-track {
+  position: relative;
+  height: var(--viz-bar-height);
+}
+
+.scale-compare-lollipop-line {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  height: var(--lollipop-stem-width);
+  transform: translateY(-50%);
+}
+
+.scale-compare-lollipop-dot {
+  position: absolute;
+  top: 50%;
+  width: var(--lollipop-dot-size);
+  height: var(--lollipop-dot-size);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  cursor: pointer;
+  z-index: 1;
+}
+
+.scale-compare-lollipop-dot:hover {
+  opacity: 0.8;
+}
+
+.scale-compare-lollipop-value {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: var(--label-1-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--neutral-700);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.scale-compare-lollipop-axis-row {
+  display: grid;
+  grid-template-columns: var(--viz-label-col-width) minmax(0, 1fr);
+  column-gap: var(--viz-label-bar-gap);
+  margin-top: 4px;
+  align-items: start;
+}
+
+.scale-compare-lollipop-chart {
+  position: relative;
+}
+
+.scale-compare-lollipop-guides {
+  position: absolute;
+  left: calc(var(--viz-label-col-width) + var(--viz-label-bar-gap));
+  right: 0;
+  top: 0;
+  pointer-events: none;
+  overflow: visible;
 }
 
 /* ================ 차트 상세 : 원/파이 (객관식 단일, 객관식 척도, 주관식 비율 배분) ================ */

@@ -4586,8 +4586,9 @@ function buildScaleCompareGroupDotHtml(group, point, maxScore, withOverall, comp
   `;
 }
 
-function buildScaleCompareLegendHtml(groups, hiddenGroups = new Set(), targetLabel = '', criterionLabel = '') {
+function buildScaleCompareLegendHtml(groups, hiddenGroups = new Set(), targetLabel = '', criterionLabel = '', opts = {}) {
   if (!Array.isArray(groups) || groups.length === 0) return '';
+  const { showDualBar = false, isDualBar = false } = opts;
   const items = [
     `<div class="legend-row"><div class="legend-item is-static"><span class="legend-swatch" style="background:var(--neutral-700);"></span><span>응답자 전체</span></div></div>`,
     ...groups.map(group => {
@@ -4607,13 +4608,19 @@ function buildScaleCompareLegendHtml(groups, hiddenGroups = new Set(), targetLab
     `;
     })
   ].join('');
+  const dualBarBtnHtml = showDualBar
+    ? `<button type="button" class="two-compare-btn${isDualBar ? ' is-active' : ''}" data-dual-bar-toggle="${escapeHtml(targetLabel)}">${isDualBar ? '기본 그래프로 보기' : '두 그룹만 비교하기'}</button>`
+    : '';
   return `
     <aside class="legend-panel">
       <div class="legend" data-target="${escapeHtml(targetLabel)}" data-mode="group">${items}</div>
-      <div class="legend-actions" data-target="${escapeHtml(targetLabel)}" data-mode="group">
-        <button type="button" class="legend-action-btn" data-legend-action="all-on">전체 선택</button>
-        <button type="button" class="legend-action-btn" data-legend-action="all-off">전체 해제</button>
-        ${criterionLabel ? `<button type="button" class="legend-action-btn" data-open-group-config="true" data-target="${escapeHtml(targetLabel)}" data-criterion="${escapeHtml(criterionLabel)}">그룹 편집</button>` : ''}
+      <div class="legend-btn-group">
+        <div class="legend-actions" data-target="${escapeHtml(targetLabel)}" data-mode="group">
+          <button type="button" class="legend-action-btn" data-legend-action="all-on">전체 선택</button>
+          <button type="button" class="legend-action-btn" data-legend-action="all-off">전체 해제</button>
+          ${criterionLabel ? `<button type="button" class="legend-action-btn" data-open-group-config="true" data-target="${escapeHtml(targetLabel)}" data-criterion="${escapeHtml(criterionLabel)}">그룹 편집</button>` : ''}
+        </div>
+        ${dualBarBtnHtml}
       </div>
     </aside>
   `;
@@ -4810,7 +4817,7 @@ function buildScaleCompareDataTableHtml(compareData, hiddenGroups = new Set()) {
 
 function buildScaleCompareSectionHtml(compareData, hiddenGroups, options = {}) {
   if (!compareData) return '';
-  const { showHeader = true, flush = false } = options;
+  const { showHeader = true, flush = false, isDualBar = false, showDualBar = false } = options;
   const visibleGroups = getDisplayScaleCompareGroups(compareData.groups, hiddenGroups);
   const hasGroups = visibleGroups.length > 0;
   const hasLegendGroups = Array.isArray(compareData.groups) && compareData.groups.length > 0;
@@ -4821,42 +4828,107 @@ function buildScaleCompareSectionHtml(compareData, hiddenGroups, options = {}) {
   let rowHtml;
   let chartInnerHtml;
   if (hasGroups) {
-    rowHtml = compareData.questions.map((question, questionIndex) => {
-      const item = question.data;
-      if (!item) return '';
-      const hideMidpoint = isScaleMidpointHidden(TARGET_SCALE_COMPARE_VIEW_KEY);
-      const baseChartHtml = item.isDerivedScale
-        ? buildDerivedScaleBoxPlotHtml(item, 'mean', { hideAxis: true, hideMeanMarker: true })
-        : buildScaleMeanOnlyHtml(
-            question.mean,
-            compareData.maxScore,
-            { kind: 'scale-mean', questionLabel: question.label, groupLabel: '응답자 전체', mean: question.mean, totalN: item.totalN },
-            item.scoreResults,
-            { hideMidpoint, hideMeanMarker: true }
-          );
-      const overallDotHtml = buildScaleCompareOverallGroupedMeanDotHtml(question, compareData.maxScore);
-      const groupDotHtml = visibleGroups
-        .map(group => buildScaleCompareGroupedMeanDotHtml(group, group.points[questionIndex], compareData.maxScore))
-        .join('');
-      return `
-        <div class="stack100-group-row scale-compare-mean-row">
-          ${buildScaleCompareQuestionLabelHtml(question)}
-          <div class="stack100-group-chart-cell">
-            <div class="scale-compare-group-row-chart">
-              ${baseChartHtml}
-              ${overallDotHtml}
-              ${groupDotHtml}
+    if (isDualBar) {
+      rowHtml = compareData.questions.map((question, questionIndex) => {
+        const item = question.data;
+        if (!item) return '';
+        const tracksHtml = visibleGroups.map(group => {
+          const point = group.points[questionIndex];
+          if (!point || point.n <= 0) return '';
+          const leftPct = getScaleMeanLeftPct(point.mean, compareData.maxScore);
+          if (leftPct === null) return '';
+          const tip = encodeURIComponent(JSON.stringify({
+            kind: 'scale-compare-group-dot',
+            groupLabel: group.label,
+            questionLabel: point.questionLabel,
+            mean: point.mean,
+            totalN: point.n
+          }));
+          return `
+            <div class="scale-compare-lollipop-track">
+              <div class="scale-compare-lollipop-line" style="width:${leftPct}%;background:${group.color};"></div>
+              <div class="scale-compare-lollipop-dot" style="left:${leftPct}%;background:${group.color};" data-tip="${tip}"></div>
+              <div class="scale-compare-lollipop-value" style="left:calc(${leftPct}% + 17px);">${formatScaleCompareMean(point.mean)}</div>
+            </div>
+          `;
+        }).join('');
+        return `
+          <div class="stack100-group-row scale-compare-mean-row scale-compare-dual-row">
+            ${buildScaleCompareQuestionLabelHtml(question)}
+            <div class="stack100-group-chart-cell">
+              <div class="scale-compare-dual-tracks">${tracksHtml}</div>
             </div>
           </div>
+        `;
+      }).join('');
+    } else {
+      rowHtml = compareData.questions.map((question, questionIndex) => {
+        const item = question.data;
+        if (!item) return '';
+        const hideMidpoint = isScaleMidpointHidden(TARGET_SCALE_COMPARE_VIEW_KEY);
+        const baseChartHtml = item.isDerivedScale
+          ? buildDerivedScaleBoxPlotHtml(item, 'mean', { hideAxis: true, hideMeanMarker: true })
+          : buildScaleMeanOnlyHtml(
+              question.mean,
+              compareData.maxScore,
+              { kind: 'scale-mean', questionLabel: question.label, groupLabel: '응답자 전체', mean: question.mean, totalN: item.totalN },
+              item.scoreResults,
+              { hideMidpoint, hideMeanMarker: true }
+            );
+        const overallDotHtml = buildScaleCompareOverallGroupedMeanDotHtml(question, compareData.maxScore);
+        const groupDotHtml = visibleGroups
+          .map(group => buildScaleCompareGroupedMeanDotHtml(group, group.points[questionIndex], compareData.maxScore))
+          .join('');
+        return `
+          <div class="stack100-group-row scale-compare-mean-row">
+            ${buildScaleCompareQuestionLabelHtml(question)}
+            <div class="stack100-group-chart-cell">
+              <div class="scale-compare-group-row-chart">
+                ${baseChartHtml}
+                ${overallDotHtml}
+                ${groupDotHtml}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+    if (isDualBar) {
+      const safeMaxScore = Number.isFinite(Number(compareData.maxScore)) && compareData.maxScore >= 1 ? Math.round(Number(compareData.maxScore)) : 5;
+      const axisTicks = Array.from({ length: safeMaxScore }, (_, i) => i + 1);
+      const pctFor = score => safeMaxScore <= 1 ? 0 : ((score - 1) / (safeMaxScore - 1)) * 100;
+      const axisTicksHtml = axisTicks.map(score => {
+        const leftPct = pctFor(score);
+        const cls = score === 1 ? 'is-start' : score === safeMaxScore ? 'is-end' : 'is-mid';
+        return `<span class="lollipop-h-axis-label ${cls}" style="left:${leftPct}%;">${score}</span>`;
+      }).join('');
+      const numQ = compareData.questions.filter(q => q.data).length;
+      const numG = visibleGroups.length;
+      const rowH = numG * 32 + (numG - 1) * 4;
+      const overlayH = numQ * rowH + Math.max(0, numQ - 1) * 16;
+      const guideLinesHtml = axisTicks.map(score => {
+        return `<span class="lollipop-h-guide" style="left:${pctFor(score)}%;"></span>`;
+      }).join('');
+      chartInnerHtml = `
+        <div class="numeric-whisker-group-chart scale-compare-lollipop-chart">
+          <div class="scale-compare-lollipop-guides" style="height:${overlayH}px;" aria-hidden="true">${guideLinesHtml}</div>
+          <div class="stack100-group-chart">${rowHtml}</div>
+          ${numQ > 0 ? `
+            <div class="scale-compare-lollipop-axis-row" aria-hidden="true">
+              <div class="lollipop-h-axis-spacer"></div>
+              <div class="lollipop-h-axis">${axisTicksHtml}</div>
+            </div>
+          ` : ''}
         </div>
       `;
-    }).join('');
-    chartInnerHtml = `
-      <div class="numeric-whisker-group-chart">
-        <div class="stack100-group-chart">${rowHtml}</div>
-        ${compareData.questions.length > 0 ? buildScaleBottomAxisHtml(compareData.maxScore) : ''}
-      </div>
-    `;
+    } else {
+      chartInnerHtml = `
+        <div class="numeric-whisker-group-chart">
+          <div class="stack100-group-chart">${rowHtml}</div>
+          ${compareData.questions.length > 0 ? buildScaleBottomAxisHtml(compareData.maxScore) : ''}
+        </div>
+      `;
+    }
   } else {
     rowHtml = compareData.questions.map(question => {
       const item = question.data;
@@ -4893,7 +4965,7 @@ function buildScaleCompareSectionHtml(compareData, hiddenGroups, options = {}) {
   `;
   const visualClass = getResultVisualClass(hasLegendGroups);
   const legendHtml = hasLegendGroups
-    ? buildScaleCompareLegendHtml(compareData.groups, hiddenGroups, compareData.targetLabel, compareData.criterionLabel || '')
+    ? buildScaleCompareLegendHtml(compareData.groups, hiddenGroups, compareData.targetLabel, compareData.criterionLabel || '', { showDualBar, isDualBar })
     : buildScaleScoreOnlyLegendHtml(scoreRange);
   return `
     <div class="scale-compare-section ${flush ? 'is-flush' : ''}">
@@ -8385,9 +8457,12 @@ function buildTargetScaleCompareSection(compareData) {
     hideMidpoint,
     disabledModes: hasGroups ? ['distribution'] : []
   });
+  const visibleGroupsForBtn = hasGroups ? getDisplayScaleCompareGroups(displayCompareData.groups, hiddenGroups) : [];
+  const canDualBar = hasGroups && visibleGroupsForBtn.length >= 1 && visibleGroupsForBtn.length <= 2;
+  const isDualBar = canDualBar && !!resultState.dualBarModes.get(displayCompareData.targetLabel);
   const compareSectionHtml = viewMode === 'distribution'
     ? buildScaleCompareDistributionSectionHtml(displayCompareData)
-    : buildScaleCompareSectionHtml(displayCompareData, hiddenGroups, { showHeader: false, flush: true });
+    : buildScaleCompareSectionHtml(displayCompareData, hiddenGroups, { showHeader: false, flush: true, isDualBar, showDualBar: canDualBar });
   const tableHtml = showTable ? buildScaleCompareDataTableHtml(displayCompareData, hiddenGroups) : '';
   return `
     <section class="result-section" data-target="${escapeHtml(displayCompareData.targetLabel)}" data-type="scale-compare">
