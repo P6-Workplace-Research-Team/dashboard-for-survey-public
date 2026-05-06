@@ -606,7 +606,7 @@ function setupPanelToggle() {
 
 function setupSelectionAndDragDrop() {
   const host = document.getElementById('question-tree');
-  const zones = document.querySelectorAll('#drop-target.drop-area, #drop-criterion.drop-area');
+  const zones = document.querySelectorAll('#drop-target.question-drop-area, #drop-criterion.question-drop-area');
   const statusEl = document.getElementById('selection-status');
   const countEl = document.getElementById('selection-count');
   const clearBtn = document.getElementById('selection-clear-btn');
@@ -701,7 +701,7 @@ function setupSelectionAndDragDrop() {
   const limit = parseInt(zone.dataset.limit, 10) || 20;
       const zoneName = zone.dataset.zone === 'target' ? '보고 싶은 문항' : '그룹별 비교';
       const existingLabels = new Set(
-        Array.from(zone.querySelectorAll('.chip')).map(c => c.dataset.label)
+        Array.from(zone.querySelectorAll('.question-chip')).map(c => c.dataset.label)
       );
 
       let added = 0;
@@ -713,7 +713,7 @@ function setupSelectionAndDragDrop() {
           if (!entry || entry.role !== 'raw' || !isSingleChoiceType(entry.type)) continue;
         }
         if (existingLabels.has(data.label)) continue;
-        const current = zone.querySelectorAll('.chip').length;
+        const current = zone.querySelectorAll('.question-chip').length;
         if (current >= limit) { blockedByLimit = true; break; }
         addChip(zone, data);
         existingLabels.add(data.label);
@@ -731,12 +731,12 @@ function setupSelectionAndDragDrop() {
 
   function addChip(zone, data) {
     const chip = document.createElement('span');
-    chip.className = 'chip';
+    chip.className = 'question-chip';
     chip.dataset.label = data.label;
     chip.dataset.key = data.key || data.label;
     chip.dataset.qno = data.qno || '';
     chip.innerHTML = `
-      <span class="chip-label">${escapeHtml(data.label)}</span>
+      <span class="question-chip-label">${escapeHtml(data.label)}</span>
       <button type="button" class="remove-btn" aria-label="제거">×</button>
     `;
     chip.querySelector('.remove-btn').addEventListener('click', () => {
@@ -748,7 +748,7 @@ function setupSelectionAndDragDrop() {
   }
 
   function refreshZoneState(zone) {
-    const chips = zone.querySelectorAll('.chip');
+    const chips = zone.querySelectorAll('.question-chip');
     zone.classList.toggle('has-chip', chips.length > 0);
     if (zone.dataset.zone === 'target') refreshTargetScaleCompareControl();
   }
@@ -1836,12 +1836,12 @@ function buildCodebookIndex(codebookRows) {
 }
 
 function getTargetChipLabels() {
-  return Array.from(document.querySelectorAll('#drop-target .chip'))
+  return Array.from(document.querySelectorAll('#drop-target .question-chip'))
     .map(c => c.dataset.label)
     .filter(Boolean);
 }
 function getCriterionChipLabel() {
-  const chip = document.querySelector('#drop-criterion .chip');
+  const chip = document.querySelector('#drop-criterion .question-chip');
   return chip ? (chip.dataset.key || chip.dataset.label) : null;
 }
 
@@ -1889,7 +1889,7 @@ function refreshTargetScaleCompareControl() {
 function clearDropZone(zoneId) {
   const zone = document.getElementById(zoneId);
   if (!zone) return;
-  zone.querySelectorAll('.chip').forEach(chip => chip.remove());
+  zone.querySelectorAll('.question-chip').forEach(chip => chip.remove());
   zone.classList.remove('has-chip');
   if (zoneId === 'drop-target') refreshTargetScaleCompareControl();
 }
