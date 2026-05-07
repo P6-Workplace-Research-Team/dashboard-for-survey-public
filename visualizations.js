@@ -3696,8 +3696,24 @@ function renderTableOptionLabel(option, targetLabel) {
 
 function buildQuestionFullHtml(entry) {
   return entry && entry.full
-    ? `<div class="result-sub">Q. ${escapeHtml(entry.full)}</div>`
+    ? `<div class="result-question-full">Q. ${escapeHtml(entry.full)}</div>`
     : '';
+}
+
+function buildResultHeaderHtml(titleHtml, fullTextHtml = '', controlsHtml = '', actionsHtml = '') {
+  const actions = actionsHtml || '';
+  return `
+    <div class="result-header">
+      <div class="result-header-top">
+        <div class="result-title">
+          ${titleHtml}
+          ${fullTextHtml}
+        </div>
+        <div class="result-header-actions">${actions}</div>
+      </div>
+      ${controlsHtml}
+    </div>
+  `;
 }
 
 function getResultVisualClass(hasLegend) {
@@ -3710,19 +3726,19 @@ function buildGroupedCountHeader(label, count, colspan) {
 
 function buildDataTableToggleButtonHtml() {
   return `
-    <button type="button" class="data-table-toggle" data-data-table-toggle aria-expanded="true">
-      <img class="data-table-toggle-icon data-table-toggle-icon-up" src="assets/icons/keyboard_arrow_up_40dp_151515_FILL0_wght400_GRAD0_opsz40.svg" alt="" aria-hidden="true">
-      <img class="data-table-toggle-icon data-table-toggle-icon-down" src="assets/icons/keyboard_arrow_down_40dp_151515_FILL0_wght400_GRAD0_opsz40.svg" alt="" aria-hidden="true">
-      <span class="data-table-toggle-label" data-label-expanded="데이터 테이블 숨기기" data-label-collapsed="데이터 테이블 펼치기">데이터 테이블 숨기기</span>
+    <button type="button" class="result-table-toggle" data-data-table-toggle aria-expanded="true">
+      <img class="result-table-toggle-icon result-table-toggle-icon-up" src="assets/icons/keyboard_arrow_up_40dp_151515_FILL0_wght400_GRAD0_opsz40.svg" alt="" aria-hidden="true">
+      <img class="result-table-toggle-icon result-table-toggle-icon-down" src="assets/icons/keyboard_arrow_down_40dp_151515_FILL0_wght400_GRAD0_opsz40.svg" alt="" aria-hidden="true">
+      <span class="result-table-toggle-label" data-label-expanded="데이터 테이블 숨기기" data-label-collapsed="데이터 테이블 펼치기">데이터 테이블 숨기기</span>
     </button>
   `;
 }
 
 function wrapResultTable(tableHtml, noteHtml = '') {
   return `
-    <div class="data-table-section" data-data-table-section>
+    <div class="result-table-section" data-data-table-section>
       ${buildDataTableToggleButtonHtml()}
-      <div class="data-table-body" data-data-table-body>
+      <div class="result-table-body" data-data-table-body>
         <div class="result-table-wrap">
           ${tableHtml}
         </div>
@@ -4054,11 +4070,7 @@ function buildRatioAllocationSection(data) {
 
   return `
     <section class="result-section" data-target="${escapeHtml(targetLabel)}" data-type="ratio-allocation">
-      <div class="result-header">
-        <div class="result-title">${escapeHtml(targetLabel)}</div>
-        ${fullText}
-        ${controlsHtml}
-      </div>
+      ${buildResultHeaderHtml(`<div class="result-question-label">${escapeHtml(targetLabel)}</div>`, fullText, controlsHtml)}
       <div class="${visualClass}">
         <div class="result-chart-col">${baseChartHtml}</div>
         ${legendHtml}
@@ -5262,17 +5274,17 @@ function buildNumericHistogramChartHtml(histogram, options = {}) {
       count: bin.count
     }));
     const valueLabel = bin.count > 0
-      ? `<span class="numeric-open-bar-value">${formatPercent(bin.pct)}</span>`
+      ? `<span class="numeric-hist-bar-value">${formatPercent(bin.pct)}</span>`
       : '';
     return `
-      <div class="numeric-open-bar ${bin.count > 0 ? '' : 'is-empty'}"
+      <div class="numeric-hist-bar ${bin.count > 0 ? '' : 'is-empty'}"
            style="left:${x.toFixed(3)}%; width:${barWidth.toFixed(3)}%; height:${visibleHeight.toFixed(3)}%; background:${SINGLE_BAR_COLOR};"
            data-tip="${tip}"
            aria-label="구간 ${index + 1}">${valueLabel}</div>
     `;
   }).join('');
 
-  const axisLabelsHtml = buildNumericBoundaryAxisLabelsHtml(histogram.bins, histogram.domainMax, 'numeric-open-axis-label');
+  const axisLabelsHtml = buildNumericBoundaryAxisLabelsHtml(histogram.bins, histogram.domainMax, 'numeric-hist-axis-label');
 
   const meanTip = encodeURIComponent(JSON.stringify({
     kind: 'numeric-mean',
@@ -5282,21 +5294,21 @@ function buildNumericHistogramChartHtml(histogram, options = {}) {
     unit: numberUnit
   }));
   return `
-    <div class="vertical-chart numeric-open-chart">
-      ${numberUnit ? `<div class="numeric-open-unit">단위 : ${escapeHtml(numberUnit)}</div>` : ''}
-      <div class="vertical-chart-plot numeric-open-hist-plot">
+    <div class="vertical-chart numeric-hist-chart">
+      <div class="vertical-chart-plot">
         <div class="vertical-chart-guides" aria-hidden="true">${guidesHtml}</div>
-        <div class="numeric-open-bars">${barsHtml}</div>
-        <div class="numeric-open-mean-layer">
+        <div class="numeric-hist-bars">${barsHtml}</div>
+        <div class="numeric-hist-mean-layer">
           ${histogram.meanLeftPct === null ? '' : `
-          <div class="numeric-open-mean-marker" style="left:${histogram.meanLeftPct}%;">
-            <div class="numeric-open-mean-line"></div>
-            <div class="numeric-open-mean-label" data-tip="${meanTip}">평균<span class="numeric-open-hist-marker-value">${formatNumericValue(histogram.mean, 1)}</span></div>
+          <div class="numeric-hist-mean-marker" style="left:${histogram.meanLeftPct}%;">
+            <div class="numeric-hist-mean-line"></div>
+            <div class="numeric-hist-mean-label" data-tip="${meanTip}">평균<span class="numeric-hist-marker-value">${formatNumericValue(histogram.mean, 1)}</span></div>
           </div>
           `}
         </div>
       </div>
-      <div class="numeric-open-boundary-axis">${axisLabelsHtml}</div>
+      <div class="numeric-hist-boundary-axis">${axisLabelsHtml}</div>
+      ${numberUnit ? `<div class="numeric-open-unit">단위 : ${escapeHtml(numberUnit)}</div>` : ''}
     </div>
   `;
 }
@@ -5426,7 +5438,7 @@ function buildTextOpenSection(data) {
   const fullText = buildQuestionFullHtml(codebookEntry);
   const safeTarget = escapeHtml(targetLabel);
   const searchIcon = 'assets/icons/search_40dp_151515_FILL0_wght400_GRAD0_opsz40.svg';
-  const itemsHtml = responses.map(r => `<div class="text-open-item" data-text="${escapeHtml(r.toLowerCase())}">${escapeHtml(r)}</div>`).join('');
+  const itemsHtml = responses.map(r => `<div class="open-text-item" data-text="${escapeHtml(r.toLowerCase())}">${escapeHtml(r)}</div>`).join('');
   const controlsHtml = `
     <div class="viz-controls">
       <div class="viz-controls-element">
@@ -5439,18 +5451,14 @@ function buildTextOpenSection(data) {
     </div>
   `;
   const chartHtml = `
-    <div class="text-open-box">
-      <div class="text-open-header">응답 ${responses.length}건 / 전체 ${totalN}명</div>
-      <div class="text-open-responses" data-text-open-responses data-target="${safeTarget}">${itemsHtml}</div>
+    <div class="open-text-box">
+      <div class="open-text-header">응답 ${responses.length}건 / 전체 ${totalN}명</div>
+      <div class="open-text-responses" data-text-open-responses data-target="${safeTarget}">${itemsHtml}</div>
     </div>
   `;
   return `
     <section class="result-section" data-target="${safeTarget}" data-type="text-open">
-      <div class="result-header">
-        <div class="result-title">${escapeHtml(targetLabel)}</div>
-        ${fullText}
-        ${controlsHtml}
-      </div>
+      ${buildResultHeaderHtml(`<div class="result-question-label">${escapeHtml(targetLabel)}</div>`, fullText, controlsHtml)}
       <div class="result-visual">
         <div class="result-chart-col">${chartHtml}</div>
       </div>
@@ -5484,12 +5492,8 @@ function buildNumericOpenSection(data) {
   const sidePanelHtml = buildResultSidePanelHtml(legendHtml, targetLabel);
   return `
     <section class="result-section" data-target="${escapeHtml(targetLabel)}" data-type="numeric-open">
-      <div class="result-header">
-        <div class="result-title">${escapeHtml(targetLabel)}</div>
-        ${fullText}
-        ${controlsHtml}
-      </div>
-      <div class="result-visual has-legend numeric-open-visual">
+      ${buildResultHeaderHtml(`<div class="result-question-label">${escapeHtml(targetLabel)}</div>`, fullText, controlsHtml)}
+      <div class="result-visual has-legend">
         <div class="result-chart-col">${chartHtml}</div>
         ${sidePanelHtml}
       </div>
@@ -6982,7 +6986,7 @@ function buildRankSection(data, rows) {
   const fullText = buildQuestionFullHtml(codebookEntry);
   const sidePanelHtml = buildResultSidePanelHtml(legendHtml, targetLabel);
   const titleHtml = `
-    <div class="result-title">
+    <div class="result-question-label">
       <span>${escapeHtml(targetLabel)}</span>
       <button type="button" class="rank1st-card-btn" data-rank1st-card-toggle="${escapeHtml(targetLabel)}">
         1순위만 보기
@@ -6992,13 +6996,7 @@ function buildRankSection(data, rows) {
 
   return `
     <section class="result-section" data-target="${escapeHtml(targetLabel)}" data-type="rank">
-      <div class="result-header">
-        <div class="result-header-top">
-          ${titleHtml}
-        </div>
-        ${fullText}
-        ${controlsHtml}
-      </div>
+      ${buildResultHeaderHtml(titleHtml, fullText, controlsHtml)}
       <div class="result-visual has-legend">
         <div class="result-chart-col">${chartHtml}</div>
         ${sidePanelHtml}
@@ -8443,23 +8441,12 @@ function buildChoiceSectionHtml(data, rows) {
   const fullText = buildQuestionFullHtml(codebookEntry);
   const visualClass = getResultVisualClass(!!groupResults || (isSingleWithoutGroup && chartType === 'pie'));
   const titleHtml = rank1stSourceLabel
-    ? `<div class="result-title rank1st-derived-title"><span>${escapeHtml(displayLabel)}</span><button type="button" class="rank1st-card-btn is-active" data-rank1st-card-toggle="${escapeHtml(rank1stSourceLabel)}">모든 순위 보기</button></div>`
-    : `<div class="result-title">${escapeHtml(displayLabel)}</div>`;
-  const rank1stToggleHtml = rank1stSourceLabel
-    ? ''
-    : '';
-  const topActionsHtml = `<div class="result-header-actions">${rank1stToggleHtml}</div>`;
+    ? `<div class="result-question-label rank1st-derived-title"><span>${escapeHtml(displayLabel)}</span><button type="button" class="rank1st-card-btn" data-rank1st-card-toggle="${escapeHtml(rank1stSourceLabel)}">모든 순위 보기</button></div>`
+    : `<div class="result-question-label">${escapeHtml(displayLabel)}</div>`;
 
   return `
     <section class="result-section${rank1stSourceLabel ? ' rank1st-derived-section' : ''}" data-target="${escapeHtml(targetLabel)}" data-type="${data.isMulti ? 'multiple' : 'single'}"${rank1stSourceLabel ? ` data-rank1st-source="${escapeHtml(rank1stSourceLabel)}"` : ''}>
-      <div class="result-header">
-        <div class="result-header-top">
-          ${titleHtml}
-          ${topActionsHtml}
-        </div>
-        ${fullText}
-        ${controlsHtml}
-      </div>
+      ${buildResultHeaderHtml(titleHtml, fullText, controlsHtml)}
       <div class="${visualClass}">
         <div class="result-chart-col">${chartHtml}</div>
         ${sidePanelHtml}
@@ -8501,11 +8488,7 @@ function buildScaleSection(data, rows) {
 
   return `
     <section class="result-section" data-target="${escapeHtml(targetLabel)}" data-type="scale">
-      <div class="result-header">
-        <div class="result-title">${escapeHtml(targetLabel)}</div>
-        ${fullText}
-        ${toggleHtml}
-      </div>
+      ${buildResultHeaderHtml(`<div class="result-question-label">${escapeHtml(targetLabel)}</div>`, fullText, toggleHtml)}
       <div class="${visualClass}">
         <div class="result-chart-col">${chartHtml}</div>
         ${sidePanelHtml}
@@ -8544,10 +8527,7 @@ function buildTargetScaleCompareSection(compareData) {
   const tableHtml = showTable ? buildScaleCompareDataTableHtml(displayCompareData, hiddenGroups) : '';
   return `
     <section class="result-section" data-target="${escapeHtml(displayCompareData.targetLabel)}" data-type="scale-compare">
-      <div class="result-header">
-        <div class="result-title">여러 문항 한 번에 비교하기</div>
-        ${toggleHtml}
-      </div>
+      ${buildResultHeaderHtml('<div class="result-question-label">여러 문항 한 번에 비교하기</div>', '', toggleHtml)}
       ${compareSectionHtml}
       ${tableHtml}
     </section>
@@ -8570,10 +8550,7 @@ function buildUnsupportedSection(label, entry) {
   const messageHtml = `이 문항 유형(<strong>${escapeHtml(typeText)}</strong>)의 시각화는 아직 준비 중이에요.`;
   return `
     <section class="result-section" data-target="${escapeHtml(label)}">
-      <div class="result-header">
-        <div class="result-title">${escapeHtml(label)}</div>
-        ${fullText}
-      </div>
+      ${buildResultHeaderHtml(`<div class="result-question-label">${escapeHtml(label)}</div>`, fullText)}
       <div class="result-unsupported">
         ${messageHtml} 현재는 <strong>객관식 단일</strong>, <strong>객관식 중복</strong>, <strong>객관식 순위</strong>, <strong>객관식 척도</strong>, <strong>주관식 숫자</strong>, <strong>주관식 비율 배분</strong> 문항을 지원합니다.
       </div>
@@ -8734,7 +8711,7 @@ function applyDataTableCollapsed(wrapper, btn, collapsed) {
   if (!wrapper || !btn) return;
   wrapper.classList.toggle('is-collapsed', !!collapsed);
   btn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
-  const labelEl = btn.querySelector('.data-table-toggle-label');
+  const labelEl = btn.querySelector('.result-table-toggle-label');
   if (labelEl) {
     const expandedText = labelEl.dataset.labelExpanded || '데이터 테이블 숨기기';
     const collapsedText = labelEl.dataset.labelCollapsed || '데이터 테이블 펼치기';
@@ -8817,7 +8794,7 @@ function attachResultEventListeners(container) {
       const target = input.dataset.target;
       const responsesEl = container.querySelector(`[data-text-open-responses][data-target="${target}"]`);
       if (!responsesEl) return;
-      responsesEl.querySelectorAll('.text-open-item').forEach(item => {
+      responsesEl.querySelectorAll('.open-text-item').forEach(item => {
         const text = item.dataset.text || '';
         item.classList.toggle('is-hidden', query.length > 0 && !text.includes(query));
       });
@@ -9354,7 +9331,7 @@ const EXPORT_HIDE_SELECTORS = [
   '.chart-view-controls',
   '.viz-controls',
   '[data-data-table-toggle]',
-  '.export-img-btn',
+  '.result-export-btn',
 ];
 
 const EXPORT_CUT_SELECTORS = [
@@ -9376,15 +9353,32 @@ function addExportButtons(container) {
   container.querySelectorAll('.result-section').forEach(function(section) {
     var header = section.querySelector('.result-header');
     if (!header) return;
-    if (header.querySelector('.export-img-btn')) return;
+    if (header.querySelector('.result-export-btn')) return;
     var row = header.querySelector('.result-header-top');
     if (!row) {
-      var titleEl = header.querySelector('.result-title');
+      var titleEl = header.querySelector('.result-question-label');
       if (!titleEl) return;
       row = document.createElement('div');
       row.className = 'result-header-top';
       titleEl.replaceWith(row);
-      row.appendChild(titleEl);
+      var main = document.createElement('div');
+      main.className = 'result-title';
+      row.appendChild(main);
+      main.appendChild(titleEl);
+
+      var subEl = header.querySelector('.result-question-full');
+      if (subEl) main.appendChild(subEl);
+    } else if (!row.querySelector('.result-title')) {
+      var existingTitle = row.querySelector('.result-question-label');
+      if (existingTitle) {
+        var headerMain = document.createElement('div');
+        headerMain.className = 'result-title';
+        existingTitle.replaceWith(headerMain);
+        headerMain.appendChild(existingTitle);
+
+        var existingSub = header.querySelector('.result-question-full');
+        if (existingSub) headerMain.appendChild(existingSub);
+      }
     }
     var actions = row.querySelector('.result-header-actions');
     if (!actions) {
@@ -9395,7 +9389,7 @@ function addExportButtons(container) {
 
     var imgBtn = document.createElement('button');
     imgBtn.type = 'button';
-    imgBtn.className = 'export-img-btn';
+    imgBtn.className = 'result-export-btn';
     imgBtn.innerHTML = '<img class="result-export-icon" src="assets/icons/add_photo_alternate_40dp_151515_FILL0_wght400_GRAD0_opsz40.svg" alt="" aria-hidden="true"> 이미지로 저장';
     imgBtn.addEventListener('click', function() { exportSectionAsImage(section, imgBtn); });
     actions.appendChild(imgBtn);
@@ -9403,7 +9397,7 @@ function addExportButtons(container) {
     if (section.dataset.type === 'single') {
       var pptBtn = document.createElement('button');
       pptBtn.type = 'button';
-      pptBtn.className = 'export-img-btn export-ppt-btn';
+      pptBtn.className = 'result-export-btn export-ppt-btn';
       pptBtn.innerHTML = '<img class="result-export-icon" src="assets/icons/add_chart_40dp_151515_FILL0_wght400_GRAD0_opsz40.svg" alt="" aria-hidden="true"> PPT로 내보내기';
       pptBtn.addEventListener('click', function() { exportSingleChoiceAsPptx(section, pptBtn); });
       actions.appendChild(pptBtn);
@@ -9728,7 +9722,7 @@ async function exportSectionAsImage(section, btn) {
     svgImgEls.forEach(function(el, i) { el.setAttribute('src', svgOrigSrcs[i]); });
     hiddenEls.forEach(function(el) { el.style.visibility = ''; });
 
-    var titleEl = section.querySelector('.result-title');
+    var titleEl = section.querySelector('.result-question-label');
     var rawTitle = titleEl
       ? (titleEl.firstChild && titleEl.firstChild.nodeType === Node.TEXT_NODE
           ? titleEl.firstChild.textContent : titleEl.textContent)
