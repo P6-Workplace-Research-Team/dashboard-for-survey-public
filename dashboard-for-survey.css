@@ -4285,13 +4285,14 @@ body.filter-dragging .filter-add-btn:hover {
   font-weight: var(--font-weight-regular);
   line-height: var(--body-line-height);
   color: var(--neutral-900);
-  word-break: keep-all;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   min-height: auto;
   padding-top: 0;
-  display: flex;
-  align-items: flex-start;
+  display: block;
   text-align: right;
-  justify-content: flex-end;
 }
 
 .scale-compare-mean-row {
