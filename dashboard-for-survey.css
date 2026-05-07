@@ -1189,6 +1189,7 @@ button {
   padding: 10px 16px;
   border: 1px solid var(--neutral-200);
   border-radius: var(--radius-8);
+  overflow: hidden;
   font-size: var(--body-3-size);
   line-height: var(--body-line-height);
   color: var(--neutral-700);
