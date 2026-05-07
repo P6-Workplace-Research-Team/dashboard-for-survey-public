@@ -111,6 +111,7 @@
   --viz-legend-width: calc(var(--criterion-col-width) - 60px);
   --viz-chart-inline-pad: 16px;
   --viz-label-col-width: clamp(120px, 20%, 220px);
+  --viz-label-col-resizer-width: 20px;
   --viz-bar-height: 32px;
   --viz-stack-height: 40px;
   --scale-track-center: calc(var(--viz-stack-height) / 2);
@@ -4566,6 +4567,37 @@ body.filter-dragging .filter-add-btn:hover {
 
 .open-text-item.is-hidden {
   display: none;
+}
+
+/* ======== 보기명 컬럼 너비 조절 리사이저 ======== */
+
+.viz-label-col-resizable {
+  position: relative;
+}
+
+.viz-label-col-resizer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--viz-label-col-width) + var(--viz-label-bar-gap) - 8px);
+  z-index: 20;
+  width: var(--viz-label-col-resizer-width);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: col-resize;
+  transform: translateX(-50%);
+}
+
+body.is-viz-label-col-resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+
+@media (max-width: 900px) {
+  .viz-label-col-resizer {
+    display: none;
+  }
 }
 
 /* ================================ 데이터 테이블 영역 ================================ */

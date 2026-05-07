@@ -1772,9 +1772,19 @@ const resultState = {
   groupConfigModalState: null,
   dualBarModes: new Map(),           // Map<targetLabel, boolean> - 이중 막대 모드
   rank1stCardOpen: new Set(),        // Set<targetLabel> - 1순위 단독 카드 펼침 여부
+  vizLabelColWidths: new Map(),      // Map<sectionKey, number> - 현재 화면에서만 유지되는 레이블 컬럼 너비
 };
 
 const TARGET_SCALE_COMPARE_VIEW_KEY = '__target_scale_compare__';
+const VIZ_LABEL_COL_WIDTH_MIN = 96;
+const VIZ_LABEL_COL_WIDTH_MAX = 360;
+const VIZ_LABEL_COL_RESIZE_SELECTORS = [
+  '.single-hbar-chart',
+  '.dual-hbar-chart',
+  '.lollipop-h-chart',
+  '.dual-lollipop-h-chart',
+  '.stack100-group-chart'
+].join(',');
 
 function parseValueCodeMap(text) {
   const map = new Map();
@@ -8578,9 +8588,11 @@ async function renderResults() {
 
   const targetLabels = getTargetChipLabels();
   if (targetLabels.length === 0) {
+    resultState.vizLabelColWidths.clear();
     container.innerHTML = '<div class="result-empty">보고 싶은 문항을 드래그하면 차트가 생성됩니다</div>';
     return;
   }
+  pruneVizLabelColWidths(targetLabels);
 
   await ensureCodebookIndexLoaded();
   refreshTargetScaleCompareControl();
@@ -8599,6 +8611,7 @@ async function renderResults() {
     const compareData = aggregateTargetScaleCompareData(targetLabels, criterionLabel, filteredRows);
     if (compareData) {
       container.innerHTML = buildTargetScaleCompareSection(compareData);
+      attachVizLabelColResizers(container);
       alignScaleCompareCharts(container);
       attachResultEventListeners(container);
       return;
@@ -8617,10 +8630,88 @@ async function renderResults() {
   }).join('');
 
   container.innerHTML = sections;
+  attachVizLabelColResizers(container);
   alignGroupCompareCharts(container);
   alignScaleCompareCharts(container);
   attachResultEventListeners(container);
   addExportButtons(container);
+}
+
+function clampVizLabelColWidth(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return null;
+  return Math.max(VIZ_LABEL_COL_WIDTH_MIN, Math.min(VIZ_LABEL_COL_WIDTH_MAX, Math.round(numeric)));
+}
+
+function getVizLabelColWidthKey(section) {
+  const target = section && section.dataset ? (section.dataset.target || '') : '';
+  const type = section && section.dataset ? (section.dataset.type || '') : '';
+  return `${type}:${target}`;
+}
+
+function pruneVizLabelColWidths(targetLabels) {
+  const activeLabels = new Set(targetLabels || []);
+  resultState.vizLabelColWidths.forEach((_, key) => {
+    const target = key.slice(key.indexOf(':') + 1);
+    if (target && !activeLabels.has(target)) resultState.vizLabelColWidths.delete(key);
+  });
+}
+
+function setSectionVizLabelColWidth(section, width, remember = false) {
+  const clamped = clampVizLabelColWidth(width);
+  if (!section || clamped === null) return;
+  section.style.setProperty('--viz-label-col-width', `${clamped}px`);
+  if (remember) resultState.vizLabelColWidths.set(getVizLabelColWidthKey(section), clamped);
+}
+
+function applyRememberedSectionVizLabelColWidth(section) {
+  if (!section) return;
+  const remembered = resultState.vizLabelColWidths.get(getVizLabelColWidthKey(section));
+  if (remembered !== undefined) setSectionVizLabelColWidth(section, remembered, false);
+}
+
+function attachVizLabelColResizers(container) {
+  if (!container) return;
+  container.querySelectorAll(VIZ_LABEL_COL_RESIZE_SELECTORS).forEach(chart => {
+    if (chart.querySelector(':scope > .viz-label-col-resizer')) return;
+    const section = chart.closest('.result-section');
+    applyRememberedSectionVizLabelColWidth(section);
+    chart.classList.add('viz-label-col-resizable');
+
+    const handle = document.createElement('button');
+    handle.type = 'button';
+    handle.className = 'viz-label-col-resizer';
+    handle.setAttribute('aria-label', '보기명 영역 너비 조절');
+    handle.addEventListener('pointerdown', event => {
+      if (window.matchMedia && window.matchMedia('(max-width: 900px)').matches) return;
+      event.preventDefault();
+      handle.setPointerCapture(event.pointerId);
+      document.body.classList.add('is-viz-label-col-resizing');
+
+      const gap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--viz-label-bar-gap')) || 0;
+      const update = clientX => {
+        const rect = chart.getBoundingClientRect();
+        setSectionVizLabelColWidth(section, clientX - rect.left - gap + 8, true);
+        alignGroupCompareCharts(container);
+        alignScaleCompareCharts(container);
+      };
+      update(event.clientX);
+
+      const onMove = moveEvent => update(moveEvent.clientX);
+      const onUp = upEvent => {
+        try { handle.releasePointerCapture(upEvent.pointerId); } catch (_) {}
+        document.body.classList.remove('is-viz-label-col-resizing');
+        handle.removeEventListener('pointermove', onMove);
+        handle.removeEventListener('pointerup', onUp);
+        handle.removeEventListener('pointercancel', onUp);
+      };
+
+      handle.addEventListener('pointermove', onMove);
+      handle.addEventListener('pointerup', onUp);
+      handle.addEventListener('pointercancel', onUp);
+    });
+    chart.appendChild(handle);
+  });
 }
 
 function alignGroupCompareCharts(container) {
@@ -9330,6 +9421,7 @@ const EXPORT_FOOTER_PAD = 28;         // 푸터 좌우 패딩
 const EXPORT_HIDE_SELECTORS = [
   '.chart-view-controls',
   '.viz-controls',
+  '.viz-label-col-resizer',
   '[data-data-table-toggle]',
   '.result-export-btn',
 ];
