@@ -226,7 +226,7 @@
 - 빈 상태 `.result-empty`: `보고 싶은 문항을 드래그하면 차트가 생성됩니다` (가운데, body-3, `--neutral-600`, padding `60px 0`)
 - 본 문서에서 다루는 사항: 컨테이너 위치·치수·빈 상태 메시지까지
 - 본 문서에서 다루지 않는 사항(=TBD)
-  - `.result-section` / `.result-header` / `.result-title` / `.result-sub` / `.result-unsupported` 등 결과 섹션 내부 구조
+- `.result-section` / `.result-header` / `.result-question-label` / `.result-question-full` / `.result-unsupported` 등 결과 섹션 내부 구조
   - 차트 종류 (가로 막대 / 척도 분포 / 평균 비교 / 척도 그룹 / 파생 척도 violin 등)
   - 정렬·뷰 토글·범례·평균 라벨 / 연도 비교 / 척도 묶기 / 기타 응답 등 결과 영역 컨트롤
   - 시각화 → CSV/이미지 export 동작 (`html2canvas`, `dom-to-image-more` 사용)

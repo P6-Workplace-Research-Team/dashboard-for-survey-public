@@ -32,7 +32,7 @@
 
 | 요소 | CSS 클래스 / 설명 |
 |---|---|
-| 문항 제목 | `.result-title` |
+| 문항 제목 | `.result-question-label` |
 | 문항 전체 텍스트 | `.result-question-full` (Q. 본문 텍스트) |
 | 차트 본체 | `.single-hbar-chart`, `.vbar-chart`, `.pie-chart-wrap`, `.stacked-chart-wrap`, `.lollipop-chart` 등 차트 영역 전체 |
 | 가중 평균 설명 주석 | `.result-note` (산출식 설명 텍스트) |
@@ -50,7 +50,7 @@
 | 그래프 유형 드롭다운 + 정렬 버튼 | `.chart-view-controls` | 가로/세로/원형/누적 전환, 기본순서/응답률 높은 순 |
 | 순위 문항 컨트롤 전체 | `.choice-controls` | 가중 평균/응답 비율 탭, 막대 방향 탭, 가중 평균 높은 순서 정렬 체크박스 |
 | 데이터 테이블 토글 버튼 | `[data-data-table-toggle]` | "데이터 테이블 펼치기/숨기기" 버튼 — 테이블 펼침 여부와 무관하게 항상 제외 |
-| 이미지 저장 버튼 자체 | `.export-img-btn` | 캡처 버튼이 이미지에 찍히지 않도록 |
+| 이미지 저장 버튼 자체 | `.result-export-btn` | 캡처 버튼이 이미지에 찍히지 않도록 |
 
 ---
 
@@ -78,7 +78,7 @@
 - **라이브러리**: `dom-to-image-more` (SVG 처리 정확도 우수)
 - **폰트**: 로컬 `assets/fonts/Pretendard-*.otf` 참조 (CDN CORS 문제 회피)
 - **캡처 흐름**:
-  1. 제외 대상 요소(`[data-data-table-toggle]`, `.chart-view-controls`, `.choice-controls`, `.export-img-btn`)를 `visibility: hidden` 처리
+  1. 제외 대상 요소(`[data-data-table-toggle]`, `.chart-view-controls`, `.choice-controls`, `.result-export-btn`)를 `visibility: hidden` 처리
   2. 데이터 테이블이 **접힌 상태**라면 `[data-data-table-section]`도 추가로 숨김
   3. `document.fonts.ready` 대기
   4. `domtoimage.toCanvas(section, { width: 1920, bgcolor: '#ffffff' })` 호출
