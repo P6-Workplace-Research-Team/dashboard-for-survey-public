@@ -1576,6 +1576,8 @@ function setupSavedModal() {
 
   refreshCount();
 
+  /* 이미지 추출 기능 */
+
   if (newBtn) newBtn.addEventListener('click', () => { window.location.href = 'home.html'; });
   const exportAllPptxBtn = document.getElementById('export-all-pptx-btn');
   if (exportAllPptxBtn) exportAllPptxBtn.addEventListener('click', () => exportAllSingleChoiceAsPptx(exportAllPptxBtn));
@@ -10025,6 +10027,7 @@ async function exportSingleChoiceAsPptx(section, btn) {
   }
 }
 
+/* 이미지 추출 기능 */
 async function exportSectionAsImage(section, btn) {
   // 라이브러리 로드 확인
   if (typeof html2canvas === 'undefined') {
