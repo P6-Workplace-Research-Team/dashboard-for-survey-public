@@ -549,22 +549,19 @@ body.home-page {
   font-size: var(--heading-6-size);
   line-height: var(--heading-line-height);
   font-weight: var(--font-weight-semibold);
-  color: var(--White);
+  color: var(--neutral-900);
   display: none;
+}
+
+.home-page .drop-zone.done .done-title {
+  display: block;
 }
 
 .home-page .check-icon {
   font-family: 'Material Symbols Rounded';
   font-size: 28px;
   font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-  color: var(--White);
-  width: 56px;
-  height: 56px;
-  border-radius: 999px;
-  background: var(--neutral-900);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  color: var(--neutral-900);
   line-height: 1;
   user-select: none;
 }
@@ -4972,6 +4969,16 @@ body.is-viz-label-col-resizing {
   padding: 8px;
 }
 
+#list-modal .modal-body {
+  height: 328px;
+  overflow-y: auto;
+  margin: 2px 2px 0 0;
+}
+
+#list-modal .modal-body::-webkit-scrollbar-track {
+  margin: 2px 0 14px;
+}
+
 .modal-footer {
   display: flex;
   justify-content: flex-end;
@@ -5040,6 +5047,7 @@ body.is-viz-label-col-resizing {
 }
 
 .saved-item {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -5050,6 +5058,48 @@ body.is-viz-label-col-resizing {
 
 .saved-item:hover {
   background: var(--neutral-50);
+}
+
+.saved-item.dragging {
+  opacity: 0.4;
+}
+
+.saved-item::before,
+.saved-item::after {
+  content: '';
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  height: 2px;
+  background: var(--neutral-300);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.saved-item::before {
+  top: -5px;
+}
+
+.saved-item::after {
+  bottom: -5px;
+}
+
+.saved-item.drag-over-before::before,
+.saved-item.drag-over-after::after {
+  opacity: 1;
+}
+
+.drag-handle {
+  font-family: 'Material Symbols Rounded';
+  font-size: 20px;
+  color: var(--neutral-300);
+  cursor: grab;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
 }
 
 .saved-item+.saved-item {
@@ -5063,7 +5113,7 @@ body.is-viz-label-col-resizing {
 }
 
 .saved-title {
-  font-size: var(--heading-5-size);
+  font-size: var(--heading-6-size);
   line-height: var(--heading-line-height);
   font-weight: var(--font-weight-semibold);
   color: var(--neutral-900);

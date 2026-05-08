@@ -736,7 +736,7 @@ function setupSelectionAndDragDrop() {
         if (!data || !data.label) continue;
         const entry = resultState.codebookByLabel.get(data.label);
         if (zone.dataset.zone === 'criterion') {
-          if (!entry || entry.role !== 'raw' || !isSingleChoiceType(entry.type)) continue;
+          if (!entry || !isSingleChoiceType(entry.type)) continue;
         }
         if (existingLabels.has(data.label)) continue;
         const current = zone.querySelectorAll('.question-chip').length;
@@ -1366,6 +1366,7 @@ function setupSavedModal() {
       row.className = 'saved-item';
       row.dataset.id = item.id;
       row.innerHTML = `
+        <div class="drag-handle" draggable="true" aria-hidden="true">drag_indicator</div>
         <div class="saved-main" data-id="${item.id}">
           <div class="saved-title" data-id="${item.id}">${escapeHtml(item.title)}</div>
           <input type="text" class="saved-title-input" maxlength="50" hidden>
@@ -1377,6 +1378,49 @@ function setupSavedModal() {
         </div>
       `;
       savedList.appendChild(row);
+    });
+
+    let dragSrcId = null;
+
+    savedList.querySelectorAll('.saved-item').forEach(item => {
+      item.addEventListener('dragstart', e => {
+        if (!e.target.closest('.drag-handle')) {
+          e.preventDefault();
+          return;
+        }
+        dragSrcId = item.dataset.id;
+        item.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+      });
+      item.addEventListener('dragend', () => {
+        dragSrcId = null;
+        item.classList.remove('dragging');
+        savedList.querySelectorAll('.saved-item').forEach(i => i.classList.remove('drag-over-before', 'drag-over-after'));
+      });
+      item.addEventListener('dragover', e => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        savedList.querySelectorAll('.saved-item').forEach(i => i.classList.remove('drag-over-before', 'drag-over-after'));
+        if (dragSrcId !== item.dataset.id) {
+          const rect = item.getBoundingClientRect();
+          item.classList.add(e.clientY > rect.top + rect.height / 2 ? 'drag-over-after' : 'drag-over-before');
+        }
+      });
+      item.addEventListener('drop', e => {
+        e.preventDefault();
+        if (!dragSrcId || dragSrcId === item.dataset.id) return;
+        const list = loadSurveys();
+        const fromIdx = list.findIndex(s => s.id === dragSrcId);
+        if (fromIdx < 0) return;
+        const rect = item.getBoundingClientRect();
+        const insertAfter = e.clientY > rect.top + rect.height / 2;
+        const [moved] = list.splice(fromIdx, 1);
+        const targetIdx = list.findIndex(s => s.id === item.dataset.id);
+        if (targetIdx < 0) return;
+        list.splice(targetIdx + (insertAfter ? 1 : 0), 0, moved);
+        saveSurveys(list);
+        renderList();
+      });
     });
 
     savedList.querySelectorAll('.saved-main').forEach(main => {
@@ -1785,6 +1829,7 @@ const resultState = {
   dataTableCollapsed: new Map(),
   singleChoiceChartTypes: new Map(),
   singleChoiceSortByRate: new Map(),
+  multiChoiceSortByRate: new Map(),
   scaleChartTypes: new Map(),
   ratioChartTypes: new Map(),
   openChoiceMenus: new Set(),
@@ -7471,6 +7516,7 @@ function buildChoiceControlsHtml(targetLabel, options) {
     stateScope = 'single',
     showSort = true,
     sortByRate = false,
+    isMulti = false,
     isMenuOpen = false
   } = options || {};
   const safeTarget = escapeHtml(targetLabel);
@@ -7507,7 +7553,7 @@ function buildChoiceControlsHtml(targetLabel, options) {
 
   const sortHtml = showSort ? `
     <label class="viz-control-checkbox">
-      <input type="checkbox" data-choice-sort-by-rate data-target="${safeTarget}" ${sortByRate ? 'checked' : ''}>
+      <input type="checkbox" data-choice-sort-by-rate ${isMulti ? 'data-is-multi="true"' : ''} data-target="${safeTarget}" ${sortByRate ? 'checked' : ''}>
       <span class="viz-control-checkbox__label">응답 비율이 높은 순서로 정렬</span>
     </label>
   ` : '';
@@ -8599,7 +8645,9 @@ function buildChoiceSectionHtml(data, rows) {
   const displayHidden = hiddenGroups;
 
   const isSingleWithoutGroup = !data.isMulti && !groupResults;
-  const sortByRate = !data.isMulti ? getSingleChoiceSortByRate(targetLabel) : false;
+  const sortByRate = data.isMulti
+    ? !!resultState.multiChoiceSortByRate.get(targetLabel)
+    : getSingleChoiceSortByRate(targetLabel);
   const displayData = sortByRate ? applyChoiceSortToData(baseData, true) : baseData;
 
   const showControls = isSingleWithoutGroup || data.isMulti || !!groupResults;
@@ -8613,8 +8661,9 @@ function buildChoiceSectionHtml(data, rows) {
         chartTypes,
         disabledTypes: groupResults ? ['bar_vertical', 'pie'] : [],
         stateScope: 'single',
-        showSort: !data.isMulti,
+        showSort: true,
         sortByRate,
+        isMulti: !!data.isMulti,
         isMenuOpen
       })
     : '';
@@ -9388,13 +9437,17 @@ function attachResultEventListeners(container) {
       renderResults();
     });
   });
-  // 객관식 단일: 응답 비율 정렬 체크박스
+  // 객관식 단일/중복: 응답 비율 정렬 체크박스
   container.querySelectorAll('[data-choice-sort-by-rate]').forEach(input => {
     input.addEventListener('change', e => {
       e.stopPropagation();
       const targetLabel = input.dataset.target;
       if (!targetLabel) return;
-      resultState.singleChoiceSortByRate.set(targetLabel, !!input.checked);
+      if (input.dataset.isMulti) {
+        resultState.multiChoiceSortByRate.set(targetLabel, !!input.checked);
+      } else {
+        resultState.singleChoiceSortByRate.set(targetLabel, !!input.checked);
+      }
       renderResults();
     });
   });

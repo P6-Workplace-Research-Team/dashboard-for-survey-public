@@ -4,6 +4,7 @@
 const _SUPABASE_URL = 'https://anryotqsnrhsonpsrdbw.supabase.co';
 const _SUPABASE_KEY = 'sb_publishable_1hDV_KyYG9qYVR2J-_3iSA_7VTUf9wY';
 const _BUCKET = 'survey-files';
+const _SORT_ORDER_KEY = 'surveys_sort_order';
 
 const _supabase = window.supabase.createClient(_SUPABASE_URL, _SUPABASE_KEY);
 
@@ -56,7 +57,19 @@ async function loadSurveysFromServer(shareToken) {
     .order('created_at', { ascending: false });
 
   if (res.error) console.error('[loadSurveysFromServer] DB 오류:', res.error);
-  _surveysCache = (res.data || []).map(_toLocalSurveyFormat);
+  var loaded = (res.data || []).map(_toLocalSurveyFormat);
+  try {
+    var savedOrder = JSON.parse(localStorage.getItem(_SORT_ORDER_KEY) || '[]');
+    if (savedOrder.length > 0) {
+      var orderMap = new Map(savedOrder.map(function(id, i) { return [id, i]; }));
+      loaded.sort(function(a, b) {
+        var ai = orderMap.has(a.id) ? orderMap.get(a.id) : Infinity;
+        var bi = orderMap.has(b.id) ? orderMap.get(b.id) : Infinity;
+        return ai !== bi ? ai - bi : 0;
+      });
+    }
+  } catch (_) {}
+  _surveysCache = loaded;
 
   if (shareToken) {
     var shared = await _supabase
@@ -86,6 +99,7 @@ function loadSurveys() {
 async function saveSurveys(newList) {
   var oldCache = _surveysCache.slice();
   _surveysCache = Array.isArray(newList) ? newList : [];
+  try { localStorage.setItem(_SORT_ORDER_KEY, JSON.stringify(_surveysCache.map(function(s) { return s.id; }))); } catch (_) {}
 
   try {
     var oldMap = new Map(oldCache.map(function(s) { return [s.id, s]; }));
