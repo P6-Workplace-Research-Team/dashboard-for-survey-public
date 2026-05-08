@@ -8697,6 +8697,7 @@ async function renderResults() {
       attachVizLabelColResizers(container);
       alignScaleCompareCharts(container);
       attachResultEventListeners(container);
+      addExportButtons(container);
       return;
     }
     resultState.targetScaleCompareMode = false;
@@ -10047,8 +10048,8 @@ async function exportSingleChoiceAsPptx(section, btn) {
 /* 이미지 추출 기능 */
 async function exportSectionAsImage(section, btn) {
   // 라이브러리 로드 확인
-  if (typeof html2canvas === 'undefined') {
-    alert('[오류] 이미지 추출 라이브러리(html2canvas)가 로드되지 않았습니다.\nassets/libs/html2canvas.min.js 파일이 있는지 확인해 주세요.');
+  if (typeof domtoimage === 'undefined') {
+    alert('[오류] 이미지 추출 라이브러리(dom-to-image-more)가 로드되지 않았습니다.\nassets/libs/dom-to-image-more.min.js 파일이 있는지 확인해 주세요.');
     return;
   }
   if (btn) {
@@ -10111,8 +10112,6 @@ async function exportSectionAsImage(section, btn) {
 async function captureSectionToA4(section, forceHideDataTable) {
   var hiddenEls = [];
   var displayHiddenEls = [];  // display:none 처리한 요소 (높이 영향)
-  var svgImgEls = [];
-  var svgOrigSrcs = [];
   var widthRestore = null;    // 너비 강제 변경 복원용
 
   try {
@@ -10150,25 +10149,15 @@ async function captureSectionToA4(section, forceHideDataTable) {
 
     await document.fonts.ready;
 
-    // file:// CORS 우회: SVG 아이콘 src 임시 교체
-    var BLANK_IMG = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
-    svgImgEls = Array.from(section.querySelectorAll('img[src$=".svg"]'));
-    svgOrigSrcs = svgImgEls.map(function(el) { return el.getAttribute('src'); });
-    svgImgEls.forEach(function(el) { el.setAttribute('src', BLANK_IMG); });
-
     var naturalWidth = section.offsetWidth;
     var naturalHeight = section.offsetHeight;
     console.log('[이미지 추출] 캡처 시작 — 강제 너비:', EXPORT_CAPTURE_WIDTH,
                 '/ 측정 너비:', naturalWidth, 'x', naturalHeight,
                 '/ forceHideDataTable:', forceHideDataTable);
 
-    // 원본 픽셀 그대로 캡처 (scale=1)
-    var canvas = await html2canvas(section, {
-      scale: 1,
-      backgroundColor: '#ffffff',
-      allowTaint: false,
-      useCORS: false,
-      logging: false,
+    // dom-to-image-more로 캡처 (html2canvas는 CSS color() 함수 미지원)
+    var canvas = await domtoimage.toCanvas(section, {
+      bgcolor: '#ffffff',
       width: naturalWidth,
       height: naturalHeight
     });
@@ -10213,7 +10202,6 @@ async function captureSectionToA4(section, forceHideDataTable) {
     return { overflow: false, canvas: out };
   } finally {
     // 복원
-    try { svgImgEls.forEach(function(el, i) { el.setAttribute('src', svgOrigSrcs[i]); }); } catch(_) {}
     try { hiddenEls.forEach(function(el) { el.style.visibility = ''; }); } catch(_) {}
     try { displayHiddenEls.forEach(function(item) { item.el.style.display = item.original; }); } catch(_) {}
     try {
