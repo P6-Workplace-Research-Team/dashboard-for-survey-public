@@ -521,8 +521,8 @@ body.home-page {
 }
 
 .home-page .drop-zone.done {
-  border: 1px solid var(--neutral-900);
-  background: var(--neutral-900);
+  border: 1px solid var(--neutral-300);
+  background: var(--White);
   padding: 30px;
 }
 
@@ -557,11 +557,11 @@ body.home-page {
   font-family: 'Material Symbols Rounded';
   font-size: 28px;
   font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-  color: var(--neutral-900);
+  color: var(--White);
   width: 56px;
   height: 56px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--neutral-900);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -572,7 +572,7 @@ body.home-page {
 .home-page .done-filename {
   font-size: var(--caption-1-size);
   line-height: var(--body-line-height);
-  color: rgba(255, 255, 255, 0.72);
+  color: var(--neutral-900);
   word-break: break-all;
   max-width: 100%;
   padding: 0;
