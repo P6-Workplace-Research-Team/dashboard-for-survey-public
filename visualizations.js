@@ -615,9 +615,15 @@ function setupSelectionAndDragDrop() {
   const criterionClearBtn = document.getElementById('criterion-clear-btn');
   const criterionYearBtn = document.getElementById('criterion-year-btn');
   const criterionZone = document.getElementById('drop-criterion');
+  let selectionAnchor = null;
 
   function selectedItems() {
     return Array.from(host.querySelectorAll('.question-item.selected'));
+  }
+
+  function visibleQuestionItems() {
+    return Array.from(host.querySelectorAll('.question-item'))
+      .filter(item => item.offsetParent !== null);
   }
 
   function refreshStatus() {
@@ -628,13 +634,32 @@ function setupSelectionAndDragDrop() {
 
   function clearSelection() {
     host.querySelectorAll('.question-item.selected').forEach(el => el.classList.remove('selected'));
+    selectionAnchor = null;
     refreshStatus();
+  }
+
+  function selectRangeTo(item) {
+    const items = visibleQuestionItems();
+    const startIndex = items.indexOf(selectionAnchor);
+    const endIndex = items.indexOf(item);
+    if (startIndex < 0 || endIndex < 0) return false;
+    const start = Math.min(startIndex, endIndex);
+    const end = Math.max(startIndex, endIndex);
+    items.slice(start, end + 1).forEach(el => el.classList.add('selected'));
+    return true;
   }
 
   host.addEventListener('click', e => {
     const item = e.target.closest('.question-item');
     if (!item) return;
+    if (e.shiftKey && selectionAnchor) {
+      if (selectRangeTo(item)) {
+        refreshStatus();
+        return;
+      }
+    }
     item.classList.toggle('selected');
+    selectionAnchor = item;
     refreshStatus();
   });
 
@@ -1752,6 +1777,7 @@ const resultState = {
   scaleMidpointHidden: new Map(),
   scaleCompareSelections: new Map(),
   targetScaleCompareMode: false,
+  targetScaleCompareSortByMean: false,
   otherResponseTexts: new Map(),
   dataTableCollapsed: new Map(),
   singleChoiceChartTypes: new Map(),
@@ -3747,7 +3773,12 @@ function buildDataTableToggleButtonHtml() {
 function wrapResultTable(tableHtml, noteHtml = '') {
   return `
     <div class="result-table-section" data-data-table-section>
-      ${buildDataTableToggleButtonHtml()}
+      <div class="result-table-header">
+        ${buildDataTableToggleButtonHtml()}
+        <button type="button" class="result-table-copy-btn" data-data-table-copy aria-label="데이터 테이블 복사하기" title="데이터 테이블 복사하기">
+          <img class="result-table-copy-icon" src="assets/icons/content_copy_40dp_151515_FILL0_wght400_GRAD0_opsz40.svg" alt="" aria-hidden="true">
+        </button>
+      </div>
       <div class="result-table-body" data-data-table-body>
         <div class="result-table-wrap">
           ${tableHtml}
@@ -4108,7 +4139,9 @@ function buildScaleToggleHtml(targetLabel, activeMode, options = {}) {
     hideMidpoint = false,
     disabledModes = [],
     showChartType = false,
-    chartType = 'bar_horizontal_100'
+    chartType = 'bar_horizontal_100',
+    showMeanSortOption = false,
+    sortByMean = false
   } = options;
   const isPie = chartType === 'pie';
   const chevron = 'assets/icons/keyboard_arrow_down_40dp_151515_FILL0_wght400_GRAD0_opsz40.svg';
@@ -4176,10 +4209,17 @@ function buildScaleToggleHtml(targetLabel, activeMode, options = {}) {
   const midpointGuide = showMidpointOption ? `
     <div class="viz-controls-note">중간값 제외 보기는 차트에서만 시각적으로 제외하며, 응답 비율의 계산 모수와 원본 수치는 바뀌지 않습니다.</div>
   ` : '';
+  const meanSortOption = showMeanSortOption ? `
+    <label class="viz-control-checkbox">
+      <input type="checkbox" data-scale-compare-sort-mean="true" data-target="${escapeHtml(targetLabel)}" ${sortByMean ? 'checked' : ''}>
+      <span class="viz-control-checkbox__label">평균값이 높은 순서로 정렬</span>
+    </label>
+  ` : '';
   return `
     <div class="viz-controls">
       ${chartTypeHtml}
       <div class="viz-control-toggle">${buttons}</div>
+      ${meanSortOption}
       ${midpointOption}
       ${midpointGuide}
     </div>
@@ -4575,6 +4615,34 @@ function aggregateTargetScaleCompareData(targetLabels, criterionLabel, rows) {
     criterionLabel: baseData.criterionLabel,
     questions,
     groups
+  };
+}
+
+function sortScaleCompareQuestionsByMean(compareData) {
+  if (!compareData || !Array.isArray(compareData.questions)) return compareData;
+  const ordered = compareData.questions
+    .map((question, index) => ({ question, index }))
+    .sort((a, b) => {
+      const aMean = Number(a.question && a.question.mean);
+      const bMean = Number(b.question && b.question.mean);
+      const aValue = Number.isFinite(aMean) ? aMean : Number.NEGATIVE_INFINITY;
+      const bValue = Number.isFinite(bMean) ? bMean : Number.NEGATIVE_INFINITY;
+      if (bValue !== aValue) return bValue - aValue;
+      return a.index - b.index;
+    });
+  return {
+    ...compareData,
+    questions: ordered.map(item => item.question),
+    groups: Array.isArray(compareData.groups)
+      ? compareData.groups.map(group => ({
+          ...group,
+          points: ordered.map(({ question, index }) => (
+            Array.isArray(group.points) && group.points[index]
+              ? group.points[index]
+              : { questionLabel: question.label, mean: 0, n: 0 }
+          ))
+        }))
+      : compareData.groups
   };
 }
 
@@ -8512,7 +8580,10 @@ function buildTargetScaleCompareSection(compareData) {
   if (!compareData || !compareData.baseData) return '';
   const customGroupOn = shouldApplyCustomGroup(compareData.baseData);
   const customCompareData = customGroupOn ? buildCustomScaleCompareData(compareData) : null;
-  const displayCompareData = customCompareData || compareData;
+  const baseCompareData = customCompareData || compareData;
+  const displayCompareData = resultState.targetScaleCompareSortByMean
+    ? sortScaleCompareQuestionsByMean(baseCompareData)
+    : baseCompareData;
   const hiddenGroups = resultState.hiddenGroupKeys.get(displayCompareData.targetLabel) || new Set();
   const tableKey = TARGET_SCALE_COMPARE_VIEW_KEY;
   const showTable = true;
@@ -8526,7 +8597,9 @@ function buildTargetScaleCompareSection(compareData) {
   const toggleHtml = buildScaleToggleHtml(TARGET_SCALE_COMPARE_VIEW_KEY, viewMode, {
     showMidpointOption: canHideScaleMidpoint(displayCompareData.baseData),
     hideMidpoint,
-    disabledModes: hasGroups ? ['distribution'] : []
+    disabledModes: hasGroups ? ['distribution'] : [],
+    showMeanSortOption: true,
+    sortByMean: !!resultState.targetScaleCompareSortByMean
   });
   const visibleGroupsForBtn = hasGroups ? getDisplayScaleCompareGroups(displayCompareData.groups, hiddenGroups) : [];
   const canDualBar = hasGroups && visibleGroupsForBtn.length >= 1 && visibleGroupsForBtn.length <= 2;
@@ -8810,6 +8883,177 @@ function applyDataTableCollapsed(wrapper, btn, collapsed) {
   }
 }
 
+function tableToTsv(table) {
+  if (!table) return '';
+  return Array.from(table.querySelectorAll('tr')).map(row => {
+    return Array.from(row.children).map(cell => {
+      return cleanCell(cell.innerText || cell.textContent || '').replace(/\t/g, ' ').replace(/\r?\n/g, ' ');
+    }).join('\t');
+  }).join('\n');
+}
+
+function getTableSectionCellEntries(rows) {
+  const activeRowSpans = [];
+  return Array.from(rows || []).map(row => {
+    const entries = [];
+    let colIndex = 0;
+    Array.from(row.children).forEach(cell => {
+      while ((activeRowSpans[colIndex] || 0) > 0) colIndex += 1;
+      const colSpan = Math.max(1, Number(cell.colSpan) || 1);
+      const rowSpan = Math.max(1, Number(cell.rowSpan) || 1);
+      entries.push({
+        cell,
+        start: colIndex,
+        end: colIndex + colSpan,
+        colSpan
+      });
+      if (rowSpan > 1) {
+        for (let offset = 0; offset < colSpan; offset += 1) {
+          activeRowSpans[colIndex + offset] = Math.max(activeRowSpans[colIndex + offset] || 0, rowSpan);
+        }
+      }
+      colIndex += colSpan;
+    });
+    for (let index = 0; index < activeRowSpans.length; index += 1) {
+      if (activeRowSpans[index] > 0) activeRowSpans[index] -= 1;
+    }
+    return entries;
+  });
+}
+
+function isResponseCountHeaderCell(cell) {
+  if (!cell) return false;
+  const text = cleanCell(cell.innerText || cell.textContent || '').replace(/\s+/g, '');
+  return text.includes('응답수');
+}
+
+function getResponseCountColumnIndexes(table) {
+  const rows = table && table.tHead
+    ? Array.from(table.tHead.rows)
+    : Array.from(table ? table.querySelectorAll('thead tr') : []);
+  const columns = new Set();
+  getTableSectionCellEntries(rows).forEach(entries => {
+    entries.forEach(({ cell, start, end }) => {
+      if (!isResponseCountHeaderCell(cell)) return;
+      for (let col = start; col < end; col += 1) columns.add(col);
+    });
+  });
+  return columns;
+}
+
+function countRemovedColumns(start, end, columnsToRemove) {
+  let count = 0;
+  for (let col = start; col < end; col += 1) {
+    if (columnsToRemove.has(col)) count += 1;
+  }
+  return count;
+}
+
+function removeColumnsFromRows(rows, columnsToRemove) {
+  const cellsToRemove = [];
+  getTableSectionCellEntries(rows).forEach(entries => {
+    entries.forEach(({ cell, start, end, colSpan }) => {
+      const removeCount = countRemovedColumns(start, end, columnsToRemove);
+      if (removeCount <= 0) return;
+      if (removeCount >= colSpan) {
+        cellsToRemove.push(cell);
+      } else {
+        cell.colSpan = colSpan - removeCount;
+      }
+    });
+  });
+  cellsToRemove.forEach(cell => cell.remove());
+}
+
+function prepareResultTableForCopy(table) {
+  if (!table) return null;
+  const copyTable = table.cloneNode(true);
+  const columnsToRemove = getResponseCountColumnIndexes(copyTable);
+  if (columnsToRemove.size === 0) return copyTable;
+
+  if (copyTable.tHead) removeColumnsFromRows(copyTable.tHead.rows, columnsToRemove);
+  Array.from(copyTable.tBodies || []).forEach(tbody => removeColumnsFromRows(tbody.rows, columnsToRemove));
+  if (copyTable.tFoot) removeColumnsFromRows(copyTable.tFoot.rows, columnsToRemove);
+  return copyTable;
+}
+
+function copyTextFallback(text) {
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.setAttribute('readonly', '');
+  textarea.style.position = 'fixed';
+  textarea.style.left = '-9999px';
+  textarea.style.top = '0';
+  document.body.appendChild(textarea);
+  textarea.select();
+  const ok = document.execCommand('copy');
+  textarea.remove();
+  if (!ok) throw new Error('Copy command failed');
+}
+
+function showDashboardToast(message) {
+  let toast = document.querySelector('[data-dashboard-toast]');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.className = 'dashboard-toast';
+    toast.dataset.dashboardToast = 'true';
+    toast.setAttribute('role', 'status');
+    toast.setAttribute('aria-live', 'polite');
+    toast.setAttribute('aria-atomic', 'true');
+    document.body.appendChild(toast);
+  }
+  toast.textContent = message;
+  toast.classList.remove('is-visible');
+  window.clearTimeout(showDashboardToast._timer);
+  window.requestAnimationFrame(() => {
+    toast.classList.add('is-visible');
+  });
+  showDashboardToast._timer = window.setTimeout(() => {
+    toast.classList.remove('is-visible');
+  }, 1800);
+}
+
+async function copyResultTable(btn) {
+  const section = btn ? btn.closest('[data-data-table-section]') : null;
+  const table = section ? section.querySelector('.result-table') : null;
+  if (!table) return;
+
+  const copyTable = prepareResultTableForCopy(table);
+  const tableHtml = copyTable.outerHTML;
+  const tableText = tableToTsv(copyTable);
+  try {
+    let copied = false;
+    try {
+      if (navigator.clipboard && window.ClipboardItem) {
+        await navigator.clipboard.write([
+          new window.ClipboardItem({
+            'text/html': new Blob([tableHtml], { type: 'text/html' }),
+            'text/plain': new Blob([tableText], { type: 'text/plain' })
+          })
+        ]);
+        copied = true;
+      } else if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(tableText);
+        copied = true;
+      }
+    } catch (_) {}
+    if (!copied) {
+      copyTextFallback(tableText);
+    }
+    showDashboardToast('데이터 테이블이 복사되었습니다');
+    btn.classList.add('is-copied');
+    btn.setAttribute('aria-label', '데이터 테이블 복사 완료');
+    btn.title = '복사 완료';
+    window.setTimeout(() => {
+      btn.classList.remove('is-copied');
+      btn.setAttribute('aria-label', '데이터 테이블 복사하기');
+      btn.title = '데이터 테이블 복사하기';
+    }, 1200);
+  } catch (_) {
+    alert('테이블을 복사하지 못했어요. 브라우저 권한을 확인한 뒤 다시 시도해 주세요.');
+  }
+}
+
 function ensureHbarDotOutsideReset() {
   if (resultState._hbarDotOutsideBound) return;
   resultState._hbarDotOutsideBound = true;
@@ -8879,6 +9123,13 @@ function attachResultEventListeners(container) {
       applyDataTableCollapsed(wrapper, btn, next);
     });
   });
+  container.querySelectorAll('[data-data-table-copy]').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      copyResultTable(btn);
+    });
+  });
   container.querySelectorAll('[data-viz-control-search]').forEach(input => {
     input.addEventListener('input', () => {
       const query = input.value.toLowerCase();
@@ -8908,6 +9159,13 @@ function attachResultEventListeners(container) {
       const targetLabel = input.dataset.target;
       if (!targetLabel) return;
       resultState.scaleMidpointHidden.set(targetLabel, !!input.checked);
+      renderResults();
+    });
+  });
+  container.querySelectorAll('[data-scale-compare-sort-mean]').forEach(input => {
+    input.addEventListener('change', e => {
+      e.stopPropagation();
+      resultState.targetScaleCompareSortByMean = !!input.checked;
       renderResults();
     });
   });
@@ -9423,6 +9681,7 @@ const EXPORT_HIDE_SELECTORS = [
   '.viz-controls',
   '.viz-label-col-resizer',
   '[data-data-table-toggle]',
+  '[data-data-table-copy]',
   '.result-export-btn',
 ];
 
