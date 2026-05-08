@@ -2015,6 +2015,7 @@ function supportsResultEntry(entry) {
   if (supportsResultType(entry.type)) return true;
   if (isTimeMinutesEntry(entry)) return true;
   return isTimeOpenRawEntry(entry);
+  return isTimeMinutesEntry(entry);
 }
 
 function getCriterionEntry(criterionLabel) {
@@ -5482,6 +5483,8 @@ function buildNumericOpenBoxChartHtml(data) {
   return `
     <div class="box-plot-chart">
       <div class="box-plot-body">
+    <div class="numeric-open-summary-whisker">
+      <div class="numeric-open-summary-body">
         ${buildNumericWhiskerTrackHtml(data, data.domainMin, data.domainMax, numberUnit, '응답자 전체', { valueFormatter: fmtValue, valueFormat: isTimeMinutes ? 'time-minutes' : '' })}
         <div class="chart-bottom-axis">${buildNumericBoxAxisHtml(data.domainMin, data.domainMax, fmtValue)}</div>
       </div>
@@ -5588,6 +5591,9 @@ function buildNumericOpenGroupChartHtml(data, hiddenGroups) {
           <div class="chart-bottom-axis">${buildNumericBoxAxisHtml(data.domainMin, data.domainMax, fmtValue)}</div>
         </div>
       </div>
+    <div class="numeric-whisker-group-chart">
+      <div class="stack100-group-chart">${overallRowHtml}${groupRowsHtml}</div>
+      <div class="chart-bottom-axis">${buildNumericBoxAxisHtml(data.domainMin, data.domainMax, fmtValue)}</div>
       ${numberUnit ? `<div class="numeric-open-unit">단위 : ${escapeHtml(numberUnit)}</div>` : ''}
     </div>
   `;
