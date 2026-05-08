@@ -1576,6 +1576,8 @@ function setupSavedModal() {
 
   refreshCount();
 
+  /* 이미지 추출 기능 */
+
   if (newBtn) newBtn.addEventListener('click', () => { window.location.href = 'home.html'; });
   const exportAllPptxBtn = document.getElementById('export-all-pptx-btn');
   if (exportAllPptxBtn) exportAllPptxBtn.addEventListener('click', () => exportAllSingleChoiceAsPptx(exportAllPptxBtn));
@@ -3698,12 +3700,18 @@ function buildGroupedLegendRowsHtml(data, hiddenGroups = new Set()) {
   }).join('');
 }
 
+function getGroupConfigTargetLabel(data) {
+  if (!data) return '';
+  return data.rank1stSourceLabel || data.targetLabel || '';
+}
+
 function buildLegendHtml(data, hidden, opts = {}) {
   if (!data.groupResults) return '';
   const items = buildGroupedLegendRowsHtml(data, hidden);
   if (!items) return '';
   const { showDualBar = false, isDualBar = false } = opts;
   const criterionLabel = data.criterionLabel || null;
+  const groupConfigTargetLabel = getGroupConfigTargetLabel(data);
 
   const dualBarBtnHtml = showDualBar
     ? `<button type="button" class="two-compare-btn${isDualBar ? ' is-active' : ''}" data-dual-bar-toggle="${escapeHtml(data.targetLabel)}">${isDualBar ? '기본 그래프로 보기' : '두 그룹만 비교하기'}</button>`
@@ -3716,7 +3724,7 @@ function buildLegendHtml(data, hidden, opts = {}) {
         <div class="legend-actions" data-target="${escapeHtml(data.targetLabel)}" data-mode="group">
           <button type="button" class="legend-action-btn" data-legend-action="all-on">전체 선택</button>
           <button type="button" class="legend-action-btn" data-legend-action="all-off">전체 해제</button>
-          ${criterionLabel ? `<button type="button" class="legend-action-btn" data-open-group-config="true" data-target="${escapeHtml(data.targetLabel)}" data-criterion="${escapeHtml(criterionLabel)}">그룹 편집</button>` : ''}
+          ${criterionLabel ? `<button type="button" class="legend-action-btn" data-open-group-config="true" data-target="${escapeHtml(groupConfigTargetLabel)}" data-criterion="${escapeHtml(criterionLabel)}">그룹 편집</button>` : ''}
         </div>
         ${dualBarBtnHtml}
       </div>
@@ -3943,6 +3951,7 @@ function buildAllocationGroupLegendHtml(data, hiddenGroups) {
   }
 
   const criterionLabel = data.criterionLabel || null;
+  const groupConfigTargetLabel = getGroupConfigTargetLabel(data);
 
   return `
     <aside class="legend-panel">
@@ -3952,7 +3961,7 @@ function buildAllocationGroupLegendHtml(data, hiddenGroups) {
       <div class="legend-actions" data-target="${escapeHtml(data.targetLabel)}" data-mode="group">
         <button type="button" class="legend-action-btn" data-legend-action="all-on">전체 선택</button>
         <button type="button" class="legend-action-btn" data-legend-action="all-off">전체 해제</button>
-        ${criterionLabel ? `<button type="button" class="legend-action-btn" data-open-group-config="true" data-target="${escapeHtml(data.targetLabel)}" data-criterion="${escapeHtml(criterionLabel)}">그룹 편집</button>` : ''}
+        ${criterionLabel ? `<button type="button" class="legend-action-btn" data-open-group-config="true" data-target="${escapeHtml(groupConfigTargetLabel)}" data-criterion="${escapeHtml(criterionLabel)}">그룹 편집</button>` : ''}
       </div>
     </aside>
   `;
@@ -7498,6 +7507,7 @@ function buildStack100GroupLegendHtml(data, hiddenGroups) {
   }
 
   const criterionLabel = data.criterionLabel || null;
+  const groupConfigTargetLabel = getGroupConfigTargetLabel(data);
 
   return `
     <aside class="legend-panel">
@@ -7507,7 +7517,7 @@ function buildStack100GroupLegendHtml(data, hiddenGroups) {
       <div class="legend-actions" data-target="${escapeHtml(data.targetLabel)}" data-mode="group">
         <button type="button" class="legend-action-btn" data-legend-action="all-on">전체 선택</button>
         <button type="button" class="legend-action-btn" data-legend-action="all-off">전체 해제</button>
-        ${criterionLabel ? `<button type="button" class="legend-action-btn" data-open-group-config="true" data-target="${escapeHtml(data.targetLabel)}" data-criterion="${escapeHtml(criterionLabel)}">그룹 편집</button>` : ''}
+        ${criterionLabel ? `<button type="button" class="legend-action-btn" data-open-group-config="true" data-target="${escapeHtml(groupConfigTargetLabel)}" data-criterion="${escapeHtml(criterionLabel)}">그룹 편집</button>` : ''}
       </div>
     </aside>
   `;
@@ -10017,6 +10027,7 @@ async function exportSingleChoiceAsPptx(section, btn) {
   }
 }
 
+/* 이미지 추출 기능 */
 async function exportSectionAsImage(section, btn) {
   // 라이브러리 로드 확인
   if (typeof html2canvas === 'undefined') {
