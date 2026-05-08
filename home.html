@@ -790,6 +790,7 @@ function validateBundleConsistency(rowsByKey) {
       row.className = 'saved-item';
       row.dataset.id = item.id;
       row.innerHTML = `
+        <div class="drag-handle" draggable="true" aria-hidden="true">drag_indicator</div>
         <div class="saved-main" data-id="${item.id}">
           <div class="saved-title" data-id="${item.id}">${escapeHtml(item.title)}</div>
           <input type="text" class="saved-title-input" maxlength="50" hidden>
@@ -801,6 +802,49 @@ function validateBundleConsistency(rowsByKey) {
         </div>
       `;
       savedList.appendChild(row);
+    });
+
+    let dragSrcId = null;
+
+    savedList.querySelectorAll('.saved-item').forEach(item => {
+      item.addEventListener('dragstart', e => {
+        if (!e.target.closest('.drag-handle')) {
+          e.preventDefault();
+          return;
+        }
+        dragSrcId = item.dataset.id;
+        item.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+      });
+      item.addEventListener('dragend', () => {
+        dragSrcId = null;
+        item.classList.remove('dragging');
+        savedList.querySelectorAll('.saved-item').forEach(i => i.classList.remove('drag-over-before', 'drag-over-after'));
+      });
+      item.addEventListener('dragover', e => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        savedList.querySelectorAll('.saved-item').forEach(i => i.classList.remove('drag-over-before', 'drag-over-after'));
+        if (dragSrcId !== item.dataset.id) {
+          const rect = item.getBoundingClientRect();
+          item.classList.add(e.clientY > rect.top + rect.height / 2 ? 'drag-over-after' : 'drag-over-before');
+        }
+      });
+      item.addEventListener('drop', e => {
+        e.preventDefault();
+        if (!dragSrcId || dragSrcId === item.dataset.id) return;
+        const list = loadSurveys();
+        const fromIdx = list.findIndex(s => s.id === dragSrcId);
+        if (fromIdx < 0) return;
+        const rect = item.getBoundingClientRect();
+        const insertAfter = e.clientY > rect.top + rect.height / 2;
+        const [moved] = list.splice(fromIdx, 1);
+        const targetIdx = list.findIndex(s => s.id === item.dataset.id);
+        if (targetIdx < 0) return;
+        list.splice(targetIdx + (insertAfter ? 1 : 0), 0, moved);
+        saveSurveys(list);
+        renderList();
+      });
     });
 
     savedList.querySelectorAll('.saved-main').forEach(main => {
