@@ -383,8 +383,9 @@ function buildQuestionTree(rows) {
     const rtype = iType >= 0 ? String(row[iType] || '').trim() : '';
     const item = { qno, label, full, role, rtype };
 
-    // expanded 행은 계산 편의를 위한 내부 컬럼이므로 사용자용 문항 리스트에서 제외합니다.
+    // expanded 행과 주관식 시간의 분환산 derived 행은 내부 집계 컬럼이므로 사용자용 문항 리스트에서 제외합니다.
     if (role.toLowerCase() === 'expanded') continue;
+    if (rtype.includes('주관식 시간') && role.toLowerCase() === 'derived') continue;
 
     if (!map.has(c1)) {
       map.set(c1, { items: [], children: new Map() });
@@ -1811,7 +1812,7 @@ const VIZ_LABEL_COL_RESIZE_SELECTORS = [
   '.dual-hbar-chart',
   '.lollipop-h-chart',
   '.dual-lollipop-h-chart',
-  '.stack100-group-chart'
+  '.lane-group-chart'
 ].join(',');
 
 function parseValueCodeMap(text) {
@@ -1977,6 +1978,20 @@ function isNumericOpenEntry(entry) {
   return isNumericOpenType(entry.type) || isTimeMinutesEntry(entry);
 }
 
+function isTimeOpenRawEntry(entry) {
+  if (!entry) return false;
+  return cleanCell(entry.type).includes('주관식 시간') && cleanCell(entry.role).toLowerCase() === 'raw';
+}
+
+function findTimeMinutesLabel(rawLabel) {
+  const direct = rawLabel + '_분환산';
+  if (resultState.codebookByLabel.has(direct)) return direct;
+  for (const [label, entry] of resultState.codebookByLabel) {
+    if (isTimeMinutesEntry(entry) && label.startsWith(rawLabel)) return label;
+  }
+  return null;
+}
+
 function isRatioAllocationType(type) {
   return cleanCell(type).includes('주관식 비율 배분');
 }
@@ -1998,6 +2013,8 @@ function supportsResultType(type) {
 function supportsResultEntry(entry) {
   if (!entry) return false;
   if (supportsResultType(entry.type)) return true;
+  if (isTimeMinutesEntry(entry)) return true;
+  return isTimeOpenRawEntry(entry);
   return isTimeMinutesEntry(entry);
 }
 
@@ -2515,6 +2532,13 @@ function aggregateResultQuestion(targetLabel, criterionLabel, rows, valueRows = 
   if (isRankChoiceType(entry.type)) return aggregateRank(targetLabel, criterionLabel, rows);
   if (isScaleChoiceType(entry.type)) return aggregateScale(targetLabel, criterionLabel, rows);
   if (isNumericOpenEntry(entry)) return aggregateNumericOpen(targetLabel, criterionLabel, rowIndexes);
+  if (isTimeOpenRawEntry(entry)) {
+    const minutesLabel = findTimeMinutesLabel(targetLabel);
+    if (!minutesLabel) return null;
+    const result = aggregateNumericOpen(minutesLabel, criterionLabel, rowIndexes);
+    if (!result) return null;
+    return { ...result, targetLabel };
+  }
   if (isRatioAllocationType(entry.type)) return aggregateRatioAllocation(targetLabel, criterionLabel, rowIndexes);
   if (isTextOpenType(entry.type)) return aggregateTextOpen(targetLabel, rowIndexes);
   return null;
@@ -3990,7 +4014,7 @@ function buildAllocationGroupLegendHtml(data, hiddenGroups) {
   return `
     <aside class="legend-panel">
       <div class="legend is-static">${optionItems}</div>
-      <div class="stack100-group-legend-divider"></div>
+      <div class="lane-group-legend-divider"></div>
       <div class="legend" data-target="${escapeHtml(data.targetLabel)}" data-mode="group">${groupItems}</div>
       <div class="legend-actions" data-target="${escapeHtml(data.targetLabel)}" data-mode="group">
         <button type="button" class="legend-action-btn" data-legend-action="all-on">전체 선택</button>
@@ -4013,25 +4037,25 @@ function buildRatioAllocationChartHtml(data, hiddenGroups = new Set()) {
   const displayGroups = getDisplayGroupResults(data.groupResults, hiddenGroups);
   if (displayGroups.length === 0) return '<div class="result-empty">표시할 그룹이 없습니다.</div>';
   const overallRowHtml = `
-    <div class="stack100-group-row">
-      <div class="stack100-group-label">응답자 전체</div>
-      <div class="stack100-group-chart-cell">
+    <div class="lane-group-row">
+      <div class="lane-group-label">응답자 전체</div>
+      <div class="lane-group-cell">
         ${buildRatioAllocationStackHtml(data.totalResults, { groupLabel: '응답자 전체', n: data.totalN, showLabels: false })}
       </div>
     </div>
-    <div class="stack100-group-chart-divider"></div>
+    <div class="lane-group-divider"></div>
   `;
   const rowsHtml = displayGroups.map(group => {
     return `
-      <div class="stack100-group-row">
-        <div class="stack100-group-label">${escapeHtml(group.label)}</div>
-        <div class="stack100-group-chart-cell">
+      <div class="lane-group-row">
+        <div class="lane-group-label">${escapeHtml(group.label)}</div>
+        <div class="lane-group-cell">
           ${buildRatioAllocationStackHtml(group.results, { groupLabel: group.label, n: group.n, showLabels: false })}
         </div>
       </div>
     `;
   }).join('');
-  return `<div class="stack100-group-chart">${overallRowHtml}${rowsHtml}</div>`;
+  return `<div class="lane-group-chart">${overallRowHtml}${rowsHtml}</div>`;
 }
 
 function buildRatioAllocationDataTableHtml(data, hiddenGroups = new Set()) {
@@ -4536,8 +4560,8 @@ function buildDerivedScaleBoxPlotHtml(data, viewMode, { hideAxis = false, mutedM
   const axisMax = data.scoreRange.length;
   const item = { ...data, n: data.n ?? data.totalN };
   return `
-    <div class="numeric-open-summary-whisker${viewMode === 'mean' ? ' is-mean-mode' : ''}">
-      <div class="numeric-open-summary-body">
+    <div class="box-plot-chart${viewMode === 'mean' ? ' is-mean-mode' : ''}">
+      <div class="box-plot-body">
         ${buildNumericWhiskerTrackHtml(item, axisMin, axisMax, '', data.groupLabel || '', { meanDecimals: 2, color: data.color, mutedMeanMarker, hideMeanMarker })}
         ${hideAxis ? '' : `<div class="chart-bottom-axis">${buildIntegerBoxAxisHtml(axisMin, axisMax)}</div>`}
       </div>
@@ -4809,7 +4833,7 @@ function buildScaleCompareQuestionLabelHtml(question) {
     label: question.label,
     full: question.full
   }));
-  return `<div class="scale-compare-label" data-tip="${tip}">${escapeHtml(question.label)}</div>`;
+  return `<div class="lane-group-label" data-tip="${tip}">${escapeHtml(question.label)}</div>`;
 }
 
 function buildScaleCompareDistributionBackgroundHtml(item) {
@@ -4856,17 +4880,19 @@ function buildScaleCompareDistributionSectionHtml(compareData) {
       ? buildDerivedScaleBoxPlotHtml(item, 'distribution', { hideAxis: true })
       : `<div class="scale-chart">${buildScaleDistributionBarHtml(item.scoreResults, item.scoreRange.length, { hideMidpoint, hideSummary: true })}</div>`;
     return `
-      <div class="stack100-group-row">
+      <div class="lane-group-row">
         ${buildScaleCompareQuestionLabelHtml(question)}
-        <div class="stack100-group-chart-cell">${chartHtml}</div>
+        <div class="lane-group-cell">${chartHtml}</div>
       </div>
     `;
   }).join('');
   return `
-    <div class="scale-compare-section is-flush">
+    <div class="scale-compare-section">
       <div class="${visualClass}">
         <div class="result-chart-col">
-          <div class="scale-compare-chart">${rowsHtml}</div>
+          <div class="scale-compare-chart">
+            <div class="lane-group-chart">${rowsHtml}</div>
+          </div>
         </div>
         ${buildScaleScoreOnlyLegendHtml(scoreRange)}
       </div>
@@ -4996,14 +5022,14 @@ function buildScaleCompareSectionHtml(compareData, hiddenGroups, options = {}) {
             <div class="scale-compare-lollipop-track">
               <div class="scale-compare-lollipop-line" style="width:${leftPct}%;background:${group.color};"></div>
               <div class="scale-compare-lollipop-dot" style="left:${leftPct}%;background:${group.color};" data-tip="${tip}"></div>
-              <div class="scale-compare-lollipop-value" style="left:calc(${leftPct}% + 17px);">${formatScaleCompareMean(point.mean)}</div>
+              <div class="lollipop-h-value" style="left:calc(${leftPct}% + 17px);">${formatScaleCompareMean(point.mean)}</div>
             </div>
           `;
         }).join('');
         return `
-          <div class="stack100-group-row scale-compare-mean-row scale-compare-dual-row">
+          <div class="lane-group-row lane-group-mean scale-compare-dual-row">
             ${buildScaleCompareQuestionLabelHtml(question)}
-            <div class="stack100-group-chart-cell">
+            <div class="lane-group-cell">
               <div class="scale-compare-dual-tracks">${tracksHtml}</div>
             </div>
           </div>
@@ -5028,9 +5054,9 @@ function buildScaleCompareSectionHtml(compareData, hiddenGroups, options = {}) {
           .map(group => buildScaleCompareGroupedMeanDotHtml(group, group.points[questionIndex], compareData.maxScore))
           .join('');
         return `
-          <div class="stack100-group-row scale-compare-mean-row">
+          <div class="lane-group-row lane-group-mean">
             ${buildScaleCompareQuestionLabelHtml(question)}
-            <div class="stack100-group-chart-cell">
+            <div class="lane-group-cell">
               <div class="scale-compare-group-row-chart">
                 ${baseChartHtml}
                 ${overallDotHtml}
@@ -5058,9 +5084,9 @@ function buildScaleCompareSectionHtml(compareData, hiddenGroups, options = {}) {
         return `<span class="lollipop-h-guide" style="left:${pctFor(score)}%;"></span>`;
       }).join('');
       chartInnerHtml = `
-        <div class="numeric-whisker-group-chart scale-compare-lollipop-chart">
+        <div class="scale-compare-lollipop-chart">
           <div class="scale-compare-lollipop-guides" style="height:${overlayH}px;" aria-hidden="true">${guideLinesHtml}</div>
-          <div class="stack100-group-chart">${rowHtml}</div>
+          <div class="lane-group-chart">${rowHtml}</div>
           ${numQ > 0 ? `
             <div class="scale-compare-lollipop-axis-row" aria-hidden="true">
               <div class="lollipop-h-axis-spacer"></div>
@@ -5070,12 +5096,13 @@ function buildScaleCompareSectionHtml(compareData, hiddenGroups, options = {}) {
         </div>
       `;
     } else {
-      chartInnerHtml = `
-        <div class="numeric-whisker-group-chart">
-          <div class="stack100-group-chart">${rowHtml}</div>
-          ${compareData.questions.length > 0 ? buildScaleBottomAxisHtml(compareData.maxScore) : ''}
+      const axisRowHtml = compareData.questions.length > 0 ? `
+        <div class="lane-group-row">
+          <div class="lane-group-label" aria-hidden="true"></div>
+          <div class="lane-group-cell">${buildScaleBottomAxisHtml(compareData.maxScore)}</div>
         </div>
-      `;
+      ` : '';
+      chartInnerHtml = `<div class="lane-group-chart">${rowHtml}${axisRowHtml}</div>`;
     }
   } else {
     rowHtml = compareData.questions.map(question => {
@@ -5092,18 +5119,19 @@ function buildScaleCompareSectionHtml(compareData, hiddenGroups, options = {}) {
             { hideMidpoint }
           );
       return `
-        <div class="stack100-group-row scale-compare-mean-row">
+        <div class="lane-group-row lane-group-mean">
           ${buildScaleCompareQuestionLabelHtml(question)}
-          <div class="stack100-group-chart-cell">${chartHtml}</div>
+          <div class="lane-group-cell">${chartHtml}</div>
         </div>
       `;
     }).join('');
-    chartInnerHtml = `
-      <div class="numeric-whisker-group-chart">
-        <div class="stack100-group-chart">${rowHtml}</div>
-        ${compareData.questions.length > 0 ? buildScaleBottomAxisHtml(compareData.maxScore) : ''}
+    const axisRowHtml = compareData.questions.length > 0 ? `
+      <div class="lane-group-row">
+        <div class="lane-group-label" aria-hidden="true"></div>
+        <div class="lane-group-cell">${buildScaleBottomAxisHtml(compareData.maxScore)}</div>
       </div>
-    `;
+    ` : '';
+    chartInnerHtml = `<div class="lane-group-chart">${rowHtml}${axisRowHtml}</div>`;
   }
 
   const chartHtml = `
@@ -5116,7 +5144,7 @@ function buildScaleCompareSectionHtml(compareData, hiddenGroups, options = {}) {
     ? buildScaleCompareLegendHtml(compareData.groups, hiddenGroups, compareData.targetLabel, compareData.criterionLabel || '', { showDualBar, isDualBar })
     : buildScaleScoreOnlyLegendHtml(scoreRange);
   return `
-    <div class="scale-compare-section ${flush ? 'is-flush' : ''}">
+    <div class="scale-compare-section">
       ${showHeader ? `<div class="scale-compare-header">
         <div class="scale-compare-title">다중 문항 비교</div>
         <div class="scale-compare-sub">
@@ -5147,7 +5175,7 @@ function buildScaleGroupLegendHtml(data, hiddenGroups, viewMode) {
 
   return `
     <aside class="legend-panel">
-      ${showScoreColors ? scoreItemsHtml + '<div class="stack100-group-legend-divider"></div>' : ''}
+      ${showScoreColors ? scoreItemsHtml + '<div class="lane-group-legend-divider"></div>' : ''}
       <div class="legend" data-target="${escapeHtml(data.targetLabel)}" data-mode="group">${groupItems}</div>
       <div class="legend-actions" data-target="${escapeHtml(data.targetLabel)}" data-mode="group">
         <button type="button" class="legend-action-btn" data-legend-action="all-on">전체 선택</button>
@@ -5237,38 +5265,38 @@ function buildNumericWhiskerTrackHtml(item, axisMin, axisMax, numberUnit = '', g
     ? `left:${meanLeft}%;background:var(--neutral-300);color:transparent;`
     : `left:${meanLeft}%;`;
   return `
-    <div class="numeric-whisker-track-wrap">
-      <div class="numeric-whisker-q-tick" style="left:${q1Left}%;" data-tip="${q1Tip}"></div>
-      <div class="numeric-whisker-q-tick" style="left:${medLeft}%;" data-tip="${q2Tip}"></div>
-      <div class="numeric-whisker-q-tick" style="left:${q3Left}%;" data-tip="${q3Tip}"></div>
-      <div class="numeric-whisker-box-row">
-        <div class="numeric-whisker-dead-seg"    style="flex:${deadLeftFlex};"></div>
-        <div class="numeric-whisker-whisker-seg" style="flex:${leftWhiskerFlex};"></div>
-        <div class="numeric-whisker-box is-left"  style="flex:${q1q2Flex};  background:${options.color || 'var(--neutral-400)'};"></div>
-        <div class="numeric-whisker-box is-right" style="flex:${q2q3Flex};  background:${options.color || 'var(--neutral-400)'};"></div>
-        <div class="numeric-whisker-whisker-seg" style="flex:${rightWhiskerFlex};"></div>
-        <div class="numeric-whisker-dead-seg"    style="flex:${deadRightFlex};"></div>
-        <div class="numeric-whisker-end-tick" style="left:${minLeft}%;" data-tip="${minTip}"></div>
-        <div class="numeric-whisker-end-tick" style="left:${maxLeft}%;" data-tip="${maxTip}"></div>
+    <div class="box-plot-track-wrap">
+      <div class="box-plot-q-tick" style="left:${q1Left}%;" data-tip="${q1Tip}"></div>
+      <div class="box-plot-q-tick" style="left:${medLeft}%;" data-tip="${q2Tip}"></div>
+      <div class="box-plot-q-tick" style="left:${q3Left}%;" data-tip="${q3Tip}"></div>
+      <div class="box-plot-box-row">
+        <div class="box-plot-dead-seg"    style="flex:${deadLeftFlex};"></div>
+        <div class="box-plot-whisker-seg" style="flex:${leftWhiskerFlex};"></div>
+        <div class="box-plot-box is-left"  style="flex:${q1q2Flex};  background:${options.color || 'var(--neutral-400)'};"></div>
+        <div class="box-plot-box is-right" style="flex:${q2q3Flex};  background:${options.color || 'var(--neutral-400)'};"></div>
+        <div class="box-plot-whisker-seg" style="flex:${rightWhiskerFlex};"></div>
+        <div class="box-plot-dead-seg"    style="flex:${deadRightFlex};"></div>
+        <div class="box-plot-end-tick" style="left:${minLeft}%;" data-tip="${minTip}"></div>
+        <div class="box-plot-end-tick" style="left:${maxLeft}%;" data-tip="${maxTip}"></div>
         ${options.hideMeanMarker ? '' : `
-        <div class="numeric-whisker-mean" style="${meanStyle}" data-tip="${meanTip}">
-          <div class="numeric-whisker-mean-label">평균</div>
+        <div class="box-plot-mean" style="${meanStyle}" data-tip="${meanTip}">
+          <div class="box-plot-mean-label">평균</div>
           ${options.mutedMeanMarker ? '' : escapeHtml(meanLabel)}
         </div>
         `}
       </div>
-      <div class="numeric-whisker-q-label-layer">
-        <div class="numeric-whisker-q-item" style="left:${q1Left}%;"  data-tip="${q1Tip}">
-          <div class="numeric-whisker-q-name">Q1</div>
-          <div class="numeric-whisker-q-val">${fmtQ(item.q1)}</div>
+      <div class="box-plot-q-label-layer">
+        <div class="box-plot-q-item" style="left:${q1Left}%;"  data-tip="${q1Tip}">
+          <div class="box-plot-q-name">Q1</div>
+          <div class="box-plot-q-val">${fmtQ(item.q1)}</div>
         </div>
-        <div class="numeric-whisker-q-item" style="left:${medLeft}%;" data-tip="${q2Tip}">
-          <div class="numeric-whisker-q-name">Q2</div>
-          <div class="numeric-whisker-q-val">${fmtQ(item.median)}</div>
+        <div class="box-plot-q-item" style="left:${medLeft}%;" data-tip="${q2Tip}">
+          <div class="box-plot-q-name">Q2</div>
+          <div class="box-plot-q-val">${fmtQ(item.median)}</div>
         </div>
-        <div class="numeric-whisker-q-item" style="left:${q3Left}%;"  data-tip="${q3Tip}">
-          <div class="numeric-whisker-q-name">Q3</div>
-          <div class="numeric-whisker-q-val">${fmtQ(item.q3)}</div>
+        <div class="box-plot-q-item" style="left:${q3Left}%;"  data-tip="${q3Tip}">
+          <div class="box-plot-q-name">Q3</div>
+          <div class="box-plot-q-val">${fmtQ(item.q3)}</div>
         </div>
       </div>
     </div>
@@ -5453,6 +5481,8 @@ function buildNumericOpenBoxChartHtml(data) {
   const fmtValue = getNumericOpenValueFormatter(data.codebookEntry);
   const numberUnit = isTimeMinutes ? '' : (data.codebookEntry && data.codebookEntry.numberUnit ? data.codebookEntry.numberUnit : '');
   return `
+    <div class="box-plot-chart">
+      <div class="box-plot-body">
     <div class="numeric-open-summary-whisker">
       <div class="numeric-open-summary-body">
         ${buildNumericWhiskerTrackHtml(data, data.domainMin, data.domainMax, numberUnit, '응답자 전체', { valueFormatter: fmtValue, valueFormat: isTimeMinutes ? 'time-minutes' : '' })}
@@ -5531,9 +5561,9 @@ function buildNumericOpenGroupChartHtml(data, hiddenGroups) {
       { color, valueFormatter: fmtValue, valueFormat: isTimeMinutes ? 'time-minutes' : '' }
     );
     return `
-      <div class="stack100-group-row">
-        <div class="stack100-group-label">${escapeHtml(groupLabel)}</div>
-        <div class="stack100-group-chart-cell">${trackHtml}</div>
+      <div class="lane-group-row">
+        <div class="lane-group-label">${escapeHtml(groupLabel)}</div>
+        <div class="lane-group-cell">${trackHtml}</div>
       </div>
     `;
   }).join('');
@@ -5546,13 +5576,21 @@ function buildNumericOpenGroupChartHtml(data, hiddenGroups) {
     { valueFormatter: fmtValue, valueFormat: isTimeMinutes ? 'time-minutes' : '' }
   );
   const overallRowHtml = `
-    <div class="stack100-group-row">
-      <div class="stack100-group-label">응답자 전체</div>
-      <div class="stack100-group-chart-cell">${overallTrackHtml}</div>
+    <div class="lane-group-row">
+      <div class="lane-group-label">응답자 전체</div>
+      <div class="lane-group-cell">${overallTrackHtml}</div>
     </div>
-    <div class="stack100-group-chart-divider"></div>
+    <div class="lane-group-divider"></div>
   `;
   return `
+    <div class="lane-group-chart">
+      ${overallRowHtml}${groupRowsHtml}
+      <div class="lane-group-row">
+        <div class="lane-group-label" aria-hidden="true"></div>
+        <div class="lane-group-cell">
+          <div class="chart-bottom-axis">${buildNumericBoxAxisHtml(data.domainMin, data.domainMax, fmtValue)}</div>
+        </div>
+      </div>
     <div class="numeric-whisker-group-chart">
       <div class="stack100-group-chart">${overallRowHtml}${groupRowsHtml}</div>
       <div class="chart-bottom-axis">${buildNumericBoxAxisHtml(data.domainMin, data.domainMax, fmtValue)}</div>
@@ -5673,9 +5711,9 @@ function buildScaleGroupRowHtml(group, maxScore, viewMode, hideMidpoint) {
     ? buildScaleMeanOnlyHtml(group.mean, maxScore, meanTip, group.scoreResults, { hideMidpoint })
     : buildScaleDistributionBarHtml(group.scoreResults, maxScore, { hideMidpoint, hideSummary: true });
   return `
-    <div class="stack100-group-row${isMean ? ' scale-compare-mean-row' : ''}">
-      <div class="stack100-group-label">${escapeHtml(group.label)}</div>
-      <div class="stack100-group-chart-cell">
+    <div class="lane-group-row${isMean ? ' lane-group-mean' : ''}">
+      <div class="lane-group-label">${escapeHtml(group.label)}</div>
+      <div class="lane-group-cell">
         ${chartHtml}
       </div>
     </div>
@@ -5698,9 +5736,9 @@ function buildDerivedScaleGroupRowHtml(group, scoreRange, viewMode) {
     color: group.color
   };
   return `
-    <div class="stack100-group-row${viewMode === 'mean' ? ' scale-compare-mean-row' : ''}">
-      <div class="stack100-group-label">${escapeHtml(group.label)}</div>
-      <div class="stack100-group-chart-cell">
+    <div class="lane-group-row${viewMode === 'mean' ? ' lane-group-mean' : ''}">
+      <div class="lane-group-label">${escapeHtml(group.label)}</div>
+      <div class="lane-group-cell">
         ${buildDerivedScaleBoxPlotHtml(chartData, viewMode, { hideAxis: true })}
       </div>
     </div>
@@ -5717,28 +5755,36 @@ function buildScaleGroupChartHtml(data, hiddenGroups, viewMode) {
     const overallGroup = { label: '응답자 전체', values: data.values || [], n: data.totalN, mean: data.mean, min: data.min, q1: data.q1, median: data.median, q3: data.q3, max: data.max };
     const overallRowHtml = `
       ${buildDerivedScaleGroupRowHtml(overallGroup, data.scoreRange, viewMode)}
-      <div class="stack100-group-chart-divider"></div>
+      <div class="lane-group-divider"></div>
     `;
     return `
-      <div class="numeric-whisker-group-chart">
-        <div class="stack100-group-chart">
-          ${displayGroups.length === 0 ? '<div class="result-empty">표시할 그룹이 없습니다.</div>' : overallRowHtml + displayGroups.map(group => buildDerivedScaleGroupRowHtml({ ...group, color: getGroupColor(data.groupResults, group.value) }, data.scoreRange, viewMode)).join('')}
-        </div>
-        ${displayGroups.length > 0 ? `<div class="chart-bottom-axis">${buildIntegerBoxAxisHtml(axisMin, axisMax)}</div>` : ''}
+      <div class="lane-group-chart">
+        ${displayGroups.length === 0 ? '<div class="result-empty">표시할 그룹이 없습니다.</div>' : overallRowHtml + displayGroups.map(group => buildDerivedScaleGroupRowHtml({ ...group, color: getGroupColor(data.groupResults, group.value) }, data.scoreRange, viewMode)).join('')}
+        ${displayGroups.length > 0 ? `
+          <div class="lane-group-row">
+            <div class="lane-group-label" aria-hidden="true"></div>
+            <div class="lane-group-cell">
+              <div class="chart-bottom-axis">${buildIntegerBoxAxisHtml(axisMin, axisMax)}</div>
+            </div>
+          </div>
+        ` : ''}
       </div>
     `;
   }
   const overallGroup = { label: '응답자 전체', mean: data.mean, scoreResults: data.scoreResults, n: data.totalN };
   const overallRowHtml = `
     ${buildScaleGroupRowHtml(overallGroup, maxScore, viewMode, hideMidpoint)}
-    <div class="stack100-group-chart-divider"></div>
+    <div class="lane-group-divider"></div>
   `;
   return `
-    <div class="numeric-whisker-group-chart">
-      <div class="stack100-group-chart">
-        ${displayGroups.length === 0 ? '<div class="result-empty">표시할 그룹이 없습니다.</div>' : overallRowHtml + displayGroups.map(group => buildScaleGroupRowHtml(group, maxScore, viewMode, hideMidpoint)).join('')}
-      </div>
-      ${displayGroups.length > 0 && viewMode === 'mean' ? buildScaleBottomAxisHtml(maxScore) : ''}
+    <div class="lane-group-chart">
+      ${displayGroups.length === 0 ? '<div class="result-empty">표시할 그룹이 없습니다.</div>' : overallRowHtml + displayGroups.map(group => buildScaleGroupRowHtml(group, maxScore, viewMode, hideMidpoint)).join('')}
+      ${displayGroups.length > 0 && viewMode === 'mean' ? `
+        <div class="lane-group-row">
+          <div class="lane-group-label" aria-hidden="true"></div>
+          <div class="lane-group-cell">${buildScaleBottomAxisHtml(maxScore)}</div>
+        </div>
+      ` : ''}
     </div>
   `;
 }
@@ -7545,9 +7591,9 @@ function buildGroupCompareStack100ChartHtml(data, hiddenGroups = new Set()) {
       return `<div class="stack100-segment ${width < 8 ? 'is-narrow' : ''}${edgeClass}" style="flex:0 0 ${width}%; background:${color};" data-tip="${tip}">${valueHtml}</div>`;
     }).join('');
     return `
-      <div class="stack100-group-row">
-        <div class="stack100-group-label">${escapeHtml(groupLabel)}</div>
-        <div class="stack100-group-chart-cell">
+      <div class="lane-group-row">
+        <div class="lane-group-label">${escapeHtml(groupLabel)}</div>
+        <div class="lane-group-cell">
           <div class="stack100-track">${segmentsHtml}</div>
         </div>
       </div>
@@ -7558,10 +7604,10 @@ function buildGroupCompareStack100ChartHtml(data, hiddenGroups = new Set()) {
   const groupRowsHtml = displayGroups.map(group => buildRowHtml(group.label, group.results || [], group.n || 0)).join('');
 
   return `
-    <div class="stack100-group-chart">
+    <div class="lane-group-chart">
       ${displayGroups.length === 0
         ? '<div class="result-empty">표시할 그룹이 없습니다.</div>'
-        : `${overallRowHtml}<div class="stack100-group-chart-divider"></div>${groupRowsHtml}`}
+        : `${overallRowHtml}<div class="lane-group-divider"></div>${groupRowsHtml}`}
     </div>
   `;
 }
@@ -7584,7 +7630,7 @@ function buildStack100GroupLegendHtml(data, hiddenGroups) {
   return `
     <aside class="legend-panel">
       <div class="legend is-static">${optionItems}</div>
-      <div class="stack100-group-legend-divider"></div>
+      <div class="lane-group-legend-divider"></div>
       <div class="legend" data-target="${escapeHtml(data.targetLabel)}" data-mode="group">${groupItems}</div>
       <div class="legend-actions" data-target="${escapeHtml(data.targetLabel)}" data-mode="group">
         <button type="button" class="legend-action-btn" data-legend-action="all-on">전체 선택</button>
@@ -8717,7 +8763,7 @@ function buildUnsupportedSection(label, entry) {
     <section class="result-section" data-target="${escapeHtml(label)}">
       ${buildResultHeaderHtml(`<div class="result-question-label">${escapeHtml(label)}</div>`, fullText)}
       <div class="result-unsupported">
-        ${messageHtml} 현재는 <strong>객관식 단일</strong>, <strong>객관식 중복</strong>, <strong>객관식 순위</strong>, <strong>객관식 척도</strong>, <strong>주관식 숫자</strong>, <strong>주관식 비율 배분</strong> 문항을 지원합니다.
+        ${messageHtml} 현재는 <strong>객관식 단일</strong>, <strong>객관식 중복</strong>, <strong>객관식 순위</strong>, <strong>객관식 척도</strong>, <strong>주관식 숫자</strong>, <strong>주관식 시간</strong>, <strong>주관식 비율 배분</strong> 문항을 지원합니다.
       </div>
     </section>
   `;
@@ -8769,6 +8815,7 @@ async function renderResults() {
       attachVizLabelColResizers(container);
       alignScaleCompareCharts(container);
       attachResultEventListeners(container);
+      addExportButtons(container);
       return;
     }
     resultState.targetScaleCompareMode = false;
@@ -10157,8 +10204,8 @@ async function exportSingleChoiceAsPptx(section, btn) {
 /* 이미지 추출 기능 */
 async function exportSectionAsImage(section, btn) {
   // 라이브러리 로드 확인
-  if (typeof html2canvas === 'undefined') {
-    alert('[오류] 이미지 추출 라이브러리(html2canvas)가 로드되지 않았습니다.\nassets/libs/html2canvas.min.js 파일이 있는지 확인해 주세요.');
+  if (typeof domtoimage === 'undefined') {
+    alert('[오류] 이미지 추출 라이브러리(dom-to-image-more)가 로드되지 않았습니다.\nassets/libs/dom-to-image-more.min.js 파일이 있는지 확인해 주세요.');
     return;
   }
   if (btn) {
@@ -10221,8 +10268,6 @@ async function exportSectionAsImage(section, btn) {
 async function captureSectionToA4(section, forceHideDataTable) {
   var hiddenEls = [];
   var displayHiddenEls = [];  // display:none 처리한 요소 (높이 영향)
-  var svgImgEls = [];
-  var svgOrigSrcs = [];
   var widthRestore = null;    // 너비 강제 변경 복원용
 
   try {
@@ -10260,25 +10305,15 @@ async function captureSectionToA4(section, forceHideDataTable) {
 
     await document.fonts.ready;
 
-    // file:// CORS 우회: SVG 아이콘 src 임시 교체
-    var BLANK_IMG = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
-    svgImgEls = Array.from(section.querySelectorAll('img[src$=".svg"]'));
-    svgOrigSrcs = svgImgEls.map(function(el) { return el.getAttribute('src'); });
-    svgImgEls.forEach(function(el) { el.setAttribute('src', BLANK_IMG); });
-
     var naturalWidth = section.offsetWidth;
     var naturalHeight = section.offsetHeight;
     console.log('[이미지 추출] 캡처 시작 — 강제 너비:', EXPORT_CAPTURE_WIDTH,
                 '/ 측정 너비:', naturalWidth, 'x', naturalHeight,
                 '/ forceHideDataTable:', forceHideDataTable);
 
-    // 원본 픽셀 그대로 캡처 (scale=1)
-    var canvas = await html2canvas(section, {
-      scale: 1,
-      backgroundColor: '#ffffff',
-      allowTaint: false,
-      useCORS: false,
-      logging: false,
+    // dom-to-image-more로 캡처 (html2canvas는 CSS color() 함수 미지원)
+    var canvas = await domtoimage.toCanvas(section, {
+      bgcolor: '#ffffff',
       width: naturalWidth,
       height: naturalHeight
     });
@@ -10323,7 +10358,6 @@ async function captureSectionToA4(section, forceHideDataTable) {
     return { overflow: false, canvas: out };
   } finally {
     // 복원
-    try { svgImgEls.forEach(function(el, i) { el.setAttribute('src', svgOrigSrcs[i]); }); } catch(_) {}
     try { hiddenEls.forEach(function(el) { el.style.visibility = ''; }); } catch(_) {}
     try { displayHiddenEls.forEach(function(item) { item.el.style.display = item.original; }); } catch(_) {}
     try {

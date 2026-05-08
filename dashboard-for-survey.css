@@ -1405,7 +1405,7 @@ button {
   flex-wrap: nowrap;
   flex: 0 0 auto;
   position: relative;
-  z-index: 5;
+  z-index: 10;
   overflow: visible;
 }
 
@@ -2964,7 +2964,8 @@ body.filter-dragging .filter-add-btn:hover {
   white-space: nowrap;
 }
 
-.lollipop-h-line {
+.lollipop-h-line,
+.scale-compare-lollipop-line {
   position: absolute;
   left: 0;
   top: 50%;
@@ -2972,7 +2973,8 @@ body.filter-dragging .filter-add-btn:hover {
   transform: translateY(-50%);
 }
 
-.lollipop-h-dot {
+.lollipop-h-dot,
+.scale-compare-lollipop-dot {
   position: absolute;
   top: 50%;
   width: var(--lollipop-dot-size);
@@ -3812,21 +3814,12 @@ body.filter-dragging .filter-add-btn:hover {
 
 
 @media (max-width: 900px) {
-  .stack100-group-row {
+  .lane-group-row {
     grid-template-columns: 1fr;
     gap: 8px;
   }
 
-  .scale-compare-label {
-    padding: 0;
-  }
-
-  .allocation-group-row {
-    grid-template-columns: 1fr;
-    gap: 8px;
-  }
-
-  .allocation-group-label {
+  .lane-group-label {
     padding: 0;
   }
 }
@@ -3839,7 +3832,7 @@ body.filter-dragging .filter-add-btn:hover {
   --scale-chart-lane-height: 92px;
 }
 
-.stack100-group-chart {
+.lane-group-chart {
   --viz-stack-height: 40px;
 }
 
@@ -4098,25 +4091,24 @@ body.filter-dragging .filter-add-btn:hover {
 
 /* ================ 차트 상세 : 박스 플롯 (주관식 숫자, 척도 산출 지표) ================ */
 
-/* TBD : 이름 바꾸기 */
-
-.numeric-open-summary-whisker {
+.box-plot-chart {
   padding: 0;
 }
 
-.numeric-open-summary-body {
+.box-plot-body {
   position: relative;
 }
 
-.numeric-open-summary-whisker .chart-bottom-axis {
-  margin-left: 0;
-}
-
-.numeric-whisker-track-wrap {
+.box-plot-track-wrap {
   position: relative;
 }
 
-.numeric-whisker-q-tick {
+.box-plot-box-row {
+  display: flex;
+  height: var(--viz-stack-height);
+  position: relative;
+}
+.box-plot-q-tick {
   position: absolute;
   top: 0;
   height: 40px;
@@ -4127,21 +4119,15 @@ body.filter-dragging .filter-add-btn:hover {
   cursor: help;
 }
 
-.numeric-whisker-box-row {
-  display: flex;
-  height: var(--viz-stack-height);
+.box-plot-dead-seg {
   position: relative;
 }
 
-.numeric-whisker-dead-seg {
+.box-plot-whisker-seg {
   position: relative;
 }
 
-.numeric-whisker-whisker-seg {
-  position: relative;
-}
-
-.numeric-whisker-whisker-seg::after {
+.box-plot-whisker-seg::after {
   content: '';
   position: absolute;
   top: 50%;
@@ -4152,7 +4138,7 @@ body.filter-dragging .filter-add-btn:hover {
   background: var(--neutral-600);
 }
 
-.numeric-whisker-end-tick {
+.box-plot-end-tick {
   position: absolute;
   top: 50%;
   width: 2px;
@@ -4163,18 +4149,7 @@ body.filter-dragging .filter-add-btn:hover {
   z-index: 2;
 }
 
-.numeric-open-summary-whisker.is-mean-mode .numeric-whisker-box,
-.numeric-open-summary-whisker.is-mean-mode .numeric-whisker-dead-seg,
-.numeric-open-summary-whisker.is-mean-mode .numeric-whisker-whisker-seg,
-.numeric-open-summary-whisker.is-mean-mode .numeric-whisker-q-tick,
-.numeric-open-summary-whisker.is-mean-mode .numeric-whisker-end-tick,
-.numeric-open-summary-whisker.is-mean-mode .chart-bottom-axis,
-.numeric-open-summary-whisker.is-mean-mode .chart-bottom-axis-tick,
-.numeric-open-summary-whisker.is-mean-mode .chart-bottom-axis-label {
-  opacity: 0.3;
-}
-
-.numeric-whisker-mean {
+.box-plot-mean {
   position: absolute;
   top: 50%;
   width: 40px;
@@ -4194,12 +4169,12 @@ body.filter-dragging .filter-add-btn:hover {
   z-index: 3;
 }
 
-.numeric-whisker-mean-label {
+.box-plot-mean-label {
   position: absolute;
   left: 50%;
   bottom: 100%;
   transform: translateX(-50%);
-  color: var(--neutral-600);
+  color: var(--neutral-700);
   font-size: var(--label-2-size);
   font-weight: var(--font-weight-semibold);
   line-height: var(--body-line-height);
@@ -4207,13 +4182,13 @@ body.filter-dragging .filter-add-btn:hover {
   z-index: 3;
 }
 
-.numeric-whisker-q-label-layer {
+.box-plot-q-label-layer {
   position: relative;
   margin-top: 8px;
   height: 45px;
 }
 
-.numeric-whisker-q-item {
+.box-plot-q-item {
   position: absolute;
   top: 0;
   transform: translateX(-50%);
@@ -4221,7 +4196,7 @@ body.filter-dragging .filter-add-btn:hover {
   cursor: help;
 }
 
-.numeric-whisker-q-name {
+.box-plot-q-name {
   font-size: var(--label-1-size);
   font-weight: var(--font-weight-semibold);
   color: var(--neutral-900);
@@ -4229,7 +4204,7 @@ body.filter-dragging .filter-add-btn:hover {
   white-space: nowrap;
 }
 
-.numeric-whisker-q-val {
+.box-plot-q-val {
   font-size: var(--label-1-size);
   font-weight: var(--font-weight-regular);
   color: var(--neutral-900);
@@ -4238,12 +4213,25 @@ body.filter-dragging .filter-add-btn:hover {
   white-space: nowrap;
 }
 
+/* 여러 문항 보기에 포함됐을 시 '평균 모드'에서 평균 값만 강조하는 코드 */
+.box-plot-chart.is-mean-mode .box-plot-box,
+.box-plot-chart.is-mean-mode .box-plot-dead-seg,
+.box-plot-chart.is-mean-mode .box-plot-whisker-seg,
+.box-plot-chart.is-mean-mode .box-plot-q-tick,
+.box-plot-chart.is-mean-mode .box-plot-end-tick,
+.box-plot-chart.is-mean-mode .chart-bottom-axis,
+.box-plot-chart.is-mean-mode .chart-bottom-axis-tick,
+.box-plot-chart.is-mean-mode .chart-bottom-axis-label {
+  opacity: 0.3;
+}
+
+
 /* ================ 가로 한 줄 그래프 공통으로 쓸 수 있는 눈금축 ================ */
 
 .chart-bottom-axis {
   position: relative;
   height: 36px;
-  margin-top :40px;
+  margin-top :32px;
   border-top: 1px solid var(--neutral-300);
 }
 
@@ -4278,26 +4266,24 @@ body.filter-dragging .filter-add-btn:hover {
 
 /* ================차트 상세 : 100% 기준 막대 계열/척도 평균/박스 플롯 - 그룹별 데이터 ================ */ 
 
-/* TBD stack100 과 클래스 통일 작업 필요 */
-
-
-.stack100-group-chart {
+.lane-group-chart {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
-.stack100-group-chart-divider {
+.lane-group-divider {
   border-top: 1px solid var(--neutral-200);
   margin: 8px 0 8px calc(var(--viz-label-col-width) + var(--viz-label-bar-gap));
 }
 
-.stack100-group-legend-divider {
+.lane-group-legend-divider {
   border-top: 1px solid var(--neutral-200);
   margin: 16px 0;
 }
 
-.stack100-group-row {
+.lane-group-row {
   position: relative;
   z-index: 1;
   display: grid;
@@ -4307,119 +4293,57 @@ body.filter-dragging .filter-add-btn:hover {
   padding: 0;
 }
 
-.stack100-group-label {
+.lane-group-label {
   min-height: var(--viz-stack-height);
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  font-size: var(--label-1-size);
-  color: var(--neutral-900);
-  line-height: var(--body-line-height);
-  text-align: right;
-}
-
-.stack100-group-chart-cell {
-  min-width: 0;
-}
-
-.scale-compare-chart {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.scale-compare-label {
+  display: block;
   font-size: var(--label-1-size);
   font-weight: var(--font-weight-regular);
-  line-height: var(--body-line-height);
   color: var(--neutral-900);
+  line-height: var(--body-line-height);
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  min-height: auto;
-  padding-top: 0;
-  display: block;
   text-align: right;
 }
 
-.scale-compare-mean-row {
+.lane-group-cell {
+  min-width: 0;
+}
+
+.lane-group-mean {
   padding-top: 0;
   align-items: center;
 }
 
-.stack100-group-row .scale-chart,
-.scale-compare-mean-row .scale-mean-only {
+.lane-group-row .scale-chart,
+.lane-group-mean .scale-mean-only {
   height: var(--viz-stack-height);
 }
 
-.scale-compare-mean-row .scale-axis-label {
+.lane-group-mean .scale-axis-label {
   display: none;
 }
-.scale-compare-mean-row .scale-edge-labels {
+.lane-group-mean .scale-edge-labels {
   display: none;
 }
-.scale-compare-mean-row .scale-mean-label {
+.lane-group-mean .scale-mean-label {
   display: none;
 }
-.stack100-group-row .numeric-whisker-q-label-layer {
+.lane-group-row .box-plot-q-label-layer {
   display: none;
 }
-.stack100-group-row .numeric-whisker-mean-label {
+.lane-group-row .box-plot-mean-label {
   display: none;
 }
-.scale-compare-mean-row .numeric-whisker-q-label-layer {
+.lane-group-mean .box-plot-q-label-layer {
   display: none;
 }
-.scale-compare-mean-row .numeric-whisker-mean-label {
+.lane-group-mean .box-plot-mean-label {
   display: none;
 }
 
-.allocation-group-chart {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  padding: 0;
-}
-
-.allocation-group-row {
-  display: grid;
-  grid-template-columns: var(--viz-label-col-width) minmax(0, 1fr);
-  gap: var(--viz-label-bar-gap);
-  align-items: start;
-}
-
-.allocation-group-label {
-  min-width: 0;
-  padding: 3px 0 0;
-  color: var(--neutral-900);
-  line-height: var(--body-line-height);
-  text-align: right;
-}
-
-.allocation-group-label strong {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--neutral-900);
-}
-
-.allocation-group-label span {
-  display: block;
-  margin-top: 2px;
-  color: var(--neutral-600);
-  font-variant-numeric: tabular-nums;
-}
-
-.allocation-group-stack {
-  min-width: 0;
-}
-
-.numeric-whisker-group-chart .chart-bottom-axis {
-  margin-left: calc(var(--viz-label-col-width) + var(--viz-label-bar-gap));
-}
+/* 척도형 여러 문항 보기에서 '그룹별 비교' 활성화 시 */
 
 .scale-compare-group-row-chart {
   position: relative;
@@ -4431,6 +4355,13 @@ body.filter-dragging .filter-add-btn:hover {
 
 .scale-compare-chart.group-compare .group-dot-wrap.is-highlighted {
   z-index: 6;
+}
+
+/* 척도형 여러 문항 보기에서 '두 그룹만 비교하기' 활성화 시 */
+
+
+.scale-compare-lollipop-chart {
+  position: relative;
 }
 
 .scale-compare-dual-tracks {
@@ -4448,37 +4379,19 @@ body.filter-dragging .filter-add-btn:hover {
   height: var(--viz-bar-height);
 }
 
-.scale-compare-lollipop-line {
-  position: absolute;
-  left: 0;
-  top: 50%;
-  height: var(--lollipop-stem-width);
-  transform: translateY(-50%);
-}
-
 .scale-compare-lollipop-dot {
-  position: absolute;
-  top: 50%;
-  width: var(--lollipop-dot-size);
-  height: var(--lollipop-dot-size);
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
   cursor: pointer;
   z-index: 1;
 }
 
 .scale-compare-lollipop-dot:hover {
-  opacity: 0.8;
+  filter: brightness(1.12);
 }
 
-.scale-compare-lollipop-value {
+.scale-compare-lollipop-track .lollipop-h-value {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  font-size: var(--label-1-size);
-  font-weight: var(--font-weight-semibold);
-  color: var(--neutral-700);
-  white-space: nowrap;
   pointer-events: none;
 }
 
@@ -4488,10 +4401,6 @@ body.filter-dragging .filter-add-btn:hover {
   column-gap: var(--viz-label-bar-gap);
   margin-top: 4px;
   align-items: start;
-}
-
-.scale-compare-lollipop-chart {
-  position: relative;
 }
 
 .scale-compare-lollipop-guides {
@@ -4560,8 +4469,6 @@ body.filter-dragging .filter-add-btn:hover {
 
 
 /* ================ 차트 상세 : 주관식 문자 ================ */
-
-/* TBD : 이름 바꾸기 */
 
 .open-text-box {
   display: flex;
