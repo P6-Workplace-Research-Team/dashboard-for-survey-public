@@ -71,6 +71,10 @@
   --label-2-size: 13px;
   --button-1-size: 14px;
   --button-2-size: 13px;
+  --button-1-icon-size: 16px;
+  --button-2-icon-size: 14px;
+  --icon-button-size: 24px;
+  --icon-button-icon-size: 16px;
   --caption-1-size: 12px;
   --caption-2-size: 11px;
   --button-1-padding: 7px 14px;
@@ -130,6 +134,8 @@
   --viz-compare-color: var(--neutral-300);
   --lollipop-stem-width: 8px;
   --lollipop-dot-size: 16px;
+  --icon-opacity: 0.6;
+  --icon-active-opacity: 0.9;
 
   /* color */
   --Black: #000000;
@@ -288,10 +294,16 @@ body.home-page {
 }
 
 .home-page .list-btn .icon {
-  width: 16px;
-  height: 16px;
-  flex: 0 0 16px;
+  width: var(--button-1-icon-size);
+  height: var(--button-1-icon-size);
+  flex: 0 0 var(--button-1-icon-size);
   object-fit: contain;
+  opacity: var(--icon-opacity);
+}
+
+.home-page .list-btn:hover .icon,
+.home-page .list-btn:focus-visible .icon {
+  opacity: var(--icon-active-opacity);
 }
 
 .home-page .list-btn .count {
@@ -504,8 +516,8 @@ body.home-page {
 }
 
 .home-page .pick-btn svg {
-  width: 16px;
-  height: 16px;
+  width: var(--button-1-icon-size);
+  height: var(--button-1-icon-size);
 }
 
 .home-page .drop-zone.done {
@@ -588,8 +600,8 @@ body.home-page {
 }
 
 .home-page .reselect-btn svg {
-  width: 16px;
-  height: 16px;
+  width: var(--button-1-icon-size);
+  height: var(--button-1-icon-size);
 }
 
 .home-page .drop-zone.has-error {
@@ -839,7 +851,7 @@ button {
   width: 20px;
   height: 20px;
   display: block;
-  opacity: 0.5;
+  opacity: var(--icon-opacity);
 }
 
 .title-edit-btn:hover {
@@ -847,7 +859,7 @@ button {
 }
 
 .title-edit-btn:hover .icon {
-  opacity: 1;
+  opacity: var(--icon-active-opacity);
 }
 
 .project-title-input {
@@ -902,10 +914,17 @@ button {
 }
 
 .dashboard-header-btn-icon {
-  width: 16px;
-  height: 16px;
-  flex: 0 0 16px;
+  width: var(--button-1-icon-size);
+  height: var(--button-1-icon-size);
+  flex: 0 0 var(--button-1-icon-size);
   object-fit: contain;
+  opacity: var(--icon-opacity);
+}
+
+.dashboard-header-btn:hover .dashboard-header-btn-icon,
+.dashboard-header-btn:focus-visible .dashboard-header-btn-icon,
+.dashboard-header-btn.is-button-1-black .dashboard-header-btn-icon {
+  opacity: var(--icon-active-opacity);
 }
 
 .dashboard-header-btn.is-button-1-black {
@@ -1037,8 +1056,12 @@ button {
   width: 16px;
   height: 16px;
   transform: translateY(-50%);
-  opacity: 0.5;
+  opacity: var(--icon-opacity);
   pointer-events: none;
+}
+
+.panel-search-wrap:focus-within .panel-search-icon {
+  opacity: var(--icon-active-opacity);
 }
 
 #question-tree {
@@ -1085,13 +1108,19 @@ button {
   width: 24px;
   height: 24px;
   object-fit: contain;
-  opacity: 0.6;
+  opacity: var(--icon-opacity);
   transform: rotate(0deg);
   transition: transform .15s, opacity .15s;
 }
 
 .accordion-category.open .accordion-chev {
   transform: rotate(90deg);
+  opacity: var(--icon-active-opacity);
+}
+
+.accordion-header:hover .accordion-chev,
+.accordion-header:focus-visible .accordion-chev {
+  opacity: var(--icon-active-opacity);
 }
 
 .accordion-list {
@@ -1158,13 +1187,19 @@ button {
   width: 24px;
   height: 24px;
   object-fit: contain;
-  opacity: 0.6;
+  opacity: var(--icon-opacity);
   transform: rotate(0deg);
   transition: transform .15s, opacity .15s;
 }
 
 .accordion-subcategory.open .sub-accordion-chev {
   transform: rotate(90deg);
+  opacity: var(--icon-active-opacity);
+}
+
+.sub-accordion-header:hover .sub-accordion-chev,
+.sub-accordion-header:focus-visible .sub-accordion-chev {
+  opacity: var(--icon-active-opacity);
 }
 
 .sub-accordion-list {
@@ -1321,12 +1356,18 @@ button {
   width: 20px;
   height: 20px;
   object-fit: contain;
-  opacity: 0.6;
+  opacity: var(--icon-opacity);
   transition: transform .18s ease, opacity .18s ease;
 }
 
 .dashboard-page .page.panel-expanded .panel-toggle-icon {
   transform: rotate(180deg);
+  opacity: var(--icon-active-opacity);
+}
+
+.panel-toggle:hover .panel-toggle-icon,
+.panel-toggle:focus-visible .panel-toggle-icon {
+  opacity: var(--icon-active-opacity);
 }
 
 /* ================================ 메인 영역 - 필터 바 ================================ */
@@ -2007,10 +2048,17 @@ body.filter-dragging .filter-add-btn:hover {
 }
 
 .result-export-icon {
-  width: 14px;
-  height: 14px;
+  width: var(--button-2-icon-size);
+  height: var(--button-2-icon-size);
   display: block;
   flex-shrink: 0;
+  opacity: var(--icon-opacity);
+}
+
+.result-export-btn:hover .result-export-icon,
+.result-export-btn:focus-visible .result-export-icon,
+.result-export-btn:disabled .result-export-icon {
+  opacity: var(--icon-active-opacity);
 }
 
 .result-unsupported {
@@ -2193,7 +2241,7 @@ body.filter-dragging .filter-add-btn:hover {
   width: 16px;
   height: 16px;
   flex-shrink: 0;
-  opacity: 0.6;
+  opacity: var(--icon-opacity);
   transition: transform .15s ease;
 }
 
@@ -2202,7 +2250,7 @@ body.filter-dragging .filter-add-btn:hover {
 }
 
 .viz-control-dropdown.is-open .viz-control-dropdown__chevron {
-  opacity: 1;
+  opacity: var(--icon-active-opacity);
   transform: rotate(180deg);
 }
 
@@ -2378,7 +2426,7 @@ body.filter-dragging .filter-add-btn:hover {
   width: 20px;
   height: 20px;
   flex-shrink: 0;
-  opacity: 0.6;
+  opacity: var(--icon-opacity);
 }
 
 .viz-control-search__input {
@@ -2404,7 +2452,7 @@ body.filter-dragging .filter-add-btn:hover {
 }
 
 .viz-control-search:focus-within .viz-control-search__icon {
-  opacity: 1;
+  opacity: var(--icon-active-opacity);
 }
 
 /* -- 컨트롤 바 안내글 -- */
@@ -4611,12 +4659,20 @@ body.is-viz-label-col-resizing {
 
 /* ======== 데이터 테이블 펼치기/숨기기 토글 ======== */
 
+.result-table-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 4px -6px;
+}
+
 .result-table-toggle {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   align-self: flex-start;
-  margin: 0 0 4px -6px;
+  margin: 0;
   padding: 4px 8px 4px 2px;
   background: transparent;
   border: 0;
@@ -4639,6 +4695,46 @@ body.is-viz-label-col-resizing {
   outline-offset: 2px;
 }
 
+.result-table-copy-btn {
+  width: var(--icon-button-size);
+  height: var(--icon-button-size);
+  margin: 0 -2px 0 0;
+  padding: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-4);
+  cursor: pointer;
+  transition: background-color .15s ease;
+}
+
+.result-table-copy-btn:hover,
+.result-table-copy-btn.is-copied {
+  background: var(--neutral-100);
+}
+
+.result-table-copy-btn:focus-visible {
+  outline: 2px solid var(--neutral-900);
+  outline-offset: 2px;
+}
+
+.result-table-copy-icon {
+  width: var(--icon-button-icon-size);
+  height: var(--icon-button-icon-size);
+  display: block;
+  object-fit: contain;
+  opacity: var(--icon-opacity);
+  transition: opacity .15s ease;
+}
+
+.result-table-copy-btn:hover .result-table-copy-icon,
+.result-table-copy-btn:focus-visible .result-table-copy-icon,
+.result-table-copy-btn.is-copied .result-table-copy-icon {
+  opacity: var(--icon-active-opacity);
+}
+
 .result-table-toggle-icon {
   width: 24px;
   height: 24px;
@@ -4646,6 +4742,13 @@ body.is-viz-label-col-resizing {
   display: inline-block;
   object-fit: contain;
   filter: brightness(0) invert(0.322);
+  opacity: var(--icon-opacity);
+  transition: opacity .15s ease;
+}
+
+.result-table-toggle:hover .result-table-toggle-icon,
+.result-table-toggle:focus-visible .result-table-toggle-icon {
+  opacity: var(--icon-active-opacity);
 }
 
 .result-table-toggle-icon-down {
@@ -4828,6 +4931,36 @@ body.is-viz-label-col-resizing {
   display: none;
 }
 
+/* ================================ 토스트 ================================ */
+
+.dashboard-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  z-index: 9999;
+  min-height: 40px;
+  padding: 9px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-8);
+  background: var(--neutral-900);
+  color: var(--White);
+  font-size: var(--label-1-size);
+  line-height: var(--body-line-height);
+  font-weight: var(--font-weight-medium);
+  box-shadow: var(--shadow);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 8px);
+  transition: opacity .16s ease, transform .16s ease;
+}
+
+.dashboard-toast.is-visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
 
 /*======================================== 카피라이트 문구 (메인 하단) ======================================== */
 
@@ -4907,7 +5040,6 @@ body.is-viz-label-col-resizing {
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-4);
-  opacity: 0.6;
 }
 
 .modal-close-icon {
@@ -4915,6 +5047,12 @@ body.is-viz-label-col-resizing {
   height: 16px;
   display: block;
   object-fit: contain;
+  opacity: var(--icon-opacity);
+}
+
+.modal-close:hover .modal-close-icon,
+.modal-close:focus-visible .modal-close-icon {
+  opacity: var(--icon-active-opacity);
 }
 
 .modal-close:hover {
@@ -5100,11 +5238,16 @@ body.is-viz-label-col-resizing {
 }
 
 .data-update-trigger-icon {
-  width: 14px;
-  height: 14px;
+  width: var(--button-2-icon-size);
+  height: var(--button-2-icon-size);
   object-fit: contain;
-  opacity: 0.6;
+  opacity: var(--icon-opacity);
   flex-shrink: 0;
+}
+
+.data-update-trigger:hover .data-update-trigger-icon,
+.data-update-trigger:focus-visible .data-update-trigger-icon {
+  opacity: var(--icon-active-opacity);
 }
 
 .data-update-status {
@@ -5301,11 +5444,17 @@ body.is-viz-label-col-resizing {
   width: 16px;
   height: 16px;
   object-fit: contain;
-  transition: transform .15s ease;
+  opacity: var(--icon-opacity);
+  transition: transform .15s ease, opacity .15s ease;
 }
 
 .group-config-group.is-collapsed .group-config-accordion-icon {
   transform: rotate(-90deg);
+}
+
+.group-config-accordion-btn:hover .group-config-accordion-icon,
+.group-config-accordion-btn:focus-visible .group-config-accordion-icon {
+  opacity: var(--icon-active-opacity);
 }
 
 .group-config-group-name {
@@ -5334,8 +5483,8 @@ body.is-viz-label-col-resizing {
 }
 
 .group-config-icon-btn {
-  width: 16px;
-  height: 16px;
+  width: var(--icon-button-icon-size);
+  height: var(--icon-button-icon-size);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -5343,16 +5492,21 @@ body.is-viz-label-col-resizing {
   border-radius: var(--radius-8);
   background: transparent;
   transition: background .15s ease, border-color .15s ease;
-  opacity: 0.6;
+  opacity: var(--icon-opacity);
 }
 
 .group-config-icon-btn:hover {
   background: var(--neutral-50);
+  opacity: var(--icon-active-opacity);
+}
+
+.group-config-icon-btn:focus-visible {
+  opacity: var(--icon-active-opacity);
 }
 
 .group-config-icon-btn img {
-  width: 16px;
-  height: 16px;
+  width: var(--icon-button-icon-size);
+  height: var(--icon-button-icon-size);
   object-fit: contain;
 }
 
@@ -5412,10 +5566,16 @@ body.is-viz-label-col-resizing {
 }
 
 .group-config-create-icon {
-  width: 14px;
-  height: 14px;
+  width: var(--button-2-icon-size);
+  height: var(--button-2-icon-size);
   object-fit: contain;
   flex-shrink: 0;
+  opacity: var(--icon-opacity);
+}
+
+.group-config-create-btn:hover .group-config-create-icon,
+.group-config-create-btn:focus-visible .group-config-create-icon {
+  opacity: var(--icon-active-opacity);
 }
 
 /* ======== 기타 응답 보기 모달 ======== */

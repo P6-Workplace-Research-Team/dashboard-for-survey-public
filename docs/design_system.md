@@ -162,6 +162,10 @@ font-family: "Pretendard Variable", Pretendard, "Apple SD Gothic Neo", "Noto San
   --button-1-strong: 600;    /* Semibold — Focus, Black variant */
   --button-2-size: 13px;     /* Regular */
   --button-2-strong: 600;    /* Semibold */
+  --button-1-icon-size: 16px;
+  --button-2-icon-size: 14px;
+  --icon-button-size: 24px;
+  --icon-button-icon-size: 16px;
   --caption-1-size: 12px;
   --caption-2-size: 10px;
 
