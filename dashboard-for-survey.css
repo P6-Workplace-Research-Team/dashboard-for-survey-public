@@ -2776,13 +2776,6 @@ body.filter-dragging .filter-add-btn:hover {
   overflow: visible;
 }
 
-.result-section[data-type="single"] .single-hbar-track {
-  background: var(--viz-chart-soft-bg);
-}
-
-.result-section[data-type="multiple"] .single-hbar-track {
-  background: var(--viz-chart-soft-bg);
-}
 
 .single-hbar-fill {
   position: absolute;
@@ -2901,7 +2894,7 @@ body.filter-dragging .filter-add-btn:hover {
 }
 
 .lollipop-h-row,
-.lollipop-h-axis-row {
+.h-axis-row {
   display: grid;
   grid-template-columns: var(--viz-label-col-width) minmax(0, 1fr) var(--viz-bar-right-col);
   column-gap: var(--viz-label-bar-gap);
@@ -2932,23 +2925,6 @@ body.filter-dragging .filter-add-btn:hover {
   position: relative;
   height: var(--viz-bar-height);
   overflow: visible;
-}
-
-.lollipop-h-guides-overlay {
-  position: absolute;
-  left: calc(var(--viz-label-col-width) + var(--viz-label-bar-gap));
-  right: calc(var(--viz-bar-right-col) + var(--viz-label-bar-gap));
-  top: 0;
-  pointer-events: none;
-}
-
-.lollipop-h-guide {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 1px;
-  background: var(--neutral-200);
-  transform: translateX(-50%);
 }
 
 .lollipop-h-inline-label {
@@ -2984,7 +2960,6 @@ body.filter-dragging .filter-add-btn:hover {
   background: var(--neutral-600);
 }
 
-
 .lollipop-h-value,
 .lollipop-h-rank{
   font-size: var(--label-1-size);
@@ -3003,25 +2978,7 @@ body.filter-dragging .filter-add-btn:hover {
   text-align: center;
 }
 
-.lollipop-h-axis-row {
-  margin-top: 4px;
-  align-items: start;
-}
 
-.lollipop-h-axis {
-  position: relative;
-  height: 16px;
-}
-
-.lollipop-h-axis-label {
-  position: absolute;
-  top: 0;
-  font-size: var(--caption-1-size);
-  line-height: var(--body-line-height);
-  color: var(--neutral-600);
-  font-variant-numeric: tabular-nums;
-  transform: translateX(-50%);
-}
 
 /* ================ 차트 상세 : 이중 롤리팝 가로 (객관식 순위 - 그룹별 보기 - 2개만 비교 시) ================ */
 
@@ -3110,6 +3067,7 @@ body.filter-dragging .filter-add-btn:hover {
 /* ================ 차트 상세 : 가로 막대 누적형 (객관식 순위) ================ */
 
 .stack-h-chart {
+  position: relative;
   padding: 0;
 }
 
@@ -3208,6 +3166,63 @@ body.filter-dragging .filter-add-btn:hover {
 
 .stack-h-total-value.is-outside {
   text-align: center;
+}
+
+
+/* ================ 차트 상세 : 가로 차트 가로 축 눈금선 ================ */
+
+
+.h-guides-overlay {
+  position: absolute;
+  top: 0;
+  pointer-events: none;
+}
+
+.single-hbar-chart .h-guides-overlay,
+.dual-hbar-chart .h-guides-overlay {
+  left: calc(var(--viz-label-col-width) + var(--viz-label-bar-gap));
+  right: 0;
+}
+
+.lollipop-h-chart .h-guides-overlay,
+.dual-lollipop-h-chart .h-guides-overlay,
+.stack-h-chart .h-guides-overlay {
+  left: calc(var(--viz-label-col-width) + var(--viz-label-bar-gap));
+  right: calc(var(--viz-bar-right-col) + var(--viz-label-bar-gap));
+}
+
+.h-guide {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--neutral-200);
+  transform: translateX(-50%);
+}
+
+.h-axis-row {
+  margin-top: 4px;
+  align-items: start;
+}
+
+.h-axis {
+  position: relative;
+  height: 16px;
+}
+
+.h-axis-label {
+  position: absolute;
+  top: 0;
+  font-size: var(--caption-1-size);
+  line-height: var(--body-line-height);
+  color: var(--neutral-600);
+  font-variant-numeric: tabular-nums;
+  transform: translateX(-50%);
+}
+
+.single-hbar-chart .h-axis-row,
+.dual-hbar-chart .h-axis-row {
+  grid-template-columns: var(--viz-label-col-width) minmax(0, 1fr);
 }
 
 /* ================ 차트 상세 : 세로 차트 공통 ================ */
@@ -5050,52 +5065,41 @@ body.is-viz-label-col-resizing {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   padding: 16px;
   border-radius: var(--radius-8);
   transition: background .15s;
+}
+
+#saved-list .saved-item {
+  padding-left: 10px;
 }
 
 .saved-item:hover {
   background: var(--neutral-50);
 }
 
-.saved-item.dragging {
-  opacity: 0.4;
+#saved-list.is-dragging .saved-item:hover {
+  background: transparent;
 }
 
-.saved-item::before,
-.saved-item::after {
-  content: '';
-  position: absolute;
-  left: 16px;
-  right: 16px;
-  height: 2px;
-  background: var(--neutral-300);
+.saved-item.dragging {
   opacity: 0;
   pointer-events: none;
 }
 
-.saved-item::before {
-  top: -5px;
-}
-
-.saved-item::after {
-  bottom: -5px;
-}
-
-.saved-item.drag-over-before::before,
-.saved-item.drag-over-after::after {
-  opacity: 1;
+.saved-item.drag-over {
+  background: var(--neutral-100);
 }
 
 .drag-handle {
-  font-family: 'Material Symbols Rounded';
-  font-size: 20px;
-  color: var(--neutral-300);
+  display: block;
+  width: 20px;
+  height: 20px;
   cursor: grab;
   user-select: none;
   flex-shrink: 0;
+  opacity: 0.25;
 }
 
 .drag-handle:active {

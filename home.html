@@ -813,38 +813,41 @@ function validateBundleConsistency(rowsByKey) {
           return;
         }
         dragSrcId = item.dataset.id;
-        item.classList.add('dragging');
         e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', item.dataset.id);
+        setTimeout(() => item.classList.add('dragging'), 0);
       });
+
       item.addEventListener('dragend', () => {
-        dragSrcId = null;
         item.classList.remove('dragging');
-        savedList.querySelectorAll('.saved-item').forEach(i => i.classList.remove('drag-over-before', 'drag-over-after'));
+        savedList.querySelectorAll('.saved-item').forEach(i => i.classList.remove('drag-over'));
+        dragSrcId = null;
+        // 현재 DOM 순서를 읽어 저장
+        const newIds = Array.from(savedList.querySelectorAll('.saved-item')).map(el => el.dataset.id);
+        const list = loadSurveys();
+        const reordered = newIds.map(id => list.find(s => s.id === id)).filter(Boolean);
+        saveSurveys(reordered);
       });
+
       item.addEventListener('dragover', e => {
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
-        savedList.querySelectorAll('.saved-item').forEach(i => i.classList.remove('drag-over-before', 'drag-over-after'));
-        if (dragSrcId !== item.dataset.id) {
-          const rect = item.getBoundingClientRect();
-          item.classList.add(e.clientY > rect.top + rect.height / 2 ? 'drag-over-after' : 'drag-over-before');
+        if (!dragSrcId || dragSrcId === item.dataset.id) return;
+        const allItems = Array.from(savedList.querySelectorAll('.saved-item'));
+        const draggingEl = allItems.find(el => el.dataset.id === dragSrcId);
+        if (!draggingEl) return;
+        savedList.querySelectorAll('.saved-item').forEach(i => i.classList.remove('drag-over'));
+        item.classList.add('drag-over');
+        const draggingIdx = allItems.indexOf(draggingEl);
+        const targetIdx = allItems.indexOf(item);
+        if (draggingIdx < targetIdx) {
+          item.after(draggingEl);
+        } else {
+          item.before(draggingEl);
         }
       });
-      item.addEventListener('drop', e => {
-        e.preventDefault();
-        if (!dragSrcId || dragSrcId === item.dataset.id) return;
-        const list = loadSurveys();
-        const fromIdx = list.findIndex(s => s.id === dragSrcId);
-        if (fromIdx < 0) return;
-        const rect = item.getBoundingClientRect();
-        const insertAfter = e.clientY > rect.top + rect.height / 2;
-        const [moved] = list.splice(fromIdx, 1);
-        const targetIdx = list.findIndex(s => s.id === item.dataset.id);
-        if (targetIdx < 0) return;
-        list.splice(targetIdx + (insertAfter ? 1 : 0), 0, moved);
-        saveSurveys(list);
-        renderList();
-      });
+
+      item.addEventListener('drop', e => { e.preventDefault(); });
     });
 
     savedList.querySelectorAll('.saved-main').forEach(main => {

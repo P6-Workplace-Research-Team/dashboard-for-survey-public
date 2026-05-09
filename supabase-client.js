@@ -59,7 +59,25 @@ async function loadSurveysFromServer(shareToken) {
   if (res.error) console.error('[loadSurveysFromServer] DB 오류:', res.error);
   var loaded = (res.data || []).map(_toLocalSurveyFormat);
   try {
-    var savedOrder = JSON.parse(localStorage.getItem(_SORT_ORDER_KEY) || '[]');
+    var savedOrder = [];
+    // 유저 메타데이터에서 순서 읽기 (디바이스 간 연동)
+    var userRes = await _supabase.auth.getUser();
+    var metaOrder = userRes.data && userRes.data.user && userRes.data.user.user_metadata
+      ? userRes.data.user.user_metadata[_SORT_ORDER_KEY]
+      : null;
+    if (Array.isArray(metaOrder) && metaOrder.length > 0) {
+      savedOrder = metaOrder;
+    } else {
+      // localStorage 마이그레이션: 기존 순서가 있으면 Supabase에 저장 후 삭제
+      var legacy = JSON.parse(localStorage.getItem(_SORT_ORDER_KEY) || '[]');
+      if (legacy.length > 0) {
+        savedOrder = legacy;
+        var migrateData = {};
+        migrateData[_SORT_ORDER_KEY] = legacy;
+        _supabase.auth.updateUser({ data: migrateData }).catch(function() {});
+        localStorage.removeItem(_SORT_ORDER_KEY);
+      }
+    }
     if (savedOrder.length > 0) {
       var orderMap = new Map(savedOrder.map(function(id, i) { return [id, i]; }));
       loaded.sort(function(a, b) {
@@ -99,7 +117,12 @@ function loadSurveys() {
 async function saveSurveys(newList) {
   var oldCache = _surveysCache.slice();
   _surveysCache = Array.isArray(newList) ? newList : [];
-  try { localStorage.setItem(_SORT_ORDER_KEY, JSON.stringify(_surveysCache.map(function(s) { return s.id; }))); } catch (_) {}
+  // 순서를 유저 메타데이터에 저장 (디바이스 간 연동)
+  try {
+    var newOrderData = {};
+    newOrderData[_SORT_ORDER_KEY] = _surveysCache.map(function(s) { return s.id; });
+    _supabase.auth.updateUser({ data: newOrderData }).catch(function() {});
+  } catch (_) {}
 
   try {
     var oldMap = new Map(oldCache.map(function(s) { return [s.id, s]; }));
