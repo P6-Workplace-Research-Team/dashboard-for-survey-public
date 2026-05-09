@@ -1366,7 +1366,7 @@ function setupSavedModal() {
       row.className = 'saved-item';
       row.dataset.id = item.id;
       row.innerHTML = `
-        <div class="drag-handle" draggable="true" aria-hidden="true">drag_indicator</div>
+        <img class="drag-handle" src="assets/icons/drag_indicator_40dp_151515_FILL0_wght400_GRAD0_opsz40.svg" alt="" aria-hidden="true" draggable="true">
         <div class="saved-main" data-id="${item.id}">
           <div class="saved-title" data-id="${item.id}">${escapeHtml(item.title)}</div>
           <input type="text" class="saved-title-input" maxlength="50" hidden>
@@ -1381,6 +1381,7 @@ function setupSavedModal() {
     });
 
     let dragSrcId = null;
+    let lastInsertionKey = null;
 
     savedList.querySelectorAll('.saved-item').forEach(item => {
       item.addEventListener('dragstart', e => {
@@ -1389,38 +1390,73 @@ function setupSavedModal() {
           return;
         }
         dragSrcId = item.dataset.id;
-        item.classList.add('dragging');
+        lastInsertionKey = null;
+        savedList.classList.add('is-dragging');
         e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', item.dataset.id);
+        const itemRect = item.getBoundingClientRect();
+        e.dataTransfer.setDragImage(item, e.clientX - itemRect.left, e.clientY - itemRect.top);
+        setTimeout(() => item.classList.add('dragging'), 0);
       });
+
       item.addEventListener('dragend', () => {
-        dragSrcId = null;
         item.classList.remove('dragging');
-        savedList.querySelectorAll('.saved-item').forEach(i => i.classList.remove('drag-over-before', 'drag-over-after'));
+        savedList.classList.remove('is-dragging');
+        savedList.querySelectorAll('.saved-item').forEach(i => {
+          i.classList.remove('drag-over');
+          i.style.transition = '';
+          i.style.transform = '';
+        });
+        dragSrcId = null;
+        lastInsertionKey = null;
+        const newIds = Array.from(savedList.querySelectorAll('.saved-item')).map(el => el.dataset.id);
+        const list = loadSurveys();
+        const reordered = newIds.map(id => list.find(s => s.id === id)).filter(Boolean);
+        saveSurveys(reordered);
       });
+
       item.addEventListener('dragover', e => {
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
-        savedList.querySelectorAll('.saved-item').forEach(i => i.classList.remove('drag-over-before', 'drag-over-after'));
-        if (dragSrcId !== item.dataset.id) {
-          const rect = item.getBoundingClientRect();
-          item.classList.add(e.clientY > rect.top + rect.height / 2 ? 'drag-over-after' : 'drag-over-before');
-        }
-      });
-      item.addEventListener('drop', e => {
-        e.preventDefault();
         if (!dragSrcId || dragSrcId === item.dataset.id) return;
-        const list = loadSurveys();
-        const fromIdx = list.findIndex(s => s.id === dragSrcId);
-        if (fromIdx < 0) return;
+
         const rect = item.getBoundingClientRect();
-        const insertAfter = e.clientY > rect.top + rect.height / 2;
-        const [moved] = list.splice(fromIdx, 1);
-        const targetIdx = list.findIndex(s => s.id === item.dataset.id);
-        if (targetIdx < 0) return;
-        list.splice(targetIdx + (insertAfter ? 1 : 0), 0, moved);
-        saveSurveys(list);
-        renderList();
+        const insertBefore = e.clientY < rect.top + rect.height / 2;
+        const insertionKey = item.dataset.id + (insertBefore ? '-before' : '-after');
+        if (lastInsertionKey === insertionKey) return;
+        lastInsertionKey = insertionKey;
+
+        const allItems = Array.from(savedList.querySelectorAll('.saved-item'));
+        const draggingEl = allItems.find(el => el.dataset.id === dragSrcId);
+        if (!draggingEl) return;
+
+        // FLIP: clear ongoing transforms, get true positions
+        allItems.forEach(el => { el.style.transition = 'none'; el.style.transform = ''; });
+        void savedList.offsetHeight;
+        const firstTops = new Map();
+        allItems.forEach(el => firstTops.set(el, el.getBoundingClientRect().top));
+
+        // Move DOM
+        if (insertBefore) {
+          item.before(draggingEl);
+        } else {
+          item.after(draggingEl);
+        }
+
+        // FLIP: animate non-dragging items to new positions
+        allItems.forEach(el => {
+          if (el === draggingEl) return;
+          const delta = firstTops.get(el) - el.getBoundingClientRect().top;
+          if (Math.abs(delta) < 1) return;
+          el.style.transition = 'none';
+          el.style.transform = `translateY(${delta}px)`;
+          void el.offsetHeight;
+          el.style.transition = 'transform 150ms ease';
+          el.style.transform = '';
+        });
       });
+
+      item.addEventListener('drop', e => { e.preventDefault(); });
     });
 
     savedList.querySelectorAll('.saved-main').forEach(main => {
@@ -3408,7 +3444,21 @@ function buildBasicChartHtml(data) {
       </div>
     `;
   }).join('');
-  return `<div class="single-hbar-chart">${rowHtml}</div>`;
+  const overlayHeight = rows.length * 40 - 8;
+  const guideHtml = [0, 20, 40, 60, 80, 100].map(t => `<span class="h-guide" style="left:${t}%;"></span>`).join('');
+  const axisHtml = [20, 40, 60, 80, 100].map(t =>
+    `<span class="h-axis-label" style="left:${t}%;">${t}</span>`
+  ).join('');
+  return `
+    <div class="single-hbar-chart">
+      <div class="h-guides-overlay" style="height:${overlayHeight}px;" aria-hidden="true">${guideHtml}</div>
+      ${rowHtml}
+      <div class="h-axis-row" aria-hidden="true">
+        <div class="h-axis-spacer"></div>
+        <div class="h-axis">${axisHtml}</div>
+      </div>
+    </div>
+  `;
 }
 
 function getGroupCompareViewMode(targetLabel) {
@@ -3629,7 +3679,23 @@ function buildDualHbarChartHtml(data, hiddenGroups = new Set()) {
     `;
   }).join('');
 
-  return `<div class="dual-hbar-chart">${rowHtml}</div>`;
+  const G = displayGroups.length;
+  const rowH = G * 32 + Math.max(0, G - 1) * 4;
+  const overlayHeight = items.length * rowH + Math.max(0, items.length - 1) * 16;
+  const guideHtml = [0, 20, 40, 60, 80, 100].map(t => `<span class="h-guide" style="left:${t}%;"></span>`).join('');
+  const axisHtml = [20, 40, 60, 80, 100].map(t =>
+    `<span class="h-axis-label" style="left:${t}%;">${t}</span>`
+  ).join('');
+  return `
+    <div class="dual-hbar-chart">
+      <div class="h-guides-overlay" style="height:${overlayHeight}px;" aria-hidden="true">${guideHtml}</div>
+      ${rowHtml}
+      <div class="h-axis-row" aria-hidden="true">
+        <div class="h-axis-spacer"></div>
+        <div class="h-axis">${axisHtml}</div>
+      </div>
+    </div>
+  `;
 }
 
 function buildVerticalBarChartHtml(data) {
@@ -5119,14 +5185,14 @@ function buildScaleCompareSectionHtml(compareData, hiddenGroups, options = {}) {
       const axisTicksHtml = axisTicks.map(score => {
         const leftPct = pctFor(score);
         const cls = score === 1 ? 'is-start' : score === safeMaxScore ? 'is-end' : 'is-mid';
-        return `<span class="lollipop-h-axis-label ${cls}" style="left:${leftPct}%;">${score}</span>`;
+        return `<span class="h-axis-label ${cls}" style="left:${leftPct}%;">${score}</span>`;
       }).join('');
       const numQ = compareData.questions.filter(q => q.data).length;
       const numG = visibleGroups.length;
       const rowH = numG * 32 + (numG - 1) * 4;
       const overlayH = numQ * rowH + Math.max(0, numQ - 1) * 16;
       const guideLinesHtml = axisTicks.map(score => {
-        return `<span class="lollipop-h-guide" style="left:${pctFor(score)}%;"></span>`;
+        return `<span class="h-guide" style="left:${pctFor(score)}%;"></span>`;
       }).join('');
       chartInnerHtml = `
         <div class="scale-compare-lollipop-chart">
@@ -5134,8 +5200,8 @@ function buildScaleCompareSectionHtml(compareData, hiddenGroups, options = {}) {
           <div class="lane-group-chart">${rowHtml}</div>
           ${numQ > 0 ? `
             <div class="scale-compare-lollipop-axis-row" aria-hidden="true">
-              <div class="lollipop-h-axis-spacer"></div>
-              <div class="lollipop-h-axis">${axisTicksHtml}</div>
+              <div class="h-axis-spacer"></div>
+              <div class="h-axis">${axisTicksHtml}</div>
             </div>
           ` : ''}
         </div>
@@ -5528,12 +5594,14 @@ function buildNumericOpenBoxChartHtml(data) {
   return `
     <div class="box-plot-chart">
       <div class="box-plot-body">
-    <div class="numeric-open-summary-whisker">
-      <div class="numeric-open-summary-body">
-        ${buildNumericWhiskerTrackHtml(data, data.domainMin, data.domainMax, numberUnit, '응답자 전체', { valueFormatter: fmtValue, valueFormat: isTimeMinutes ? 'time-minutes' : '' })}
-        <div class="chart-bottom-axis">${buildNumericBoxAxisHtml(data.domainMin, data.domainMax, fmtValue)}</div>
+        <div class="numeric-open-summary-whisker">
+          <div class="numeric-open-summary-body">
+            ${buildNumericWhiskerTrackHtml(data, data.domainMin, data.domainMax, numberUnit, '응답자 전체', { valueFormatter: fmtValue, valueFormat: isTimeMinutes ? 'time-minutes' : '' })}
+            <div class="chart-bottom-axis">${buildNumericBoxAxisHtml(data.domainMin, data.domainMax, fmtValue)}</div>
+          </div>
+          ${numberUnit ? `<div class="numeric-open-unit">단위 : ${escapeHtml(numberUnit)}</div>` : ''}
+        </div>
       </div>
-      ${numberUnit ? `<div class="numeric-open-unit">단위 : ${escapeHtml(numberUnit)}</div>` : ''}
     </div>
   `;
 }
@@ -6457,7 +6525,7 @@ function buildRankLollipopChartHtml(data) {
   const overlayHeight = rows.length * 40 - 8;
   const guideOverlayHtml = axisTicks.map(tick => {
     const tickPct = pctFor(tick);
-    return `<span class="lollipop-h-guide" style="left:${tickPct}%;"></span>`;
+    return `<span class="h-guide" style="left:${tickPct}%;"></span>`;
   }).join('');
   const rowHtml = rows.map((r) => {
     const rankObj = data.ranking.find(item => item.option === r.option);
@@ -6487,15 +6555,15 @@ function buildRankLollipopChartHtml(data) {
   }).join('');
   return `
     <div class="lollipop-h-chart">
-      <div class="lollipop-h-guides-overlay" style="height:${overlayHeight}px;" aria-hidden="true">${guideOverlayHtml}</div>
+      <div class="h-guides-overlay" style="height:${overlayHeight}px;" aria-hidden="true">${guideOverlayHtml}</div>
       ${rowHtml}
-      <div class="lollipop-h-axis-row" aria-hidden="true">
-        <div class="lollipop-h-axis-spacer"></div>
-        <div class="lollipop-h-axis">
+      <div class="h-axis-row" aria-hidden="true">
+        <div class="h-axis-spacer"></div>
+        <div class="h-axis">
           ${axisTicks.map(tick => {
             const leftPct = pctFor(tick);
             const cls = tick === axisMin ? 'is-start' : (tick === axisMax ? 'is-end' : 'is-mid');
-            return `<span class="lollipop-h-axis-label ${cls}" style="left:${leftPct}%;">${tick}</span>`;
+            return `<span class="h-axis-label ${cls}" style="left:${leftPct}%;">${tick}</span>`;
           }).join('')}
         </div>
         <div class="lollipop-h-axis-rank-spacer"></div>
@@ -6519,7 +6587,7 @@ function buildRankLollipopGroupCompareChartHtml(data, hiddenGroups = new Set()) 
   const overlayHeight = rows.length * 40 - 8;
   const guideOverlayHtml = axisTicks.map(tick => {
     const tickPct = pctFor(tick);
-    return `<span class="lollipop-h-guide" style="left:${tickPct}%;"></span>`;
+    return `<span class="h-guide" style="left:${tickPct}%;"></span>`;
   }).join('');
   const rowHtml = rows.map((r) => {
     const rankObj = data.ranking.find(item => item.option === r.option);
@@ -6560,15 +6628,15 @@ function buildRankLollipopGroupCompareChartHtml(data, hiddenGroups = new Set()) 
   }).join('');
   return `
     <div class="lollipop-h-chart group-compare">
-      <div class="lollipop-h-guides-overlay" style="height:${overlayHeight}px;" aria-hidden="true">${guideOverlayHtml}</div>
+      <div class="h-guides-overlay" style="height:${overlayHeight}px;" aria-hidden="true">${guideOverlayHtml}</div>
       ${rowHtml}
-      <div class="lollipop-h-axis-row" aria-hidden="true">
-        <div class="lollipop-h-axis-spacer"></div>
-        <div class="lollipop-h-axis">
+      <div class="h-axis-row" aria-hidden="true">
+        <div class="h-axis-spacer"></div>
+        <div class="h-axis">
           ${axisTicks.map(tick => {
             const leftPct = pctFor(tick);
             const cls = tick === axisMin ? 'is-start' : (tick === axisMax ? 'is-end' : 'is-mid');
-            return `<span class="lollipop-h-axis-label ${cls}" style="left:${leftPct}%;">${tick}</span>`;
+            return `<span class="h-axis-label ${cls}" style="left:${leftPct}%;">${tick}</span>`;
           }).join('')}
         </div>
         <div class="lollipop-h-axis-rank-spacer"></div>
@@ -6595,7 +6663,7 @@ function buildRankDualLollipopChartHtml(data, hiddenGroups = new Set()) {
   const overlayHeight = rows.length * (displayGroups.length * trackH + (displayGroups.length - 1) * trackGap) + (rows.length - 1) * rowGap;
   const guideOverlayHtml = axisTicks.map(tick => {
     const tickPct = pctFor(tick);
-    return `<span class="lollipop-h-guide" style="left:${tickPct}%;"></span>`;
+    return `<span class="h-guide" style="left:${tickPct}%;"></span>`;
   }).join('');
   const rowHtml = rows.map((r) => {
     const rankObj = data.ranking.find(item => item.option === r.option);
@@ -6637,15 +6705,15 @@ function buildRankDualLollipopChartHtml(data, hiddenGroups = new Set()) {
   }).join('');
   return `
     <div class="dual-lollipop-h-chart">
-      <div class="lollipop-h-guides-overlay" style="height:${overlayHeight}px;" aria-hidden="true">${guideOverlayHtml}</div>
+      <div class="h-guides-overlay" style="height:${overlayHeight}px;" aria-hidden="true">${guideOverlayHtml}</div>
       ${rowHtml}
-      <div class="lollipop-h-axis-row" aria-hidden="true">
-        <div class="lollipop-h-axis-spacer"></div>
-        <div class="lollipop-h-axis">
+      <div class="h-axis-row" aria-hidden="true">
+        <div class="h-axis-spacer"></div>
+        <div class="h-axis">
           ${axisTicks.map(tick => {
             const leftPct = pctFor(tick);
             const cls = tick === axisMin ? 'is-start' : (tick === axisMax ? 'is-end' : 'is-mid');
-            return `<span class="lollipop-h-axis-label ${cls}" style="left:${leftPct}%;">${tick}</span>`;
+            return `<span class="h-axis-label ${cls}" style="left:${leftPct}%;">${tick}</span>`;
           }).join('')}
         </div>
         <div class="lollipop-h-axis-rank-spacer"></div>
@@ -6770,7 +6838,22 @@ function buildRankStackChartHtml(data, hiddenRanks) {
       </div>
     `;
   }).join('');
-  return `<div class="stack-h-chart">${rowHtml}</div>`;
+  const overlayHeight = rows.length * 40 - 8;
+  const guideHtml = [0, 20, 40, 60, 80, 100].map(t => `<span class="h-guide" style="left:${t}%;"></span>`).join('');
+  const axisHtml = [20, 40, 60, 80, 100].map(t =>
+    `<span class="h-axis-label" style="left:${t}%;">${t}</span>`
+  ).join('');
+  return `
+    <div class="stack-h-chart">
+      <div class="h-guides-overlay" style="height:${overlayHeight}px;" aria-hidden="true">${guideHtml}</div>
+      ${rowHtml}
+      <div class="h-axis-row" aria-hidden="true">
+        <div class="h-axis-spacer"></div>
+        <div class="h-axis">${axisHtml}</div>
+        <div></div>
+      </div>
+    </div>
+  `;
 }
 
 function buildRankVerticalStackChartHtml(data, hiddenRanks) {
@@ -7235,18 +7318,12 @@ function buildRankSection(data, rows) {
   resultState.otherResponseTexts.set(targetLabel, otherTexts);
   const fullText = buildQuestionFullHtml(codebookEntry);
   const sidePanelHtml = buildResultSidePanelHtml(legendHtml, targetLabel);
-  const titleHtml = `
-    <div class="result-question-label">
-      <span>${escapeHtml(targetLabel)}</span>
-      <button type="button" class="rank1st-card-btn" data-rank1st-card-toggle="${escapeHtml(targetLabel)}">
-        1순위만 보기
-      </button>
-    </div>
-  `;
+  const titleHtml = `<div class="result-question-label">${escapeHtml(targetLabel)}</div>`;
+  const rank1stBtnHtml = `<button type="button" class="rank1st-card-btn" data-rank1st-card-toggle="${escapeHtml(targetLabel)}">1순위만 보기</button>`;
 
   return `
     <section class="result-section" data-target="${escapeHtml(targetLabel)}" data-type="rank">
-      ${buildResultHeaderHtml(titleHtml, fullText, controlsHtml)}
+      ${buildResultHeaderHtml(titleHtml, fullText, controlsHtml, rank1stBtnHtml)}
       <div class="result-visual has-legend">
         <div class="result-chart-col">${chartHtml}</div>
         ${sidePanelHtml}
@@ -8696,12 +8773,15 @@ function buildChoiceSectionHtml(data, rows) {
   const fullText = buildQuestionFullHtml(codebookEntry);
   const visualClass = getResultVisualClass(!!groupResults || (isSingleWithoutGroup && chartType === 'pie'));
   const titleHtml = rank1stSourceLabel
-    ? `<div class="result-question-label rank1st-derived-title"><span>${escapeHtml(displayLabel)}</span><button type="button" class="rank1st-card-btn" data-rank1st-card-toggle="${escapeHtml(rank1stSourceLabel)}">모든 순위 보기</button></div>`
+    ? `<div class="result-question-label rank1st-derived-title">${escapeHtml(displayLabel)}</div>`
     : `<div class="result-question-label">${escapeHtml(displayLabel)}</div>`;
+  const choiceActionsHtml = rank1stSourceLabel
+    ? `<button type="button" class="rank1st-card-btn is-active" data-rank1st-card-toggle="${escapeHtml(rank1stSourceLabel)}">모든 순위 보기</button>`
+    : '';
 
   return `
     <section class="result-section${rank1stSourceLabel ? ' rank1st-derived-section' : ''}" data-target="${escapeHtml(targetLabel)}" data-type="${data.isMulti ? 'multiple' : 'single'}"${rank1stSourceLabel ? ` data-rank1st-source="${escapeHtml(rank1stSourceLabel)}"` : ''}>
-      ${buildResultHeaderHtml(titleHtml, fullText, controlsHtml)}
+      ${buildResultHeaderHtml(titleHtml, fullText, controlsHtml, choiceActionsHtml)}
       <div class="${visualClass}">
         <div class="result-chart-col">${chartHtml}</div>
         ${sidePanelHtml}
