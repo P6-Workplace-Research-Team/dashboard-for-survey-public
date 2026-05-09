@@ -3447,7 +3447,7 @@ function buildBasicChartHtml(data) {
   const overlayHeight = rows.length * 40 - 8;
   const guideHtml = [0, 20, 40, 60, 80, 100].map(t => `<span class="h-guide" style="left:${t}%;"></span>`).join('');
   const axisHtml = [20, 40, 60, 80, 100].map(t =>
-    `<span class="h-axis-label" style="left:${t}%;">${t}</span>`
+    `<span class="h-axis-label" style="left:${t}%;">${t}%</span>`
   ).join('');
   return `
     <div class="single-hbar-chart">
@@ -3684,7 +3684,7 @@ function buildDualHbarChartHtml(data, hiddenGroups = new Set()) {
   const overlayHeight = items.length * rowH + Math.max(0, items.length - 1) * 16;
   const guideHtml = [0, 20, 40, 60, 80, 100].map(t => `<span class="h-guide" style="left:${t}%;"></span>`).join('');
   const axisHtml = [20, 40, 60, 80, 100].map(t =>
-    `<span class="h-axis-label" style="left:${t}%;">${t}</span>`
+    `<span class="h-axis-label" style="left:${t}%;">${t}%</span>`
   ).join('');
   return `
     <div class="dual-hbar-chart">
@@ -6841,7 +6841,7 @@ function buildRankStackChartHtml(data, hiddenRanks) {
   const overlayHeight = rows.length * 40 - 8;
   const guideHtml = [0, 20, 40, 60, 80, 100].map(t => `<span class="h-guide" style="left:${t}%;"></span>`).join('');
   const axisHtml = [20, 40, 60, 80, 100].map(t =>
-    `<span class="h-axis-label" style="left:${t}%;">${t}</span>`
+    `<span class="h-axis-label" style="left:${t}%;">${t}%</span>`
   ).join('');
   return `
     <div class="stack-h-chart">
