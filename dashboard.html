@@ -7,8 +7,9 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block">
 <link rel="stylesheet" href="dashboard-for-survey.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-client.js"></script>
-<script>requireAuth();</script>
+<script src="js/supabase-client.js"></script>
+<script src="js/bootstrap-auth.js"></script>
+<script src="js/saved-list-modal.js"></script>
 </head>
 <body class="dashboard-page">
 
@@ -124,23 +125,13 @@
   </div>
 
   <footer class="dash-footer">
+    <!-- PPT 내보내기 버튼 — 추후 활성화
     <button class="dashboard-header-btn is-button-1-black" type="button" id="export-all-pptx-btn">
       <img class="dashboard-header-btn-icon" src="assets/icons/arrow_downward_40dp_151515_FILL0_wght400_GRAD0_opsz40.svg" alt="">
       전체 문항 PPT로 내보내기
     </button>
+    -->
   </footer>
-</div>
-
-<div class="modal-backdrop" id="list-modal" role="dialog" aria-modal="true" aria-labelledby="list-modal-title">
-  <div class="modal">
-    <div class="modal-header">
-      <div class="modal-title" id="list-modal-title">저장된 대시보드 리스트</div>
-      <button class="modal-close" id="close-list-btn" aria-label="닫기">
-        <img class="modal-close-icon" src="assets/icons/close_wght600fill1_40px.svg" alt="">
-      </button>
-    </div>
-    <div class="modal-body" id="saved-list"></div>
-  </div>
 </div>
 
 <div class="modal-backdrop" id="data-update-modal" role="dialog" aria-modal="true" aria-labelledby="data-update-modal-title">
@@ -222,6 +213,15 @@
 <script src="assets/libs/dom-to-image-more.min.js"></script>
 <script src="assets/libs/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
-<script src="visualizations.js"></script>
+<script src="js/visualizations.js"></script>
+<script>
+  try {
+    window.initSavedListModal && window.initSavedListModal({
+      openButtonIds: ['dashboard-list-btn'],
+      countBadgeIds: ['saved-count'],
+      emptyHtml: '아직 저장된 대시보드가 없습니다.<br>대시보드를 저장하면 여기에 쌓입니다.'
+    });
+  } catch (_) {}
+</script>
 </body>
 </html>
