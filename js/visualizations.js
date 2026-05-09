@@ -1,4 +1,14 @@
-﻿// 스토리지 레이어: supabase-client.js 참고
+﻿/* =====================================================================
+   visualizations.js
+
+   이 파일은 레거시 단일 파일 구조를 유지하되, 아래 3개 레이어로 구획해 읽기/유지보수를 개선한다.
+
+   1) Data / Aggregation
+   2) Chart Renderers (HTML builders)
+   3) UI Binding (events / modals / init)
+   ===================================================================== */
+
+// 스토리지 레이어: supabase-client.js 참고
 
 function readAsText(file) {
   return new Promise((resolve, reject) => {
@@ -96,33 +106,6 @@ function checkColumns(headerRow, required) {
   const headerSet = new Set((headerRow || []).map(normalizeHeader));
   const missing = required.filter(c => !headerSet.has(c.toLowerCase()));
   return { ok: missing.length === 0, missing };
-}
-
-function detectResponseType(rows) {
-  if (!rows || rows.length < 2) return { type: 'unknown', numericRatio: 0, sampleSize: 0 };
-  const header = rows[0] || [];
-  const skipCols = REQUIRED_RESPONSE.length;
-  let numeric = 0;
-  let textLike = 0;
-  let samples = 0;
-  const dataRows = rows.slice(1, 31);
-  dataRows.forEach(r => {
-    for (let c = skipCols; c < (r || []).length; c++) {
-      if (isFreeTextHeaderName(header[c])) continue;
-      const v = String(r[c] == null ? '' : r[c]).trim();
-      if (!v) continue;
-      samples++;
-      if (/^-?\d+(\.\d+)?$/.test(v)) numeric++;
-      else if (/^-?\d+(\.\d+)?(\s*\|\s*-?\d+(\.\d+)?)+$/.test(v)) numeric++;
-      else textLike++;
-    }
-  });
-  if (samples === 0) return { type: 'unknown', numericRatio: 0, sampleSize: 0 };
-  const textRatio = textLike / samples;
-  let type = 'ambiguous';
-  if (textRatio < 0.3) type = 'numeric';
-  else if (textRatio >= 0.7) type = 'label';
-  return { type, numericRatio: numeric / samples, textRatio, sampleSize: samples };
 }
 
 function validateFileForKey(key, rows) {
@@ -1305,11 +1288,8 @@ function setupTitleRename() {
 }
 
 function setupSavedModal() {
-  const listModal = document.getElementById('list-modal');
-  const openListBtn = document.getElementById('dashboard-list-btn');
-  const closeListBtn = document.getElementById('close-list-btn');
-  const savedList = document.getElementById('saved-list');
-  const savedCountBadge = document.getElementById('saved-count');
+  // NOTE: Saved dashboard list modal is handled by `js/saved-list-modal.js` (DOM injected).
+  // This function now only wires dashboard-local controls (data update modal, exports, etc.).
   const newBtn = document.getElementById('new-analysis-btn');
   const dataUpdateBtn = document.getElementById('dashboard-data-update-btn');
   const dataUpdateModal = document.getElementById('data-update-modal');
@@ -1318,10 +1298,6 @@ function setupSavedModal() {
   const dataUpdateFileInput = document.getElementById('data-update-file-input');
   const applyDataUpdateBtn = document.getElementById('apply-data-update-btn');
   let pendingDataUpdates = {};
-
-  function refreshCount() {
-    setNumberTagValue(savedCountBadge, loadSurveys().length);
-  }
 
   function getCurrentSurvey() {
     const currentId = sessionStorage.getItem('survey.currentId');
@@ -1339,194 +1315,6 @@ function setupSavedModal() {
       dataUpdateFileInput.value = '';
       delete dataUpdateFileInput.dataset.targetKey;
     }
-  }
-
-  function openSurvey(id) {
-    const found = loadSurveys().find(s => s.id === id);
-    if (!found) return;
-    try {
-      sessionStorage.setItem('survey.currentId', id);
-      sessionStorage.setItem('survey.title', found.title);
-    } catch (_) {}
-    window.location.href = 'dashboard.html';
-  }
-
-  function renderList() {
-    if (!savedList) return;
-    const items = loadSurveys();
-    savedList.innerHTML = '';
-
-    if (items.length === 0) {
-      savedList.innerHTML = '<div class="saved-empty">아직 저장된 대시보드가 없습니다.<br>대시보드를 저장하면 여기에 쌓입니다.</div>';
-      return;
-    }
-
-    items.forEach(item => {
-      const row = document.createElement('div');
-      row.className = 'saved-item';
-      row.dataset.id = item.id;
-      row.innerHTML = `
-        <img class="drag-handle" src="assets/icons/drag_indicator_40dp_151515_FILL0_wght400_GRAD0_opsz40.svg" alt="" aria-hidden="true" draggable="true">
-        <div class="saved-main" data-id="${item.id}">
-          <div class="saved-title" data-id="${item.id}">${escapeHtml(item.title)}</div>
-          <input type="text" class="saved-title-input" maxlength="50" hidden>
-          <div class="saved-meta">저장일 ${formatDate(item.updatedAt || item.createdAt)}</div>
-        </div>
-        <div class="saved-actions">
-          <button type="button" class="saved-rename" data-rename="${item.id}">이름 바꾸기</button>
-          <button type="button" class="saved-delete" data-del="${item.id}">삭제</button>
-        </div>
-      `;
-      savedList.appendChild(row);
-    });
-
-    let dragSrcId = null;
-    let lastInsertionKey = null;
-
-    savedList.querySelectorAll('.saved-item').forEach(item => {
-      item.addEventListener('dragstart', e => {
-        if (!e.target.closest('.drag-handle')) {
-          e.preventDefault();
-          return;
-        }
-        dragSrcId = item.dataset.id;
-        lastInsertionKey = null;
-        savedList.classList.add('is-dragging');
-        e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('text/plain', item.dataset.id);
-        const itemRect = item.getBoundingClientRect();
-        e.dataTransfer.setDragImage(item, e.clientX - itemRect.left, e.clientY - itemRect.top);
-        setTimeout(() => item.classList.add('dragging'), 0);
-      });
-
-      item.addEventListener('dragend', () => {
-        item.classList.remove('dragging');
-        savedList.classList.remove('is-dragging');
-        savedList.querySelectorAll('.saved-item').forEach(i => {
-          i.classList.remove('drag-over');
-          i.style.transition = '';
-          i.style.transform = '';
-        });
-        dragSrcId = null;
-        lastInsertionKey = null;
-        const newIds = Array.from(savedList.querySelectorAll('.saved-item')).map(el => el.dataset.id);
-        const list = loadSurveys();
-        const reordered = newIds.map(id => list.find(s => s.id === id)).filter(Boolean);
-        saveSurveys(reordered);
-      });
-
-      item.addEventListener('dragover', e => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-        if (!dragSrcId || dragSrcId === item.dataset.id) return;
-
-        const rect = item.getBoundingClientRect();
-        const insertBefore = e.clientY < rect.top + rect.height / 2;
-        const insertionKey = item.dataset.id + (insertBefore ? '-before' : '-after');
-        if (lastInsertionKey === insertionKey) return;
-        lastInsertionKey = insertionKey;
-
-        const allItems = Array.from(savedList.querySelectorAll('.saved-item'));
-        const draggingEl = allItems.find(el => el.dataset.id === dragSrcId);
-        if (!draggingEl) return;
-
-        // FLIP: clear ongoing transforms, get true positions
-        allItems.forEach(el => { el.style.transition = 'none'; el.style.transform = ''; });
-        void savedList.offsetHeight;
-        const firstTops = new Map();
-        allItems.forEach(el => firstTops.set(el, el.getBoundingClientRect().top));
-
-        // Move DOM
-        if (insertBefore) {
-          item.before(draggingEl);
-        } else {
-          item.after(draggingEl);
-        }
-
-        // FLIP: animate non-dragging items to new positions
-        allItems.forEach(el => {
-          if (el === draggingEl) return;
-          const delta = firstTops.get(el) - el.getBoundingClientRect().top;
-          if (Math.abs(delta) < 1) return;
-          el.style.transition = 'none';
-          el.style.transform = `translateY(${delta}px)`;
-          void el.offsetHeight;
-          el.style.transition = 'transform 150ms ease';
-          el.style.transform = '';
-        });
-      });
-
-      item.addEventListener('drop', e => { e.preventDefault(); });
-    });
-
-    savedList.querySelectorAll('.saved-main').forEach(main => {
-      main.addEventListener('click', () => {
-        const input = main.querySelector('.saved-title-input');
-        if (input && !input.hidden) return;
-        openSurvey(main.dataset.id);
-      });
-    });
-
-    savedList.querySelectorAll('.saved-rename').forEach(btn => {
-      btn.addEventListener('click', e => {
-        e.stopPropagation();
-        const row = btn.closest('.saved-item');
-        const id = btn.dataset.rename;
-        const titleEl = row.querySelector('.saved-title');
-        const inputEl = row.querySelector('.saved-title-input');
-
-        inputEl.value = titleEl.textContent;
-        titleEl.hidden = true;
-        inputEl.hidden = false;
-        inputEl.focus();
-        inputEl.select();
-
-        function commit() {
-          inputEl.removeEventListener('blur', commit);
-          inputEl.removeEventListener('keydown', onKey);
-          const next = inputEl.value.trim().slice(0, 50);
-          if (next && next !== titleEl.textContent) renameSurvey(id, next);
-          renderList();
-          refreshCount();
-        }
-        function cancel() {
-          inputEl.removeEventListener('blur', commit);
-          inputEl.removeEventListener('keydown', onKey);
-          titleEl.hidden = false;
-          inputEl.hidden = true;
-        }
-        function onKey(ev) {
-          if (ev.key === 'Enter') { ev.preventDefault(); inputEl.blur(); }
-          else if (ev.key === 'Escape') { ev.preventDefault(); cancel(); }
-        }
-        inputEl.addEventListener('blur', commit);
-        inputEl.addEventListener('keydown', onKey);
-      });
-    });
-
-    savedList.querySelectorAll('[data-del]').forEach(el => {
-      el.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        if (!confirm('이 대시보드를 삭제하시겠습니까?')) return;
-
-        const id = el.dataset.del;
-        const currentSurveys = loadSurveys();
-        const target = currentSurveys.find(s => s.id === id);
-        const next = currentSurveys.filter(s => s.id !== id);
-        saveSurveys(next);
-        if (target) {
-          try { await deleteSurveyFiles(id, target.files || {}, next); } catch (_) {}
-        }
-        if (sessionStorage.getItem('survey.currentId') === id) {
-          try {
-            sessionStorage.removeItem('survey.currentId');
-            sessionStorage.removeItem('survey.title');
-          } catch (_) {}
-        }
-        renderList();
-        refreshCount();
-      });
-    });
   }
 
   function renderDataUpdateList() {
@@ -1655,25 +1443,11 @@ function setupSavedModal() {
     renderResults();
   }
 
-  refreshCount();
-
   /* 이미지 추출 기능 */
 
   if (newBtn) newBtn.addEventListener('click', () => { window.location.href = 'home.html'; });
   const exportAllPptxBtn = document.getElementById('export-all-pptx-btn');
   if (exportAllPptxBtn) exportAllPptxBtn.addEventListener('click', () => exportAllSingleChoiceAsPptx(exportAllPptxBtn));
-  if (openListBtn && listModal) {
-    openListBtn.addEventListener('click', () => {
-      renderList();
-      listModal.classList.add('show');
-    });
-  }
-  if (closeListBtn && listModal) {
-    closeListBtn.addEventListener('click', () => listModal.classList.remove('show'));
-    listModal.addEventListener('click', e => {
-      if (e.target === listModal) listModal.classList.remove('show');
-    });
-  }
 
   if (dataUpdateBtn && dataUpdateModal) {
     dataUpdateBtn.addEventListener('click', () => {
@@ -1696,10 +1470,15 @@ function setupSavedModal() {
   }
   if (applyDataUpdateBtn) {
     applyDataUpdateBtn.addEventListener('click', async () => {
+      applyDataUpdateBtn.disabled = true;
+      applyDataUpdateBtn.textContent = '데이터 교체 중...';
       try {
         await applyDataFileUpdates();
       } catch (err) {
         alert((err && err.message) || '파일 분석 중 오류가 발생했습니다. 업로드 파일을 다시 확인해 주세요.');
+      } finally {
+        applyDataUpdateBtn.disabled = false;
+        applyDataUpdateBtn.textContent = '대시보드 업데이트';
       }
     });
   }
@@ -1720,7 +1499,6 @@ function setupSavedModal() {
 
   document.addEventListener('keydown', e => {
     if (e.key !== 'Escape') return;
-    if (listModal) listModal.classList.remove('show');
     if (dataUpdateModal) {
       resetPendingDataUpdates();
       dataUpdateModal.classList.remove('show');
@@ -1729,8 +1507,8 @@ function setupSavedModal() {
 }
 
 /* =====================================================================
-   [분석 결과 렌더링]
-   - data_visualization.md 의 2-1(객관식 단일), 2-3(객관식 순위) 규칙을 따릅니다.
+   2) Chart Renderers (HTML builders)
+   - data_visualization.md 의 유형별 규칙을 따른다.
    ===================================================================== */
 
 const DATA_VIZ_COLORS = {
@@ -2097,7 +1875,6 @@ function supportsResultEntry(entry) {
   if (supportsResultType(entry.type)) return true;
   if (isTimeMinutesEntry(entry)) return true;
   return isTimeOpenRawEntry(entry);
-  return isTimeMinutesEntry(entry);
 }
 
 function getCriterionEntry(criterionLabel) {
@@ -3446,17 +3223,17 @@ function buildBasicChartHtml(data) {
     `;
   }).join('');
   const overlayHeight = rows.length * 40 - 8;
-  const guideHtml = [0, 20, 40, 60, 80, 100].map(t => `<span class="h-guide" style="left:${t}%;"></span>`).join('');
+  const guideHtml = [0, 20, 40, 60, 80, 100].map(t => `<span class="horizontal-chart-guide" style="left:${t}%;"></span>`).join('');
   const axisHtml = [20, 40, 60, 80, 100].map(t =>
-    `<span class="h-axis-label" style="left:${t}%;">${t}%</span>`
+    `<span class="horizontal-chart-axis-label" style="left:${t}%;">${t}%</span>`
   ).join('');
   return `
     <div class="single-hbar-chart">
-      <div class="h-guides-overlay" style="height:${overlayHeight}px;" aria-hidden="true">${guideHtml}</div>
+      <div class="horizontal-chart-guides" style="height:${overlayHeight}px;" aria-hidden="true">${guideHtml}</div>
       ${rowHtml}
-      <div class="h-axis-row" aria-hidden="true">
-        <div class="h-axis-spacer"></div>
-        <div class="h-axis">${axisHtml}</div>
+      <div class="horizontal-chart-axis-row" aria-hidden="true">
+        <div class="horizontal-chart-axis-spacer"></div>
+        <div class="horizontal-chart-axis">${axisHtml}</div>
       </div>
     </div>
   `;
@@ -3683,17 +3460,17 @@ function buildDualHbarChartHtml(data, hiddenGroups = new Set()) {
   const G = displayGroups.length;
   const rowH = G * 32 + Math.max(0, G - 1) * 4;
   const overlayHeight = items.length * rowH + Math.max(0, items.length - 1) * 16;
-  const guideHtml = [0, 20, 40, 60, 80, 100].map(t => `<span class="h-guide" style="left:${t}%;"></span>`).join('');
+  const guideHtml = [0, 20, 40, 60, 80, 100].map(t => `<span class="horizontal-chart-guide" style="left:${t}%;"></span>`).join('');
   const axisHtml = [20, 40, 60, 80, 100].map(t =>
-    `<span class="h-axis-label" style="left:${t}%;">${t}%</span>`
+    `<span class="horizontal-chart-axis-label" style="left:${t}%;">${t}%</span>`
   ).join('');
   return `
     <div class="dual-hbar-chart">
-      <div class="h-guides-overlay" style="height:${overlayHeight}px;" aria-hidden="true">${guideHtml}</div>
+      <div class="horizontal-chart-guides" style="height:${overlayHeight}px;" aria-hidden="true">${guideHtml}</div>
       ${rowHtml}
-      <div class="h-axis-row" aria-hidden="true">
-        <div class="h-axis-spacer"></div>
-        <div class="h-axis">${axisHtml}</div>
+      <div class="horizontal-chart-axis-row" aria-hidden="true">
+        <div class="horizontal-chart-axis-spacer"></div>
+        <div class="horizontal-chart-axis">${axisHtml}</div>
       </div>
     </div>
   `;
@@ -5186,14 +4963,14 @@ function buildScaleCompareSectionHtml(compareData, hiddenGroups, options = {}) {
       const axisTicksHtml = axisTicks.map(score => {
         const leftPct = pctFor(score);
         const cls = score === 1 ? 'is-start' : score === safeMaxScore ? 'is-end' : 'is-mid';
-        return `<span class="h-axis-label ${cls}" style="left:${leftPct}%;">${score}</span>`;
+        return `<span class="horizontal-chart-axis-label ${cls}" style="left:${leftPct}%;">${score}</span>`;
       }).join('');
       const numQ = compareData.questions.filter(q => q.data).length;
       const numG = visibleGroups.length;
       const rowH = numG * 32 + (numG - 1) * 4;
       const overlayH = numQ * rowH + Math.max(0, numQ - 1) * 16;
       const guideLinesHtml = axisTicks.map(score => {
-        return `<span class="h-guide" style="left:${pctFor(score)}%;"></span>`;
+        return `<span class="horizontal-chart-guide" style="left:${pctFor(score)}%;"></span>`;
       }).join('');
       chartInnerHtml = `
         <div class="scale-compare-lollipop-chart">
@@ -5201,8 +4978,8 @@ function buildScaleCompareSectionHtml(compareData, hiddenGroups, options = {}) {
           <div class="lane-group-chart">${rowHtml}</div>
           ${numQ > 0 ? `
             <div class="scale-compare-lollipop-axis-row" aria-hidden="true">
-              <div class="h-axis-spacer"></div>
-              <div class="h-axis">${axisTicksHtml}</div>
+              <div class="horizontal-chart-axis-spacer"></div>
+              <div class="horizontal-chart-axis">${axisTicksHtml}</div>
             </div>
           ` : ''}
         </div>
@@ -6526,7 +6303,7 @@ function buildRankLollipopChartHtml(data) {
   const overlayHeight = rows.length * 40 - 8;
   const guideOverlayHtml = axisTicks.map(tick => {
     const tickPct = pctFor(tick);
-    return `<span class="h-guide" style="left:${tickPct}%;"></span>`;
+    return `<span class="horizontal-chart-guide" style="left:${tickPct}%;"></span>`;
   }).join('');
   const rowHtml = rows.map((r) => {
     const rankObj = data.ranking.find(item => item.option === r.option);
@@ -6556,15 +6333,15 @@ function buildRankLollipopChartHtml(data) {
   }).join('');
   return `
     <div class="lollipop-h-chart">
-      <div class="h-guides-overlay" style="height:${overlayHeight}px;" aria-hidden="true">${guideOverlayHtml}</div>
+      <div class="horizontal-chart-guides" style="height:${overlayHeight}px;" aria-hidden="true">${guideOverlayHtml}</div>
       ${rowHtml}
-      <div class="h-axis-row" aria-hidden="true">
-        <div class="h-axis-spacer"></div>
-        <div class="h-axis">
+      <div class="horizontal-chart-axis-row" aria-hidden="true">
+        <div class="horizontal-chart-axis-spacer"></div>
+        <div class="horizontal-chart-axis">
           ${axisTicks.map(tick => {
             const leftPct = pctFor(tick);
             const cls = tick === axisMin ? 'is-start' : (tick === axisMax ? 'is-end' : 'is-mid');
-            return `<span class="h-axis-label ${cls}" style="left:${leftPct}%;">${tick}</span>`;
+            return `<span class="horizontal-chart-axis-label ${cls}" style="left:${leftPct}%;">${tick}</span>`;
           }).join('')}
         </div>
         <div class="lollipop-h-axis-rank-spacer"></div>
@@ -6588,7 +6365,7 @@ function buildRankLollipopGroupCompareChartHtml(data, hiddenGroups = new Set()) 
   const overlayHeight = rows.length * 40 - 8;
   const guideOverlayHtml = axisTicks.map(tick => {
     const tickPct = pctFor(tick);
-    return `<span class="h-guide" style="left:${tickPct}%;"></span>`;
+    return `<span class="horizontal-chart-guide" style="left:${tickPct}%;"></span>`;
   }).join('');
   const rowHtml = rows.map((r) => {
     const rankObj = data.ranking.find(item => item.option === r.option);
@@ -6629,15 +6406,15 @@ function buildRankLollipopGroupCompareChartHtml(data, hiddenGroups = new Set()) 
   }).join('');
   return `
     <div class="lollipop-h-chart group-compare">
-      <div class="h-guides-overlay" style="height:${overlayHeight}px;" aria-hidden="true">${guideOverlayHtml}</div>
+      <div class="horizontal-chart-guides" style="height:${overlayHeight}px;" aria-hidden="true">${guideOverlayHtml}</div>
       ${rowHtml}
-      <div class="h-axis-row" aria-hidden="true">
-        <div class="h-axis-spacer"></div>
-        <div class="h-axis">
+      <div class="horizontal-chart-axis-row" aria-hidden="true">
+        <div class="horizontal-chart-axis-spacer"></div>
+        <div class="horizontal-chart-axis">
           ${axisTicks.map(tick => {
             const leftPct = pctFor(tick);
             const cls = tick === axisMin ? 'is-start' : (tick === axisMax ? 'is-end' : 'is-mid');
-            return `<span class="h-axis-label ${cls}" style="left:${leftPct}%;">${tick}</span>`;
+            return `<span class="horizontal-chart-axis-label ${cls}" style="left:${leftPct}%;">${tick}</span>`;
           }).join('')}
         </div>
         <div class="lollipop-h-axis-rank-spacer"></div>
@@ -6664,7 +6441,7 @@ function buildRankDualLollipopChartHtml(data, hiddenGroups = new Set()) {
   const overlayHeight = rows.length * (displayGroups.length * trackH + (displayGroups.length - 1) * trackGap) + (rows.length - 1) * rowGap;
   const guideOverlayHtml = axisTicks.map(tick => {
     const tickPct = pctFor(tick);
-    return `<span class="h-guide" style="left:${tickPct}%;"></span>`;
+    return `<span class="horizontal-chart-guide" style="left:${tickPct}%;"></span>`;
   }).join('');
   const rowHtml = rows.map((r) => {
     const rankObj = data.ranking.find(item => item.option === r.option);
@@ -6706,15 +6483,15 @@ function buildRankDualLollipopChartHtml(data, hiddenGroups = new Set()) {
   }).join('');
   return `
     <div class="dual-lollipop-h-chart">
-      <div class="h-guides-overlay" style="height:${overlayHeight}px;" aria-hidden="true">${guideOverlayHtml}</div>
+      <div class="horizontal-chart-guides" style="height:${overlayHeight}px;" aria-hidden="true">${guideOverlayHtml}</div>
       ${rowHtml}
-      <div class="h-axis-row" aria-hidden="true">
-        <div class="h-axis-spacer"></div>
-        <div class="h-axis">
+      <div class="horizontal-chart-axis-row" aria-hidden="true">
+        <div class="horizontal-chart-axis-spacer"></div>
+        <div class="horizontal-chart-axis">
           ${axisTicks.map(tick => {
             const leftPct = pctFor(tick);
             const cls = tick === axisMin ? 'is-start' : (tick === axisMax ? 'is-end' : 'is-mid');
-            return `<span class="h-axis-label ${cls}" style="left:${leftPct}%;">${tick}</span>`;
+            return `<span class="horizontal-chart-axis-label ${cls}" style="left:${leftPct}%;">${tick}</span>`;
           }).join('')}
         </div>
         <div class="lollipop-h-axis-rank-spacer"></div>
@@ -6840,17 +6617,17 @@ function buildRankStackChartHtml(data, hiddenRanks) {
     `;
   }).join('');
   const overlayHeight = rows.length * 40 - 8;
-  const guideHtml = [0, 20, 40, 60, 80, 100].map(t => `<span class="h-guide" style="left:${t}%;"></span>`).join('');
+  const guideHtml = [0, 20, 40, 60, 80, 100].map(t => `<span class="horizontal-chart-guide" style="left:${t}%;"></span>`).join('');
   const axisHtml = [20, 40, 60, 80, 100].map(t =>
-    `<span class="h-axis-label" style="left:${t}%;">${t}%</span>`
+    `<span class="horizontal-chart-axis-label" style="left:${t}%;">${t}%</span>`
   ).join('');
   return `
     <div class="stack-h-chart">
-      <div class="h-guides-overlay" style="height:${overlayHeight}px;" aria-hidden="true">${guideHtml}</div>
+      <div class="horizontal-chart-guides" style="height:${overlayHeight}px;" aria-hidden="true">${guideHtml}</div>
       ${rowHtml}
-      <div class="h-axis-row" aria-hidden="true">
-        <div class="h-axis-spacer"></div>
-        <div class="h-axis">${axisHtml}</div>
+      <div class="horizontal-chart-axis-row" aria-hidden="true">
+        <div class="horizontal-chart-axis-spacer"></div>
+        <div class="horizontal-chart-axis">${axisHtml}</div>
         <div></div>
       </div>
     </div>
@@ -7319,12 +7096,12 @@ function buildRankSection(data, rows) {
   resultState.otherResponseTexts.set(targetLabel, otherTexts);
   const fullText = buildQuestionFullHtml(codebookEntry);
   const sidePanelHtml = buildResultSidePanelHtml(legendHtml, targetLabel);
-  const titleHtml = `<div class="result-question-label">${escapeHtml(targetLabel)}</div>`;
   const rank1stBtnHtml = `<button type="button" class="rank1st-card-btn" data-rank1st-card-toggle="${escapeHtml(targetLabel)}">1순위만 보기</button>`;
+  const titleHtml = `<div class="result-question-label-row"><div class="result-question-label">${escapeHtml(targetLabel)}</div>${rank1stBtnHtml}</div>`;
 
   return `
     <section class="result-section" data-target="${escapeHtml(targetLabel)}" data-type="rank">
-      ${buildResultHeaderHtml(titleHtml, fullText, controlsHtml, rank1stBtnHtml)}
+      ${buildResultHeaderHtml(titleHtml, fullText, controlsHtml)}
       <div class="result-visual has-legend">
         <div class="result-chart-col">${chartHtml}</div>
         ${sidePanelHtml}
@@ -8773,16 +8550,16 @@ function buildChoiceSectionHtml(data, rows) {
   resultState.otherResponseTexts.set(targetLabel, otherTexts);
   const fullText = buildQuestionFullHtml(codebookEntry);
   const visualClass = getResultVisualClass(!!groupResults || (isSingleWithoutGroup && chartType === 'pie'));
-  const titleHtml = rank1stSourceLabel
-    ? `<div class="result-question-label rank1st-derived-title">${escapeHtml(displayLabel)}</div>`
-    : `<div class="result-question-label">${escapeHtml(displayLabel)}</div>`;
   const choiceActionsHtml = rank1stSourceLabel
     ? `<button type="button" class="rank1st-card-btn is-active" data-rank1st-card-toggle="${escapeHtml(rank1stSourceLabel)}">모든 순위 보기</button>`
     : '';
+  const titleHtml = rank1stSourceLabel
+    ? `<div class="result-question-label-row"><div class="result-question-label rank1st-derived-title">${escapeHtml(displayLabel)}</div>${choiceActionsHtml}</div>`
+    : `<div class="result-question-label">${escapeHtml(displayLabel)}</div>`;
 
   return `
     <section class="result-section${rank1stSourceLabel ? ' rank1st-derived-section' : ''}" data-target="${escapeHtml(targetLabel)}" data-type="${data.isMulti ? 'multiple' : 'single'}"${rank1stSourceLabel ? ` data-rank1st-source="${escapeHtml(rank1stSourceLabel)}"` : ''}>
-      ${buildResultHeaderHtml(titleHtml, fullText, controlsHtml, choiceActionsHtml)}
+      ${buildResultHeaderHtml(titleHtml, fullText, controlsHtml)}
       <div class="${visualClass}">
         <div class="result-chart-col">${chartHtml}</div>
         ${sidePanelHtml}
@@ -9896,6 +9673,10 @@ function formatTooltipHtml(d) {
   }
 }
 
+/* =====================================================================
+   3) UI Binding (events / modals / init)
+   ===================================================================== */
+
 function observeDropZones() {
   ['drop-target', 'drop-criterion'].forEach(id => {
     const zone = document.getElementById(id);
@@ -10063,6 +9844,7 @@ function addExportButtons(container) {
     imgBtn.addEventListener('click', function() { exportSectionAsImage(section, imgBtn); });
     actions.appendChild(imgBtn);
 
+    /* PPT 내보내기 버튼 — 추후 활성화
     if (section.dataset.type === 'single') {
       var pptBtn = document.createElement('button');
       pptBtn.type = 'button';
@@ -10071,6 +9853,7 @@ function addExportButtons(container) {
       pptBtn.addEventListener('click', function() { exportSingleChoiceAsPptx(section, pptBtn); });
       actions.appendChild(pptBtn);
     }
+    */
   });
 }
 

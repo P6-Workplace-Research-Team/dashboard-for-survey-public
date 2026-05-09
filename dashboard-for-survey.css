@@ -976,7 +976,7 @@ button {
   width: var(--panel-shell-width);
   min-height: 0;
   height: 100%;
-  z-index: 2;
+  z-index: 11;
 }
 
 .dashboard-page .page.panel-expanded .left-panel-shell {
@@ -986,7 +986,7 @@ button {
   bottom: 0;
   width: calc(min(780px, calc(100vw - 56px)) + var(--panel-handle-width));
   box-shadow: var(--shadow);
-  z-index: 6;
+  z-index: 11;
 }
 
 .left-panel {
@@ -1963,7 +1963,6 @@ body.filter-dragging .filter-add-btn:hover {
   display: flex;
   flex-direction: column;
   gap: 0;
-  margin-bottom: var(--viz-control-chart-gap);
 }
 
 .result-header-top {
@@ -1979,6 +1978,12 @@ body.filter-dragging .filter-add-btn:hover {
   flex-direction: column;
   gap: 12px;
   min-width: 0;
+}
+
+.result-question-label-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .result-question-label {
@@ -2057,6 +2062,7 @@ body.filter-dragging .filter-add-btn:hover {
 .result-export-btn:disabled .result-export-icon {
   opacity: var(--icon-active-opacity);
 }
+
 
 .result-unsupported {
   font-size: var(--caption-1-size);
@@ -2474,8 +2480,8 @@ body.filter-dragging .filter-add-btn:hover {
   grid-template-columns: minmax(0, 1fr) var(--viz-legend-width);
   gap: var(--viz-chart-legend-gap);
   align-items: start;
-  margin-bottom: var(--viz-chart-table-gap);
   padding: 0 16px;
+  margin-top: var(--viz-control-chart-gap);
 }
 
 .result-visual.has-legend {
@@ -2738,6 +2744,68 @@ body.filter-dragging .filter-add-btn:hover {
   pointer-events: none;
 }
 
+
+/* ================ 차트 상세 : 가로 차트 공통 ================ */
+
+/* 가로 차트 눈금선 */
+
+.horizontal-chart-guides {
+  position: absolute;
+  top: 0;
+  pointer-events: none;
+}
+
+.single-hbar-chart .horizontal-chart-guides,
+.dual-hbar-chart .horizontal-chart-guides {
+  left: calc(var(--viz-label-col-width) + var(--viz-label-bar-gap));
+  right: 0;
+}
+
+.lollipop-h-chart .horizontal-chart-guides,
+.dual-lollipop-h-chart .horizontal-chart-guides,
+.stack-h-chart .horizontal-chart-guides {
+  left: calc(var(--viz-label-col-width) + var(--viz-label-bar-gap));
+  right: calc(var(--viz-bar-right-col) + var(--viz-label-bar-gap));
+}
+
+.horizontal-chart-guide {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--neutral-200);
+  transform: translateX(-50%);
+}
+
+.horizontal-chart-axis-row {
+  margin-top: 4px;
+  align-items: start;
+  display: grid;
+  grid-template-columns: var(--viz-label-col-width) minmax(0, 1fr) var(--viz-bar-right-col);
+  column-gap: var(--viz-label-bar-gap);
+  align-items: center;
+}
+
+.single-hbar-chart .horizontal-chart-axis-row,
+.dual-hbar-chart .horizontal-chart-axis-row {
+  grid-template-columns: var(--viz-label-col-width) minmax(0, 1fr);
+}
+
+.horizontal-chart-axis {
+  position: relative;
+  height: 14px;
+}
+
+.horizontal-chart-axis-label {
+  position: absolute;
+  top: 0;
+  font-size: var(--caption-1-size);
+  line-height: var(--body-line-height);
+  color: var(--neutral-600);
+  font-variant-numeric: tabular-nums;
+  transform: translateX(-50%);
+}
+
 /* ================ 차트 상세 : 가로 막대 (객관식 단일/중복) ================ */
 
 .single-hbar-chart {
@@ -2754,7 +2822,8 @@ body.filter-dragging .filter-add-btn:hover {
   height: var(--viz-bar-height);
 }
 
-.single-hbar-row:last-child {
+.single-hbar-row:last-child,
+.single-hbar-row:has(+ .horizontal-chart-axis-row) {
   margin-bottom: 0;
 }
 
@@ -2841,7 +2910,8 @@ body.filter-dragging .filter-add-btn:hover {
   margin-bottom: 16px;
 }
 
-.dual-hbar-row:last-child {
+.dual-hbar-row:last-child,
+.dual-hbar-row:has(+ .horizontal-chart-axis-row) {
   margin-bottom: 0;
 }
 
@@ -2866,7 +2936,6 @@ body.filter-dragging .filter-add-btn:hover {
   position: relative;
   border-radius: var(--viz-bar-radius);
   height: var(--viz-bar-height);
-  background: var(--viz-chart-soft-bg);
   overflow: visible;
 }
 
@@ -2893,17 +2962,13 @@ body.filter-dragging .filter-add-btn:hover {
   padding: 0;
 }
 
-.lollipop-h-row,
-.h-axis-row {
+.lollipop-h-row {
   display: grid;
   grid-template-columns: var(--viz-label-col-width) minmax(0, 1fr) var(--viz-bar-right-col);
   column-gap: var(--viz-label-bar-gap);
-  align-items: center;
-}
-
-.lollipop-h-row {
   height: var(--viz-bar-height);
   margin-bottom: var(--viz-bar-row-gap);
+  align-items: center;
 }
 
 .lollipop-h-row:last-of-type {
@@ -3080,7 +3145,8 @@ body.filter-dragging .filter-add-btn:hover {
   margin-bottom: var(--viz-bar-row-gap);
 }
 
-.stack-h-row:last-child {
+.stack-h-row:last-child,
+.stack-h-row:has(+ .horizontal-chart-axis-row) {
   margin-bottom: 0;
 }
 
@@ -3166,63 +3232,6 @@ body.filter-dragging .filter-add-btn:hover {
 
 .stack-h-total-value.is-outside {
   text-align: center;
-}
-
-
-/* ================ 차트 상세 : 가로 차트 가로 축 눈금선 ================ */
-
-
-.h-guides-overlay {
-  position: absolute;
-  top: 0;
-  pointer-events: none;
-}
-
-.single-hbar-chart .h-guides-overlay,
-.dual-hbar-chart .h-guides-overlay {
-  left: calc(var(--viz-label-col-width) + var(--viz-label-bar-gap));
-  right: 0;
-}
-
-.lollipop-h-chart .h-guides-overlay,
-.dual-lollipop-h-chart .h-guides-overlay,
-.stack-h-chart .h-guides-overlay {
-  left: calc(var(--viz-label-col-width) + var(--viz-label-bar-gap));
-  right: calc(var(--viz-bar-right-col) + var(--viz-label-bar-gap));
-}
-
-.h-guide {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 1px;
-  background: var(--neutral-200);
-  transform: translateX(-50%);
-}
-
-.h-axis-row {
-  margin-top: 4px;
-  align-items: start;
-}
-
-.h-axis {
-  position: relative;
-  height: 16px;
-}
-
-.h-axis-label {
-  position: absolute;
-  top: 0;
-  font-size: var(--caption-1-size);
-  line-height: var(--body-line-height);
-  color: var(--neutral-600);
-  font-variant-numeric: tabular-nums;
-  transform: translateX(-50%);
-}
-
-.single-hbar-chart .h-axis-row,
-.dual-hbar-chart .h-axis-row {
-  grid-template-columns: var(--viz-label-col-width) minmax(0, 1fr);
 }
 
 /* ================ 차트 상세 : 세로 차트 공통 ================ */
@@ -3641,8 +3650,6 @@ body.filter-dragging .filter-add-btn:hover {
 
 
 /* ================ 차트 상세 : 100% 기준 가로 누적 막대 (객관식 단일 ver) ================ */
-
-/* TBD : 얘네 다 비슷비슷하게 생겼는데 이렇게 따로 따로 꼭 있어야 하는지 확인 */
 
 .stack100-chart {
   padding: 0;
@@ -4238,7 +4245,7 @@ body.filter-dragging .filter-add-btn:hover {
 }
 
 
-/* ================ 가로 한 줄 그래프 공통으로 쓸 수 있는 눈금축 ================ */
+/* ================ 가로 한 줄 그래프 (100% 기준 누적 막대, 척도, 비율 배분) 공통으로 쓸 수 있는 눈금축 ================ */
 
 .chart-bottom-axis {
   position: relative;
@@ -4276,7 +4283,7 @@ body.filter-dragging .filter-add-btn:hover {
 
 
 
-/* ================차트 상세 : 100% 기준 막대 계열/척도 평균/박스 플롯 - 그룹별 데이터 ================ */ 
+/* ================차트 상세 : 가로 한 줄 그래프 - 그룹별 데이터 ================ */ 
 
 .lane-group-chart {
   position: relative;
@@ -4574,6 +4581,7 @@ body.is-viz-label-col-resizing {
   display: flex;
   flex-direction: column;
   padding: 0 16px;
+  margin-top: var(--viz-chart-table-gap);
 }
 
 /* ======== 데이터 테이블 펼치기/숨기기 토글 ======== */
@@ -4800,7 +4808,7 @@ body.is-viz-label-col-resizing {
 
 .result-table-note {
   margin: 8px 0 28px;
-  padding: 0 16px;
+  padding: 0;
   font-size: var(--caption-1-size);
   line-height: var(--body-line-height);
   font-weight: var(--font-weight-regular);
