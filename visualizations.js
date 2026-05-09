@@ -1891,6 +1891,7 @@ const VIZ_LABEL_COL_WIDTH_MAX = 360;
 const VIZ_LABEL_COL_RESIZE_SELECTORS = [
   '.single-hbar-chart',
   '.dual-hbar-chart',
+  '.stack-h-chart',
   '.lollipop-h-chart',
   '.dual-lollipop-h-chart',
   '.lane-group-chart'
