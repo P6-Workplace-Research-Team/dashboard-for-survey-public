@@ -2778,7 +2778,7 @@ body.filter-dragging .filter-add-btn:hover {
 }
 
 .horizontal-chart-axis-row {
-  margin-top: 4px;
+  padding-top: 4px;
   align-items: start;
   display: grid;
   grid-template-columns: var(--viz-label-col-width) minmax(0, 1fr) var(--viz-bar-right-col);
@@ -2822,10 +2822,6 @@ body.filter-dragging .filter-add-btn:hover {
   height: var(--viz-bar-height);
 }
 
-.single-hbar-row:last-child,
-.single-hbar-row:has(+ .horizontal-chart-axis-row) {
-  margin-bottom: 0;
-}
 
 .single-hbar-label {
   font-size: var(--label-1-size);
@@ -2912,7 +2908,7 @@ body.filter-dragging .filter-add-btn:hover {
 
 .dual-hbar-row:last-child,
 .dual-hbar-row:has(+ .horizontal-chart-axis-row) {
-  margin-bottom: 0;
+  margin-bottom: 8px;
 }
 
 .dual-hbar-label {
@@ -2971,9 +2967,6 @@ body.filter-dragging .filter-add-btn:hover {
   align-items: center;
 }
 
-.lollipop-h-row:last-of-type {
-  margin-bottom: 0;
-}
 
 .lollipop-h-label {
   font-size: var(--label-1-size);
@@ -3145,10 +3138,6 @@ body.filter-dragging .filter-add-btn:hover {
   margin-bottom: var(--viz-bar-row-gap);
 }
 
-.stack-h-row:last-child,
-.stack-h-row:has(+ .horizontal-chart-axis-row) {
-  margin-bottom: 0;
-}
 
 .stack-h-main {
   display: grid;

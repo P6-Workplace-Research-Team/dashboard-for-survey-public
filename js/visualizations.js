@@ -3222,7 +3222,7 @@ function buildBasicChartHtml(data) {
       </div>
     `;
   }).join('');
-  const overlayHeight = rows.length * 40 - 8;
+  const overlayHeight = rows.length * 40;
   const guideHtml = [0, 20, 40, 60, 80, 100].map(t => `<span class="horizontal-chart-guide" style="left:${t}%;"></span>`).join('');
   const axisHtml = [20, 40, 60, 80, 100].map(t =>
     `<span class="horizontal-chart-axis-label" style="left:${t}%;">${t}%</span>`
@@ -3416,7 +3416,21 @@ function buildGroupCompareChartHtml(data, hiddenGroups = new Set()) {
       </div>
     `;
   }).join('');
-  return `<div class="single-hbar-chart group-compare">${rowHtml}</div>`;
+  const overlayHeight = items.length * 40;
+  const guideHtml = [0, 20, 40, 60, 80, 100].map(t => `<span class="horizontal-chart-guide" style="left:${t}%;"></span>`).join('');
+  const axisHtml = [20, 40, 60, 80, 100].map(t =>
+    `<span class="horizontal-chart-axis-label" style="left:${t}%;">${t}%</span>`
+  ).join('');
+  return `
+    <div class="single-hbar-chart group-compare">
+      <div class="horizontal-chart-guides" style="height:${overlayHeight}px;" aria-hidden="true">${guideHtml}</div>
+      ${rowHtml}
+      <div class="horizontal-chart-axis-row" aria-hidden="true">
+        <div class="horizontal-chart-axis-spacer"></div>
+        <div class="horizontal-chart-axis">${axisHtml}</div>
+      </div>
+    </div>
+  `;
 }
 
 function buildDualHbarChartHtml(data, hiddenGroups = new Set()) {
@@ -3459,7 +3473,7 @@ function buildDualHbarChartHtml(data, hiddenGroups = new Set()) {
 
   const G = displayGroups.length;
   const rowH = G * 32 + Math.max(0, G - 1) * 4;
-  const overlayHeight = items.length * rowH + Math.max(0, items.length - 1) * 16;
+  const overlayHeight = items.length * rowH + Math.max(0, items.length - 1) * 16 + 8;
   const guideHtml = [0, 20, 40, 60, 80, 100].map(t => `<span class="horizontal-chart-guide" style="left:${t}%;"></span>`).join('');
   const axisHtml = [20, 40, 60, 80, 100].map(t =>
     `<span class="horizontal-chart-axis-label" style="left:${t}%;">${t}%</span>`
@@ -6300,7 +6314,7 @@ function buildRankLollipopChartHtml(data) {
     if (axisMax === axisMin) return 0;
     return ((safeValue - axisMin) / (axisMax - axisMin)) * 100;
   };
-  const overlayHeight = rows.length * 40 - 8;
+  const overlayHeight = rows.length * 40;
   const guideOverlayHtml = axisTicks.map(tick => {
     const tickPct = pctFor(tick);
     return `<span class="horizontal-chart-guide" style="left:${tickPct}%;"></span>`;
@@ -6362,7 +6376,7 @@ function buildRankLollipopGroupCompareChartHtml(data, hiddenGroups = new Set()) 
     return ((safeValue - axisMin) / (axisMax - axisMin)) * 100;
   };
   const displayGroups = getDisplayGroupResults(data.groupResults, hiddenGroups);
-  const overlayHeight = rows.length * 40 - 8;
+  const overlayHeight = rows.length * 40;
   const guideOverlayHtml = axisTicks.map(tick => {
     const tickPct = pctFor(tick);
     return `<span class="horizontal-chart-guide" style="left:${tickPct}%;"></span>`;
@@ -6438,7 +6452,7 @@ function buildRankDualLollipopChartHtml(data, hiddenGroups = new Set()) {
   const trackH = 32;
   const trackGap = 4;
   const rowGap = 16;
-  const overlayHeight = rows.length * (displayGroups.length * trackH + (displayGroups.length - 1) * trackGap) + (rows.length - 1) * rowGap;
+  const overlayHeight = rows.length * (displayGroups.length * trackH + (displayGroups.length - 1) * trackGap) + (rows.length - 1) * rowGap + 8;
   const guideOverlayHtml = axisTicks.map(tick => {
     const tickPct = pctFor(tick);
     return `<span class="horizontal-chart-guide" style="left:${tickPct}%;"></span>`;
@@ -6616,7 +6630,7 @@ function buildRankStackChartHtml(data, hiddenRanks) {
       </div>
     `;
   }).join('');
-  const overlayHeight = rows.length * 40 - 8;
+  const overlayHeight = rows.length * 40;
   const guideHtml = [0, 20, 40, 60, 80, 100].map(t => `<span class="horizontal-chart-guide" style="left:${t}%;"></span>`).join('');
   const axisHtml = [20, 40, 60, 80, 100].map(t =>
     `<span class="horizontal-chart-axis-label" style="left:${t}%;">${t}%</span>`
