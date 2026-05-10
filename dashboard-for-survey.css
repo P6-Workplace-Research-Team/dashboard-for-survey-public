@@ -189,6 +189,8 @@ body {
   margin: 0;
   padding: 0;
   height: 100%;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
@@ -2052,6 +2054,7 @@ body.filter-dragging .filter-add-btn:hover {
 .result-export-icon {
   width: var(--button-2-icon-size);
   height: var(--button-2-icon-size);
+  font-size: var(--button-2-icon-size);
   display: block;
   flex-shrink: 0;
   opacity: var(--icon-opacity);
@@ -2062,7 +2065,6 @@ body.filter-dragging .filter-add-btn:hover {
 .result-export-btn:disabled .result-export-icon {
   opacity: var(--icon-active-opacity);
 }
-
 
 .result-unsupported {
   font-size: var(--caption-1-size);
@@ -2636,6 +2638,7 @@ body.filter-dragging .filter-add-btn:hover {
   border-radius: var(--radius-8);
   padding: 6px 12px;
   background: var(--White);
+  white-space: nowrap;
   transition: all .15s ease;
 }
 
@@ -2778,7 +2781,7 @@ body.filter-dragging .filter-add-btn:hover {
 }
 
 .horizontal-chart-axis-row {
-  margin-top: 4px;
+  padding-top: 4px;
   align-items: start;
   display: grid;
   grid-template-columns: var(--viz-label-col-width) minmax(0, 1fr) var(--viz-bar-right-col);
@@ -2822,10 +2825,6 @@ body.filter-dragging .filter-add-btn:hover {
   height: var(--viz-bar-height);
 }
 
-.single-hbar-row:last-child,
-.single-hbar-row:has(+ .horizontal-chart-axis-row) {
-  margin-bottom: 0;
-}
 
 .single-hbar-label {
   font-size: var(--label-1-size);
@@ -2912,7 +2911,7 @@ body.filter-dragging .filter-add-btn:hover {
 
 .dual-hbar-row:last-child,
 .dual-hbar-row:has(+ .horizontal-chart-axis-row) {
-  margin-bottom: 0;
+  margin-bottom: 8px;
 }
 
 .dual-hbar-label {
@@ -2971,9 +2970,6 @@ body.filter-dragging .filter-add-btn:hover {
   align-items: center;
 }
 
-.lollipop-h-row:last-of-type {
-  margin-bottom: 0;
-}
 
 .lollipop-h-label {
   font-size: var(--label-1-size);
@@ -3145,10 +3141,6 @@ body.filter-dragging .filter-add-btn:hover {
   margin-bottom: var(--viz-bar-row-gap);
 }
 
-.stack-h-row:last-child,
-.stack-h-row:has(+ .horizontal-chart-axis-row) {
-  margin-bottom: 0;
-}
 
 .stack-h-main {
   display: grid;

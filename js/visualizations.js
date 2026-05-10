@@ -8,8 +8,13 @@
    3) UI Binding (events / modals / init)
    ===================================================================== */
 
+
+
 // 스토리지 레이어: supabase-client.js 참고
 
+/**
+ * File을 UTF-8 텍스트로 읽어 Promise로 반환합니다.
+ */
 function readAsText(file) {
   return new Promise((resolve, reject) => {
     const r = new FileReader();
@@ -20,6 +25,9 @@ function readAsText(file) {
 }
 
 // 코드북/응답 데이터 파일을 읽고 파싱하기 위한 공통 유틸리티입니다.
+/**
+ * HTML 삽입용으로 &, <, 따옴표 등을 이스케이프합니다.
+ */
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({
     '&': '&amp;',
@@ -30,6 +38,9 @@ function escapeHtml(s) {
   }[c]));
 }
 
+/**
+ * 숫자 자릿수에 맞는 CSS 클래스 이름을 반환합니다.
+ */
 function getNumberTagDigitClass(value) {
   const digits = String(Math.abs(Number(value) || 0)).length;
   if (digits >= 3) return 'digits-3';
@@ -37,6 +48,9 @@ function getNumberTagDigitClass(value) {
   return '';
 }
 
+/**
+ * 숫자 태그 요소의 텍스트와 자릿수 클래스를 갱신합니다.
+ */
 function setNumberTagValue(el, value) {
   if (!el) return;
   el.textContent = String(value);
@@ -45,6 +59,9 @@ function setNumberTagValue(el, value) {
   if (digitClass) el.classList.add(digitClass);
 }
 
+/**
+ * CSV 문자열을 따옴표/쉼표 규칙에 맞게 2차원 배열로 파싱합니다.
+ */
 function parseCSV(text) {
   if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
   const rows = [];
@@ -72,6 +89,9 @@ function parseCSV(text) {
   return rows;
 }
 
+/**
+ * 업로드 파일(현재 CSV)을 읽어 행 배열과 원문을 반환합니다.
+ */
 async function readTabularFile(file, maxRows = null) {
   const ext = (file && file.name ? file.name.split('.').pop() : '').toLowerCase();
   if (ext === 'csv') {
@@ -86,10 +106,16 @@ async function readTabularFile(file, maxRows = null) {
   throw new Error('unsupported');
 }
 
+/**
+ * 열 이름 비교용으로 앞뒤 공백·BOM을 제거하고 소문자로 맞춥니다.
+ */
 function normalizeHeader(s) {
   return String(s || '').replace(/^\uFEFF/, '').trim().toLowerCase();
 }
 
+/**
+ * 열 이름이 기타 서술형(기타 텍스트) 컬럼인지 판별합니다.
+ */
 function isFreeTextHeaderName(headerName) {
   const normalized = normalizeHeader(headerName);
   return normalized.includes('기타_텍스트')
@@ -102,12 +128,18 @@ function isFreeTextHeaderName(headerName) {
 const REQUIRED_CODEBOOK = ['question_no', 'question_label', 'response_type', 'data_column_role', 'value_code_map'];
 const REQUIRED_RESPONSE = ['survey_year', 'respondent_no'];
 
+/**
+ * 헤더 행에 필수 컬럼이 모두 있는지 검사합니다.
+ */
 function checkColumns(headerRow, required) {
   const headerSet = new Set((headerRow || []).map(normalizeHeader));
   const missing = required.filter(c => !headerSet.has(c.toLowerCase()));
   return { ok: missing.length === 0, missing };
 }
 
+/**
+ * 코드북/값/라벨 파일 종류별로 행 구조가 올바른지 검증합니다.
+ */
 function validateFileForKey(key, rows) {
   if (!rows || rows.length === 0) {
     return { ok: false, error: '파일이 비어 있습니다.' };
@@ -141,6 +173,9 @@ function validateFileForKey(key, rows) {
   return { ok: true };
 }
 
+/**
+ * 코드북 시트에서 question_label 열 값 목록을 추출합니다.
+ */
 function getCodebookQuestionLabels(rows) {
   if (!rows || rows.length < 2) return [];
   const header = (rows[0] || []).map(normalizeHeader);
@@ -154,11 +189,17 @@ function getCodebookQuestionLabels(rows) {
   return labels;
 }
 
+/**
+ * 응답 시트 헤더에서 survey_year, respondent_no 뒤의 문항 열명을 반환합니다.
+ */
 function getResponseQuestionHeaders(rows) {
   if (!rows || rows.length === 0) return [];
   return (rows[0] || []).slice(2).map(cleanCell);
 }
 
+/**
+ * 두 배열을 cleanCell 기준으로 같은지 비교합니다.
+ */
 function arraysEqualNormalized(a, b) {
   if ((a || []).length !== (b || []).length) return false;
   for (let i = 0; i < a.length; i++) {
@@ -167,6 +208,9 @@ function arraysEqualNormalized(a, b) {
   return true;
 }
 
+/**
+ * 두 헤더 배열에서 처음 어긋나는 인덱스와 값을 반환합니다.
+ */
 function findFirstHeaderMismatch(a, b) {
   const len = Math.min(a.length, b.length);
   for (let i = 0; i < len; i++) {
@@ -177,6 +221,9 @@ function findFirstHeaderMismatch(a, b) {
   return null;
 }
 
+/**
+ * 코드북 문항 순서/이름이 응답 데이터 열과 맞는지 검증합니다.
+ */
 function validateCodebookAgainstResponse(codebookRows, responseRows, responseLabel) {
   const codebookLabels = getCodebookQuestionLabels(codebookRows);
   const responseHeaders = getResponseQuestionHeaders(responseRows);
@@ -198,6 +245,9 @@ function validateCodebookAgainstResponse(codebookRows, responseRows, responseLab
   return { ok: true };
 }
 
+/**
+ * 값 시트와 라벨 시트의 행·열 구조 일관성을 검증합니다.
+ */
 function validateResponsePair(valueRows, labelRows) {
   if (!valueRows || !labelRows) return { ok: true };
   const valueHeader = (valueRows[0] || []).map(cleanCell);
@@ -227,6 +277,9 @@ function validateResponsePair(valueRows, labelRows) {
   return { ok: true };
 }
 
+/**
+ * 값/라벨 파일이 서로 뒤바뀌었는지 코드북 힌트로 추정합니다.
+ */
 function detectValueLabelSwap(codebookRows, valueRows, labelRows) {
   if (!codebookRows || codebookRows.length < 2) return { ok: true };
 
@@ -302,6 +355,9 @@ function detectValueLabelSwap(codebookRows, valueRows, labelRows) {
   return { ok: true };
 }
 
+/**
+ * 로드된 코드북·값·라벨 묶음 전체를 교차 검증합니다.
+ */
 function validateBundleConsistency(rowsByKey) {
   const { codebook, value, label } = rowsByKey;
   if (codebook && (value || label)) {
@@ -323,6 +379,9 @@ function validateBundleConsistency(rowsByKey) {
   return { ok: true };
 }
 
+/**
+ * 저장된 코드북 파일 레코드에서 행 배열을 비동기로 불러옵니다.
+ */
 async function loadCodebookRows(fileRec) {
   if (!fileRec) return null;
   const payload = await getStoredFilePayload(fileRec);
@@ -333,11 +392,17 @@ async function loadCodebookRows(fileRec) {
   return null;
 }
 
+/**
+ * 셀 값을 문자열로 정리(트림)합니다.
+ */
 function cleanCell(v) {
   return String(v == null ? '' : v).replace(/^\uFEFF/, '').trim();
 }
 
 // 코드북을 category_1 > question 또는 category_1 > category_2 > question 구조로 변환합니다.
+/**
+ * 코드북 행으로 문항 계층(섹션/문항) 트리 구조를 만듭니다.
+ */
 function buildQuestionTree(rows) {
   if (!rows || rows.length < 2) return [];
   const header = (rows[0] || []).map(normalizeHeader);
@@ -390,6 +455,9 @@ function buildQuestionTree(rows) {
   }));
 }
 
+/**
+ * 문항 트리를 HTML 목록으로 렌더링합니다.
+ */
 function renderTree(tree) {
   const host = document.getElementById('question-tree');
   host.innerHTML = '';
@@ -473,6 +541,9 @@ function renderTree(tree) {
 }
 
 // 좌측 문항 패널의 아코디언 열기/닫기와 검색 동작을 담당합니다.
+/**
+ * 문항 목록 아코디언(접기/펼치기) 동작을 연결합니다.
+ */
 function setupAccordion() {
   const host = document.getElementById('question-tree');
   host.addEventListener('click', e => {
@@ -488,6 +559,9 @@ function setupAccordion() {
   });
 }
 
+/**
+ * 문항 검색 입력과 필터링 UI를 연결합니다.
+ */
 function setupSearch() {
   const input = document.getElementById('panel-search');
   const host = document.getElementById('question-tree');
@@ -579,6 +653,9 @@ function setupSearch() {
 }
 
 // 좌측 패널 확장/축소와 문항 다중선택, 드래그앤드롭을 처리합니다.
+/**
+ * 좌우 패널 토글 버튼 동작을 연결합니다.
+ */
 function setupPanelToggle() {
   const btn = document.getElementById('panel-toggle');
   const page = document.querySelector('.page');
@@ -588,6 +665,9 @@ function setupPanelToggle() {
   });
 }
 
+/**
+ * 문항 선택, 드래그앤드롭, 비교/기준 영역 한도 등을 연결합니다.
+ */
 function setupSelectionAndDragDrop() {
   const host = document.getElementById('question-tree');
   const zones = document.querySelectorAll('#drop-target.question-drop-area, #drop-criterion.question-drop-area');
@@ -777,6 +857,9 @@ const filterState = {
   openKey: null
 };
 
+/**
+ * 코드북·라벨 데이터로 필터 후보(연도·응답값 등)를 구성합니다.
+ */
 function buildFilterCandidates(codebookRows, labelRows) {
   const header = (labelRows && labelRows[0] || []).map(cleanCell);
   const headerMap = new Map();
@@ -865,6 +948,9 @@ function buildFilterCandidates(codebookRows, labelRows) {
   return { candidates, headerMap };
 }
 
+/**
+ * 필터 후보에서 기본으로 켤 필터 키 목록을 반환합니다.
+ */
 function getDefaultFilterKeys(candidates) {
   const fixed = candidates.filter(item => item.fixed).map(item => item.key);
   const respondentSingles = candidates
@@ -876,20 +962,32 @@ function getDefaultFilterKeys(candidates) {
   return [...fixed, ...candidates.filter(item => !item.fixed).slice(0, 4).map(item => item.key)];
 }
 
+/**
+ * 현재 활성화된 필터 슬롯 항목을 반환합니다.
+ */
 function getActiveFilterItems() {
   return filterState.activeKeys
     .map(key => filterState.candidates.find(item => item.key === key))
     .filter(Boolean);
 }
 
+/**
+ * 특정 필터 키에 선택된 값 집합을 반환합니다.
+ */
 function getSelectedValues(key) {
   return filterState.selectedMap.get(key) || new Set();
 }
 
+/**
+ * 필터 키에 해당하는 후보 메타데이터를 반환합니다.
+ */
 function getCandidateByKey(key) {
   return filterState.candidates.find(item => item.key === key) || null;
 }
 
+/**
+ * 현재 필터에 통과한 응답 행 인덱스 배열을 반환합니다.
+ */
 function getFilteredRowIndexes() {
   const rows = filterState.rows || [];
   if (rows.length < 2) return [];
@@ -907,15 +1005,24 @@ function getFilteredRowIndexes() {
   return indexes;
 }
 
+/**
+ * 필터 통과 행 수를 반환합니다.
+ */
 function getFilteredRowCount() {
   return getFilteredRowIndexes().length;
 }
 
+/**
+ * 행 배열에서 주어진 인덱스만 골라 부분 배열을 만듭니다.
+ */
 function getRowsByIndexes(rows, indexes) {
   if (!Array.isArray(rows) || !Array.isArray(indexes)) return [];
   return indexes.map(index => rows[index]).filter(Boolean);
 }
 
+/**
+ * 필터 UI의 응답 수 표시를 갱신합니다.
+ */
 function updateFilterCount() {
   const nEl = document.getElementById('n-count');
   if (!nEl) return;
@@ -923,6 +1030,9 @@ function updateFilterCount() {
   nEl.textContent = n.toLocaleString();
 }
 
+/**
+ * 필터 한 줄 요약 HTML을 생성합니다.
+ */
 function renderFilterSummary(item) {
   const selected = getSelectedValues(item.key);
   if (selected.size === 0) return '전체';
@@ -930,6 +1040,9 @@ function renderFilterSummary(item) {
   return `${labels.join(', ')}${selected.size > 2 ? ' 외' : ''}`;
 }
 
+/**
+ * 필터 패널 전체 DOM을 다시 그립니다.
+ */
 function renderFilters() {
   const listEl = document.getElementById('filter-list');
   const addWrap = document.getElementById('filter-add');
@@ -1072,6 +1185,9 @@ function renderFilters() {
 
 }
 
+/**
+ * 활성 필터 순서를 바꿉니다(드래그 정렬 등).
+ */
 function moveActiveFilter(sourceKey, targetKey, beforeTarget = true) {
   const sourceIndex = filterState.activeKeys.indexOf(sourceKey);
   const targetIndex = filterState.activeKeys.indexOf(targetKey);
@@ -1104,6 +1220,9 @@ function moveActiveFilter(sourceKey, targetKey, beforeTarget = true) {
   renderFilters();
 }
 
+/**
+ * 앵커 기준으로 팝업 메뉴 위치를 메인 영역 안에 맞춥니다.
+ */
 function positionPopupWithinMainArea(anchorEl, menuEl) {
   if (!anchorEl || !menuEl) return;
   const mainArea = document.querySelector('.main-area');
@@ -1131,6 +1250,9 @@ function positionPopupWithinMainArea(anchorEl, menuEl) {
   }
 }
 
+/**
+ * 기준(분모) 연도 버튼 표시 여부를 현재 상태에 맞게 조정합니다.
+ */
 function updateCriterionYearButtonVisibility() {
   const criterionYearBtn = document.getElementById('criterion-year-btn');
   if (!criterionYearBtn) return;
@@ -1139,6 +1261,9 @@ function updateCriterionYearButtonVisibility() {
   criterionYearBtn.hidden = !isVisible;
 }
 
+/**
+ * 필터 UI를 초기화하고 후보를 채운 뒤 이벤트를 연결합니다.
+ */
 async function setupFilters() {
   const currentId = sessionStorage.getItem('survey.currentId');
   const nEl = document.getElementById('n-count');
@@ -1195,6 +1320,9 @@ async function setupFilters() {
   setupFilterListeners();
 }
 
+/**
+ * 필터 변경 시 결과 갱신 등 리스너를 등록합니다.
+ */
 function setupFilterListeners() {
   const addWrap = document.getElementById('filter-add');
   const addMenu = document.getElementById('filter-add-menu');
@@ -1223,6 +1351,9 @@ function setupFilterListeners() {
   }
 }
 
+/**
+ * 저장된 설문 이름을 바꿉니다(스토리지 반영).
+ */
 function renameSurvey(id, newTitle) {
   const clean = String(newTitle || '').trim().slice(0, 50);
   if (!clean) return false;
@@ -1240,6 +1371,9 @@ function renameSurvey(id, newTitle) {
 }
 
 // 설문 제목 수정, 저장된 대시보드 목록 모달, 저장 버튼 동작을 연결합니다.
+/**
+ * 설문 제목 인라인 편집 UI를 연결합니다.
+ */
 function setupTitleRename() {
   const titleEl = document.getElementById('project-title');
   const inputEl = document.getElementById('project-title-input');
@@ -1287,6 +1421,9 @@ function setupTitleRename() {
   });
 }
 
+/**
+ * 저장된 설문 목록 모달을 구성하고 이벤트를 연결합니다.
+ */
 function setupSavedModal() {
   // NOTE: Saved dashboard list modal is handled by `js/saved-list-modal.js` (DOM injected).
   // This function now only wires dashboard-local controls (data update modal, exports, etc.).
@@ -1447,7 +1584,7 @@ function setupSavedModal() {
 
   if (newBtn) newBtn.addEventListener('click', () => { window.location.href = 'home.html'; });
   const exportAllPptxBtn = document.getElementById('export-all-pptx-btn');
-  if (exportAllPptxBtn) exportAllPptxBtn.addEventListener('click', () => exportAllSingleChoiceAsPptx(exportAllPptxBtn));
+  if (exportAllPptxBtn) exportAllPptxBtn.addEventListener('click', () => exportAllSectionsAsPptx(exportAllPptxBtn));
 
   if (dataUpdateBtn && dataUpdateModal) {
     dataUpdateBtn.addEventListener('click', () => {
@@ -1534,7 +1671,6 @@ const DATA_VIZ_COLORS = {
 
 const GROUP_PALETTE = DATA_VIZ_COLORS.categorical;
 const ALLOCATION_PALETTE = DATA_VIZ_COLORS.categorical;
-const CHOICE_COLOR_PALETTE = DATA_VIZ_COLORS.categorical;
 const CUSTOM_GROUP_PALETTE = [
   'var(--color-11)', 'var(--color-12)', 'var(--color-13)', 'var(--color-14)',
   'var(--color-15)', 'var(--color-16)', 'var(--color-17)', 'var(--color-18)'
@@ -1543,12 +1679,6 @@ const SINGLE_BAR_COLOR = DATA_VIZ_COLORS.singleBar;
 const COMPARE_BAR_COLOR = DATA_VIZ_COLORS.compareBar;
 const HBAR_INSIDE_VALUE_THRESHOLD = 90;
 
-function choiceNeutralColor(index) {
-  const idx = Math.max(0, Number(index) || 0);
-  return CHOICE_COLOR_PALETTE[idx % CHOICE_COLOR_PALETTE.length];
-}
-
-const CHOICE_BAR_CHART_TYPES = ['bar_horizontal', 'bar_vertical'];
 const CHOICE_CHART_TYPES = ['bar_horizontal', 'bar_vertical', 'bar_horizontal_100', 'pie'];
 const CHOICE_CHART_TYPE_LABELS = {
   bar_horizontal: '가로 막대',
@@ -1569,19 +1699,31 @@ const SCALE_RATIO_CHART_TYPE_LABELS = {
   bar_horizontal_100: '가로 누적 막대',
   pie: '원 그래프'
 };
+/**
+ * 차트 팔레트용 고정/순환 색 값을 반환합니다.
+ */
 function rankStackColor(idx) {
   if (idx < RANK_STACK_PALETTE.length) return RANK_STACK_PALETTE[idx];
   return RANK_STACK_PALETTE[RANK_STACK_PALETTE.length - 1];
 }
 
+/**
+ * 순위 차트/정렬 관련 설정값을 반환합니다.
+ */
 function getRankWeight(rankCount, rankIndex) {
   return Math.max(1, (2 * (rankCount - rankIndex)) - 1);
 }
 
+/**
+ * 순위 평균/가중 등 표시용 문자열로 포맷합니다.
+ */
 function formatRankAverage(value) {
   return Number.isFinite(value) ? value.toFixed(2) : '0.00';
 }
 
+/**
+ * 순위형 문항 차트·범례·표·컨트롤 HTML을 생성합니다.
+ */
 function buildRankWeightFormulaText(rankCount) {
   const safeRankCount = Math.max(1, Number(rankCount) || 1);
   const weights = Array.from({ length: safeRankCount }, (_, index) => getRankWeight(safeRankCount, index));
@@ -1608,6 +1750,9 @@ const SCALE_7PT = [
 ];
 const SCALE_DIVERGING_PALETTE = SCALE_7PT;
 
+/**
+ * 현재 UI/상태/인덱스에서 파생 값을 조회합니다.
+ */
 function getScaleColor(score, maxScore) {
   if (!Number.isFinite(score) || !Number.isFinite(maxScore) || maxScore <= 1) return 'var(--neutral-300)';
   if (maxScore === 5) return SCALE_5PT[Math.max(0, Math.min(4, score - 1))];
@@ -1617,6 +1762,9 @@ function getScaleColor(score, maxScore) {
   return palette[Math.max(0, Math.min(palette.length - 1, idx))];
 }
 
+/**
+ * 현재 UI/상태/인덱스에서 파생 값을 조회합니다.
+ */
 function getScaleMutedColor(score, maxScore) {
   return `color-mix(in srgb, ${getScaleColor(score, maxScore)} 30%, transparent)`;
 }
@@ -1627,8 +1775,6 @@ const resultState = {
   hiddenGroupKeys: new Map(),
   hiddenRankKeys: new Map(),
   hiddenTableKeys: new Set(),
-  choiceViewModes: new Map(),
-  choiceBarChartTypes: new Map(),
   choiceSortModes: new Map(),
   rankViewModes: new Map(),
   rankSortModes: new Map(),
@@ -1650,8 +1796,6 @@ const resultState = {
   rankChartTypes: new Map(),
   rankSortByScore: new Map(),
   openRankMenus: new Set(),
-  groupCompareViewModes: new Map(),
-  groupCompareSortModes: new Map(),
   tooltipEl: null,
   initialized: false,
   customGroupDefs: new Map(),        // Map<criterionLabel, Array<{id, name}>>
@@ -1675,6 +1819,9 @@ const VIZ_LABEL_COL_RESIZE_SELECTORS = [
   '.lane-group-chart'
 ].join(',');
 
+/**
+ * 코드북의 value_code_map 문자열을 코드→라벨 맵으로 파싱합니다.
+ */
 function parseValueCodeMap(text) {
   const map = new Map();
   String(text || '').split('|').forEach(part => {
@@ -1688,6 +1835,9 @@ function parseValueCodeMap(text) {
   return map;
 }
 
+/**
+ * 코드북 행으로 문항 메타데이터 인덱스(맵/배열)를 구축합니다.
+ */
 function buildCodebookIndex(codebookRows) {
   const map = new Map();
   const rowsByLabel = new Map();
@@ -1703,6 +1853,7 @@ function buildCodebookIndex(codebookRows) {
   const iRole = col('data_column_role');
   const iOptions = col('response_options');
   const iOther = col('other_input_expected');
+  const iCat1 = col('category_1');
   const iValueCount = col('value_count');
   const iValueCodeMap = col('value_code_map');
   const iNumberUnit = col('number_unit');
@@ -1721,6 +1872,7 @@ function buildCodebookIndex(codebookRows) {
     const valueCodeMap = iValueCodeMap >= 0 ? parseValueCodeMap(row[iValueCodeMap]) : new Map();
     map.set(label, {
       label,
+      category1: iCat1 >= 0 ? cleanCell(row[iCat1]) : '',
       full: cleanCell(row[iFull]),
       type: cleanCell(row[iType]),
       role: cleanCell(row[iRole]),
@@ -1735,16 +1887,25 @@ function buildCodebookIndex(codebookRows) {
   return map;
 }
 
+/**
+ * 비교 대상으로 선택된 문항 라벨 목록을 반환합니다.
+ */
 function getTargetChipLabels() {
   return Array.from(document.querySelectorAll('#drop-target .question-chip'))
     .map(c => c.dataset.label)
     .filter(Boolean);
 }
+/**
+ * 기준(분모) 문항 라벨을 반환합니다.
+ */
 function getCriterionChipLabel() {
   const chip = document.querySelector('#drop-criterion .question-chip');
   return chip ? (chip.dataset.key || chip.dataset.label) : null;
 }
 
+/**
+ * 척도 다문항 비교 UI에서 그룹 식별 키를 만듭니다.
+ */
 function getScaleCompareGroupKey(entry) {
   if (!entry || !isScaleChoiceType(entry.type)) return '';
   const valueCount = Number(entry.valueCount);
@@ -1752,6 +1913,9 @@ function getScaleCompareGroupKey(entry) {
   return String(Math.round(valueCount));
 }
 
+/**
+ * 척도 비교에 쓸 대상 문항 라벨 목록을 반환합니다.
+ */
 function getTargetScaleCompareLabels(targetLabels = getTargetChipLabels()) {
   const scaleItems = targetLabels.map(label => {
     const entry = resultState.codebookByLabel.get(label);
@@ -1771,6 +1935,9 @@ function getTargetScaleCompareLabels(targetLabels = getTargetChipLabels()) {
   return labels.length >= 2 ? labels : [];
 }
 
+/**
+ * 척도 비교 대상 선택 컨트롤 표시를 최신 상태로 맞춥니다.
+ */
 function refreshTargetScaleCompareControl() {
   const btn = document.getElementById('target-scale-compare-btn');
   if (!btn) return;
@@ -1786,6 +1953,9 @@ function refreshTargetScaleCompareControl() {
   }
 }
 
+/**
+ * 지정 드롭존의 선택 칩을 비웁니다.
+ */
 function clearDropZone(zoneId) {
   const zone = document.getElementById(zoneId);
   if (!zone) return;
@@ -1794,10 +1964,16 @@ function clearDropZone(zoneId) {
   if (zoneId === 'drop-target') refreshTargetScaleCompareControl();
 }
 
+/**
+ * 필터가 적용된 라벨(텍스트) 응답 행을 반환합니다.
+ */
 function getFilteredLabelDataRows() {
   return getRowsByIndexes(filterState.rows || [], getFilteredRowIndexes());
 }
 
+/**
+ * 필터가 적용된 값(코드) 응답 행을 반환합니다.
+ */
 function getFilteredValueDataRows() {
   const valueRows = filterState.valueRows || [];
   if ((filterState.rows || []).length < 2) return [];
@@ -1805,26 +1981,44 @@ function getFilteredValueDataRows() {
   return getRowsByIndexes(valueRows, getFilteredRowIndexes());
 }
 
+/**
+ * 코드북 response_type 등에서 "SingleChoice" 유형 여부를 판별합니다.
+ */
 function isSingleChoiceType(type) {
   return cleanCell(type).includes('객관식 단일');
 }
 
+/**
+ * 코드북 response_type 등에서 "MultiChoice" 유형 여부를 판별합니다.
+ */
 function isMultiChoiceType(type) {
   return cleanCell(type).includes('객관식 중복');
 }
 
+/**
+ * 코드북 response_type 등에서 "RankChoice" 유형 여부를 판별합니다.
+ */
 function isRankChoiceType(type) {
   return cleanCell(type).includes('객관식 순위');
 }
 
+/**
+ * 코드북 response_type 등에서 "ScaleChoice" 유형 여부를 판별합니다.
+ */
 function isScaleChoiceType(type) {
   return cleanCell(type).includes('객관식 척도');
 }
 
+/**
+ * 코드북 response_type 등에서 "NumericOpen" 유형 여부를 판별합니다.
+ */
 function isNumericOpenType(type) {
   return cleanCell(type).includes('주관식 숫자');
 }
 
+/**
+ * 코드북 response_type 등에서 "TimeMinutesEntry" 유형 여부를 판별합니다.
+ */
 function isTimeMinutesEntry(entry) {
   if (!entry) return false;
   const type = cleanCell(entry.type);
@@ -1833,16 +2027,25 @@ function isTimeMinutesEntry(entry) {
   return type.includes('주관식 시간') && role === 'derived' && label.includes('분환산');
 }
 
+/**
+ * 코드북 response_type 등에서 "NumericOpenEntry" 유형 여부를 판별합니다.
+ */
 function isNumericOpenEntry(entry) {
   if (!entry) return false;
   return isNumericOpenType(entry.type) || isTimeMinutesEntry(entry);
 }
 
+/**
+ * 코드북 response_type 등에서 "TimeOpenRawEntry" 유형 여부를 판별합니다.
+ */
 function isTimeOpenRawEntry(entry) {
   if (!entry) return false;
   return cleanCell(entry.type).includes('주관식 시간') && cleanCell(entry.role).toLowerCase() === 'raw';
 }
 
+/**
+ * 시간(분) 파생 열에 대응하는 라벨 열을 찾습니다.
+ */
 function findTimeMinutesLabel(rawLabel) {
   const direct = rawLabel + '_분환산';
   if (resultState.codebookByLabel.has(direct)) return direct;
@@ -1852,14 +2055,23 @@ function findTimeMinutesLabel(rawLabel) {
   return null;
 }
 
+/**
+ * 코드북 response_type 등에서 "RatioAllocation" 유형 여부를 판별합니다.
+ */
 function isRatioAllocationType(type) {
   return cleanCell(type).includes('주관식 비율 배분');
 }
 
+/**
+ * 코드북 response_type 등에서 "TextOpen" 유형 여부를 판별합니다.
+ */
 function isTextOpenType(type) {
   return cleanCell(type).includes('주관식 문자');
 }
 
+/**
+ * 해당 문항 유형/엔트리가 결과 패널에서 지원되는지 판별합니다.
+ */
 function supportsResultType(type) {
   return isSingleChoiceType(type)
     || isMultiChoiceType(type)
@@ -1870,6 +2082,9 @@ function supportsResultType(type) {
     || isTextOpenType(type);
 }
 
+/**
+ * 해당 문항 유형/엔트리가 결과 패널에서 지원되는지 판별합니다.
+ */
 function supportsResultEntry(entry) {
   if (!entry) return false;
   if (supportsResultType(entry.type)) return true;
@@ -1877,6 +2092,9 @@ function supportsResultEntry(entry) {
   return isTimeOpenRawEntry(entry);
 }
 
+/**
+ * 기준 문항 라벨에 해당하는 코드북 엔트리를 찾습니다.
+ */
 function getCriterionEntry(criterionLabel) {
   return resultState.codebookByLabel.get(criterionLabel) || (() => {
     const candidate = getCandidateByKey(criterionLabel);
@@ -1890,6 +2108,9 @@ function getCriterionEntry(criterionLabel) {
   })();
 }
 
+/**
+ * 다중선택 문항의 선택지 목록(확장 포함)을 반환합니다.
+ */
 function getExpandedMultiOptionItems(targetLabel, entry) {
   if (!entry || !isMultiChoiceType(entry.type)) return [];
 
@@ -1919,6 +2140,9 @@ function getExpandedMultiOptionItems(targetLabel, entry) {
   return items;
 }
 
+/**
+ * 다중선택 표기 문자열이 선택됨을 나타내는지 판별합니다.
+ */
 function isMarkedMultiSelected(value) {
   const normalized = cleanCell(value).toLowerCase();
   return normalized === '선택'
@@ -1929,6 +2153,9 @@ function isMarkedMultiSelected(value) {
     || normalized === 'selected';
 }
 
+/**
+ * 한 행에서 다중선택 값을 파싱해 선택지 배열로 만듭니다.
+ */
 function getMultiSelectionsFromRow(row, rawIdx, expandedItems) {
   const selected = [];
   const seen = new Set();
@@ -1957,23 +2184,26 @@ function getMultiSelectionsFromRow(row, rawIdx, expandedItems) {
 }
 
 /* ---------- 공통 포맷 ---------- */
+/**
+ * 퍼센트·소수 표시 형식으로 포맷합니다.
+ */
 function formatPercent(value) {
   const num = Number(value);
   if (!Number.isFinite(num)) return '0.0%';
   return `${(Math.round((num + 1e-10) * 10) / 10).toFixed(1)}%`;
 }
 
-function formatOneDecimal(value) {
-  const num = Number(value);
-  if (!Number.isFinite(num)) return '0.0';
-  return (Math.round((num + 1e-10) * 10) / 10).toFixed(1);
-}
-
+/**
+ * 선택지가 기타(직접입력) 옵션인지 판별합니다.
+ */
 function isOtherOption(option) {
   return cleanCell(option).includes('기타');
 }
 
 const PINNED_SORT_PATTERNS = ['기타', '해당사항없음', '잘모름', '모르겠음', '무응답', '응답거절'];
+/**
+ * 정렬 시 항상 끝/앞에 고정되는 옵션인지 판별합니다.
+ */
 function isPinnedSortOption(option) {
   const normalized = cleanCell(option).replace(/\s+/g, '');
   return PINNED_SORT_PATTERNS.some(pat => normalized === pat || normalized.startsWith(pat));
@@ -1982,6 +2212,9 @@ function isPinnedSortOption(option) {
 /* =========================================================
    [객관식 단일] 집계 / 렌더
    ========================================================= */
+/**
+ * 단일선택 문항을 기준(교차)별로 응답 분포를 집계합니다.
+ */
 function aggregateSingleFromColumn(targetLabel, criterionLabel, rows, options = {}) {
   const {
     sourceLabel = targetLabel,
@@ -2088,10 +2321,16 @@ function aggregateSingleFromColumn(targetLabel, criterionLabel, rows, options = 
   };
 }
 
+/**
+ * 단일선택 문항을 기준(교차)별로 응답 분포를 집계합니다.
+ */
 function aggregateSingle(targetLabel, criterionLabel, rows) {
   return aggregateSingleFromColumn(targetLabel, criterionLabel, rows);
 }
 
+/**
+ * 다중선택 문항을 기준별로 선택 비율을 집계합니다.
+ */
 function aggregateMulti(targetLabel, criterionLabel, rows) {
   const entry = resultState.codebookByLabel.get(targetLabel);
   if (!entry) return null;
@@ -2197,6 +2436,9 @@ function aggregateMulti(targetLabel, criterionLabel, rows) {
   };
 }
 
+/**
+ * 화면 표시용 숫자 문자열을 유한 실수로 파싱합니다.
+ */
 function parseFiniteDisplayNumber(value) {
   const raw = cleanCell(value).replace(/,/g, '');
   if (!raw) return null;
@@ -2204,6 +2446,9 @@ function parseFiniteDisplayNumber(value) {
   return Number.isFinite(num) ? num : null;
 }
 
+/**
+ * 비율 배분 집계에 쓸 라벨/값 행 소스를 고릅니다.
+ */
 function getRatioAllocationDataSource() {
   const hasValueRows = Array.isArray(filterState.valueRows) && filterState.valueRows.length >= 2;
   return {
@@ -2212,6 +2457,9 @@ function getRatioAllocationDataSource() {
   };
 }
 
+/**
+ * 비율 배분 하위 항목(열) 목록을 헤더 맵과 함께 확장합니다.
+ */
 function getExpandedRatioAllocationItems(targetLabel, entry, headerMap) {
   if (!entry || !isRatioAllocationType(entry.type)) return [];
   const sourceHeaderMap = headerMap || new Map();
@@ -2240,6 +2488,9 @@ function getExpandedRatioAllocationItems(targetLabel, entry, headerMap) {
   return items;
 }
 
+/**
+ * 원시 행에서 비율 배분 숫자 배열을 추출합니다.
+ */
 function getRatioAllocationValuesFromRaw(row, rawIdx, optionOrder) {
   if (rawIdx === undefined || !Array.isArray(optionOrder) || optionOrder.length === 0) return null;
   const raw = cleanCell((row || [])[rawIdx]);
@@ -2253,6 +2504,9 @@ function getRatioAllocationValuesFromRaw(row, rawIdx, optionOrder) {
   return values.every(item => Number.isFinite(item.value)) ? values : null;
 }
 
+/**
+ * 확장 항목 순서에 맞게 행에서 비율 값 배열을 만듭니다.
+ */
 function getRatioAllocationValues(row, rawIdx, expandedItems, optionOrder) {
   const safeOptionOrder = Array.isArray(optionOrder) ? optionOrder : [];
   const byOption = new Map();
@@ -2271,6 +2525,9 @@ function getRatioAllocationValues(row, rawIdx, expandedItems, optionOrder) {
   return getRatioAllocationValuesFromRaw(row, rawIdx, safeOptionOrder);
 }
 
+/**
+ * 비율 배분 값 배열이 유효한지 검사합니다.
+ */
 function isValidRatioAllocationValues(values) {
   if (!Array.isArray(values) || values.length === 0) return false;
   if (!values.every(item => Number.isFinite(item.value) && item.value >= 0)) return false;
@@ -2278,6 +2535,9 @@ function isValidRatioAllocationValues(values) {
   return sum >= 99.99 && sum <= 100.01;
 }
 
+/**
+ * 비율 배분 레코드를 옵션 순서대로 합산·요약합니다.
+ */
 function summarizeRatioAllocationRecords(records, optionOrder) {
   const n = Array.isArray(records) ? records.length : 0;
   const sums = Object.fromEntries((optionOrder || []).map(option => [option, 0]));
@@ -2297,6 +2557,9 @@ function summarizeRatioAllocationRecords(records, optionOrder) {
   });
 }
 
+/**
+ * 비율 배분 문항을 기준별로 합산·요약합니다.
+ */
 function aggregateRatioAllocation(targetLabel, criterionLabel, rowIndexes = []) {
   const entry = resultState.codebookByLabel.get(targetLabel);
   if (!entry) return null;
@@ -2383,6 +2646,9 @@ function aggregateRatioAllocation(targetLabel, criterionLabel, rowIndexes = []) 
   };
 }
 
+/**
+ * 문항 유형에 따라 단일/다중/척도 등 적절한 집계 함수로 위임합니다.
+ */
 function aggregateResultQuestion(targetLabel, criterionLabel, rows, valueRows = [], rowIndexes = []) {
   const entry = resultState.codebookByLabel.get(targetLabel);
   if (!entry) return null;
@@ -2403,31 +2669,49 @@ function aggregateResultQuestion(targetLabel, criterionLabel, rows, valueRows = 
   return null;
 }
 
+/**
+ * 코드북 엔트리에서 척도 점수 범위 배열을 반환합니다.
+ */
 function getScaleScoreRange(entry) {
   const maxScore = Number(entry && entry.valueCount);
   const safeMax = Number.isFinite(maxScore) && maxScore >= 2 ? Math.round(maxScore) : 5;
   return Array.from({ length: safeMax }, (_, i) => i + 1);
 }
 
+/**
+ * 점수값에 해당하는 라벨을 코드북에서 찾습니다.
+ */
 function getScaleScoreLabel(entry, score) {
   const mapped = cleanCell(entry && entry.valueCodeMap ? entry.valueCodeMap.get(String(score)) : '');
   return mapped || `${score}점`;
 }
 
+/**
+ * 코드북 엔트리가 파생(연산) 척도인지 판별합니다.
+ */
 function isDerivedScaleEntry(entry) {
   return !!(entry && isScaleChoiceType(entry.type) && cleanCell(entry.role) === 'derived');
 }
 
+/**
+ * 평균 점수를 0–100% 트랙 상의 좌표로 변환합니다.
+ */
 function getScaleMeanLeftPct(mean, maxScore) {
   if (!Number.isFinite(mean) || mean <= 0) return null;
   if (!Number.isFinite(maxScore) || maxScore <= 1) return 50;
   return Math.max(0, Math.min(100, ((mean - 1) / (maxScore - 1)) * 100));
 }
 
+/**
+ * 척도 점수·평균 등 표시용 문자열로 포맷합니다.
+ */
 function formatScaleCompareMean(mean) {
   return Number.isFinite(mean) && mean > 0 ? mean.toFixed(2) : '';
 }
 
+/**
+ * 척도 응답의 긍·부정 요약 통계를 냅니다.
+ */
 function getScalePolaritySummary(scoreResults) {
   const mid = (Array.isArray(scoreResults) ? scoreResults.length : 0) > 0
     ? ((scoreResults.length + 1) / 2)
@@ -2455,6 +2739,9 @@ function getScalePolaritySummary(scoreResults) {
   });
 }
 
+/**
+ * 척도 원시 값 배열의 평균·분산 등 기초 통계를 냅니다.
+ */
 function getScaleValueStats(values) {
   const nums = (Array.isArray(values) ? values : []).filter(Number.isFinite);
   const n = nums.length;
@@ -2485,6 +2772,9 @@ function getScaleValueStats(values) {
   };
 }
 
+/**
+ * 단일 척도 문항 분포·축·범례·표 HTML을 생성합니다.
+ */
 function buildDerivedScaleResult(values, scoreRange) {
   const stats = getScaleValueStats(values);
   const safeRange = Array.isArray(scoreRange) ? scoreRange : [];
@@ -2527,17 +2817,26 @@ function buildDerivedScaleResult(values, scoreRange) {
   };
 }
 
+/**
+ * 히스토그램 간격·시작값 등을 유효 범위로 조정합니다.
+ */
 function clampNumericHistogramStep(value) {
   const num = Math.round(Number(value));
   if (!Number.isFinite(num)) return 5;
   return Math.max(1, Math.min(1000000, num));
 }
 
+/**
+ * 히스토그램 간격·시작값 등을 유효 범위로 조정합니다.
+ */
 function normalizeNumericHistogramStart(value) {
   const num = Math.round(Number(value));
   return Number.isFinite(num) ? num : 0;
 }
 
+/**
+ * 히스토그램 구간 폭 기본값을 데이터에서 추천합니다.
+ */
 function getDefaultNumericHistogramStep(values) {
   const nums = (Array.isArray(values) ? values : []).filter(Number.isFinite);
   if (nums.length <= 1) return 1;
@@ -2549,6 +2848,9 @@ function getDefaultNumericHistogramStep(values) {
   return clampNumericHistogramStep(roughStep);
 }
 
+/**
+ * 히스토그램 시작값 기본값을 데이터에서 추천합니다.
+ */
 function getDefaultNumericHistogramStart(values, step = null) {
   const nums = (Array.isArray(values) ? values : []).filter(Number.isFinite);
   if (nums.length === 0) return 0;
@@ -2557,6 +2859,9 @@ function getDefaultNumericHistogramStart(values, step = null) {
   return Math.floor(min / safeStep) * safeStep;
 }
 
+/**
+ * 숫자/단위 포함 표시 문자열로 포맷합니다.
+ */
 function formatNumericValue(value, digits = 2) {
   if (!Number.isFinite(value)) return '-';
   const rounded = Number(value.toFixed(digits));
@@ -2566,6 +2871,9 @@ function formatNumericValue(value, digits = 2) {
   });
 }
 
+/**
+ * formatMinutesAsTime: 대시보드 시각화/집계 로직의 일부입니다(이름·호출 맥락 참고).
+ */
 function formatMinutesAsTime(value) {
   if (!Number.isFinite(value)) return '-';
   const m = Math.round(Number(value));
@@ -2576,11 +2884,17 @@ function formatMinutesAsTime(value) {
   return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
 }
 
+/**
+ * 숫자/시간 단위에 맞는 값 포맷 함수를 반환합니다.
+ */
 function getNumericOpenValueFormatter(entry) {
   if (isTimeMinutesEntry(entry)) return (value, _digits = 2) => formatMinutesAsTime(value);
   return (value, digits = 2) => formatNumericValue(value, digits);
 }
 
+/**
+ * 숫자/단위 포함 표시 문자열로 포맷합니다.
+ */
 function formatNumericMeanDisplay(value, unit = '') {
   const num = Number(value);
   const base = Number.isFinite(num)
@@ -2592,11 +2906,17 @@ function formatNumericMeanDisplay(value, unit = '') {
   return unit ? `${base}${unit}` : base;
 }
 
+/**
+ * 숫자/단위 포함 표시 문자열로 포맷합니다.
+ */
 function formatNumericValueWithUnit(value, unit = '', digits = 2) {
   const base = formatNumericValue(value, digits);
   return base === '-' ? base : (unit ? `${base}${unit}` : base);
 }
 
+/**
+ * 히스토그램 축 범위(최소·최대)를 추정합니다.
+ */
 function getNumericHistogramDomain(values) {
   const nums = (Array.isArray(values) ? values : []).filter(Number.isFinite);
   if (nums.length === 0) return { min: 0, max: 0 };
@@ -2607,25 +2927,9 @@ function getNumericHistogramDomain(values) {
   };
 }
 
-function getNumericYAxisConfig(maxCount) {
-  const safeMax = Math.max(0, Math.ceil(Number(maxCount) || 0));
-  const candidates = [5, 10];
-  let scale = 1;
-  while ((scale * 10) < Math.max(safeMax, 10)) {
-    scale *= 10;
-  }
-  const steps = [];
-  for (let s = Math.max(1, scale / 10); s <= scale * 10; s *= 10) {
-    candidates.forEach(multiplier => steps.push(multiplier * s));
-  }
-  const uniqueSteps = Array.from(new Set(steps)).sort((a, b) => a - b);
-  const tickStep = uniqueSteps.find(step => Math.ceil(Math.max(safeMax, 1) / step) <= 6) || uniqueSteps[uniqueSteps.length - 1] || 5;
-  const axisMax = Math.max(tickStep, Math.ceil(Math.max(safeMax, 1) / tickStep) * tickStep);
-  const ticks = [];
-  for (let value = 0; value <= axisMax; value += tickStep) ticks.push(value);
-  return { tickStep, axisMax, ticks };
-}
-
+/**
+ * 숫자 값을 축 범위 내 백분율 위치로 변환합니다.
+ */
 function getNumericValueLeftPct(value, axisMin, axisMax) {
   if (!Number.isFinite(value)) return null;
   if (!Number.isFinite(axisMin) || !Number.isFinite(axisMax)) return null;
@@ -2633,6 +2937,9 @@ function getNumericValueLeftPct(value, axisMin, axisMax) {
   return Math.max(0, Math.min(100, ((value - axisMin) / (axisMax - axisMin)) * 100));
 }
 
+/**
+ * 숫자/시간 개방형 문항 차트·축·표 HTML을 생성합니다.
+ */
 function buildNumericHistogram(values, config = {}, domain = null) {
   const nums = (Array.isArray(values) ? values : []).filter(Number.isFinite);
   const stats = getScaleValueStats(nums);
@@ -2751,6 +3058,9 @@ function buildNumericHistogram(values, config = {}, domain = null) {
   };
 }
 
+/**
+ * 열에서 유한한 숫자만 모아 배열로 반환합니다.
+ */
 function collectFiniteNumericValues(rows, columnIndex) {
   if (!Array.isArray(rows) || columnIndex === undefined) return [];
   const values = [];
@@ -2764,6 +3074,9 @@ function collectFiniteNumericValues(rows, columnIndex) {
   return values;
 }
 
+/**
+ * 숫자/시간 입력 문항을 기준별로 히스토그램·통계를 집계합니다.
+ */
 function aggregateNumericOpen(targetLabel, criterionLabel, rowIndexes = []) {
   const entry = resultState.codebookByLabel.get(targetLabel);
   if (!entry) return null;
@@ -2869,6 +3182,9 @@ function aggregateNumericOpen(targetLabel, criterionLabel, rowIndexes = []) {
   };
 }
 
+/**
+ * 척도 문항을 기준별로 점수 분포·평균 등을 집계합니다.
+ */
 function aggregateScale(targetLabel, criterionLabel, rows) {
   const entry = resultState.codebookByLabel.get(targetLabel);
   if (!entry) return null;
@@ -3044,36 +3360,17 @@ function aggregateScale(targetLabel, criterionLabel, rows) {
   };
 }
 
-function isSelectedBinaryValue(value) {
-  const normalized = cleanCell(value).toLowerCase();
-  return normalized === '1'
-    || normalized === 'y'
-    || normalized === 'yes'
-    || normalized === 'true'
-    || normalized === '선택';
-}
-
-function getExpandedBinaryOptionEntries(targetLabel, entry) {
-  const codebookMap = resultState.codebookByLabel || new Map();
-  return (entry.options || []).map(option => {
-    const expandedLabel = `${targetLabel}__${option}`;
-    const expandedEntry = codebookMap.get(expandedLabel);
-    if (!expandedEntry || expandedEntry.role !== 'expanded') return null;
-    return { option, expandedLabel, expandedEntry };
-  }).filter(Boolean);
-}
-
-
-
-function getChoiceChartViewMode(targetLabel) {
-  return resultState.choiceViewModes.get(targetLabel) || 'horizontal';
-}
-
+/**
+ * 순위 차트 보기 모드를 반환합니다.
+ */
 function getRankChartViewMode(targetLabel) {
   return resultState.rankViewModes.get(targetLabel) || 'horizontal';
 }
 
 
+/**
+ * 결과 블록 헤더·레이아웃 래퍼 HTML을 생성합니다.
+ */
 function buildResultSidePanelHtml(legendHtml, targetLabel) {
   if (legendHtml && legendHtml.includes('</aside>')) {
     return legendHtml;
@@ -3081,14 +3378,23 @@ function buildResultSidePanelHtml(legendHtml, targetLabel) {
   return '<aside class="legend-panel is-placeholder" aria-hidden="true"></aside>';
 }
 
+/**
+ * 단일선택 차트 정렬 모드를 반환합니다.
+ */
 function getChoiceChartSortMode(targetLabel) {
   return resultState.choiceSortModes.get(targetLabel) || 'default';
 }
 
+/**
+ * 순위 차트 정렬 모드를 반환합니다.
+ */
 function getRankChartSortMode(targetLabel) {
   return resultState.rankSortModes.get(targetLabel) || 'default';
 }
 
+/**
+ * 행 배열을 지표 함수와 정렬 모드에 따라 정렬합니다.
+ */
 function sortRowsByMetric(rows, metricFn, sortMode) {
   const safeRows = Array.isArray(rows) ? rows : [];
   if (sortMode !== 'desc') return safeRows;
@@ -3098,69 +3404,17 @@ function sortRowsByMetric(rows, metricFn, sortMode) {
     .map(item => item.row);
 }
 
+/**
+ * 단일선택 차트용 행 데이터(비율 등)를 만듭니다.
+ */
 function getChoiceChartRows(data) {
   if (!data) return [];
   return sortRowsByMetric(data.totalResults, row => row.pct, getChoiceChartSortMode(data.targetLabel));
 }
 
-function getRankDisplayedPct(row, hiddenRanks = new Set()) {
-  if (!row) return 0;
-  const rankedPct = Array.isArray(row.perRank)
-    ? row.perRank.reduce((sum, pr, rankIndex) => sum + (hiddenRanks.has(rankIndex) ? 0 : (pr.pct || 0)), 0)
-    : 0;
-  const allRankPct = Array.isArray(row.perRank)
-    ? row.perRank.reduce((sum, pr) => sum + (pr.pct || 0), 0)
-    : 0;
-  const nonRankedPct = Math.max(0, (row.totalPct || 0) - allRankPct);
-  return rankedPct + nonRankedPct;
-}
-
-function getRankChartRows(data, hiddenRanks = new Set()) {
-  if (!data) return [];
-  return sortRowsByMetric(data.totalResults, row => getRankDisplayedPct(row, hiddenRanks), getRankChartSortMode(data.targetLabel));
-}
-
-function buildChartViewToggleHtml(targetLabel, activeMode, chartType) {
-  const activeSort = chartType === 'rank'
-    ? getRankChartSortMode(targetLabel)
-    : getChoiceChartSortMode(targetLabel);
-  const modeOptions = [
-    { mode: 'horizontal', label: '가로 막대' },
-    { mode: 'vertical', label: '세로 막대' },
-      { mode: 'pie', label: '원형(파이)' },
-    { mode: 'stacked', label: '누적 막대' }
-  ];
-  const modeSelect = `
-    <label class="chart-type-select-wrap">
-      <span class="chart-type-select-label">그래프 유형</span>
-      <select class="chart-type-select"
-              data-chart-view-select="true"
-              data-chart-type="${escapeHtml(chartType)}"
-              data-target="${escapeHtml(targetLabel)}">
-        ${modeOptions.map(item => `<option value="${item.mode}" ${activeMode === item.mode ? 'selected' : ''}>${escapeHtml(item.label)}</option>`).join('')}
-      </select>
-    </label>
-  `;
-  const sortButtons = [
-    { mode: 'default', label: '기본 순서' },
-    { mode: 'desc', label: '응답률 높은 순' }
-  ].map(item => `
-    <button type="button"
-            class="viz-control-toggle__btn ${activeSort === item.mode ? 'active' : ''}"
-            data-chart-sort="${item.mode}"
-            data-chart-type="${escapeHtml(chartType)}"
-            data-target="${escapeHtml(targetLabel)}">
-      ${escapeHtml(item.label)}
-    </button>
-  `).join('');
-  return `
-    <div class="chart-view-controls">
-      ${modeSelect}
-      <div class="viz-control-toggle">${sortButtons}</div>
-    </div>
-  `;
-}
-
+/**
+ * 세로형 차트 공통 축·그리드·쉘 HTML을 생성합니다.
+ */
 function buildVerticalPercentAxisHtml() {
   const ticks = [100, 75, 50, 25, 0];
   return `
@@ -3170,6 +3424,9 @@ function buildVerticalPercentAxisHtml() {
   `;
 }
 
+/**
+ * 세로형 차트 공통 축·그리드·쉘 HTML을 생성합니다.
+ */
 function buildVerticalPercentGridHtml() {
   const ticks = [100, 75, 50, 25, 0];
   return `
@@ -3179,6 +3436,9 @@ function buildVerticalPercentGridHtml() {
   `;
 }
 
+/**
+ * 세로형 차트 공통 축·그리드·쉘 HTML을 생성합니다.
+ */
 function buildVerticalChartShell(rowHtml, className = '') {
   return `
     <div class="vbar-chart ${className}">
@@ -3193,6 +3453,9 @@ function buildVerticalChartShell(rowHtml, className = '') {
   `;
 }
 
+/**
+ * 차트·표·컨트롤 등 화면용 HTML 조각을 생성합니다.
+ */
 function buildBasicChartHtml(data) {
   const rows = getChoiceChartRows(data);
   const rowHtml = rows.map(r => {
@@ -3222,7 +3485,7 @@ function buildBasicChartHtml(data) {
       </div>
     `;
   }).join('');
-  const overlayHeight = rows.length * 40 - 8;
+  const overlayHeight = rows.length * 40;
   const guideHtml = [0, 20, 40, 60, 80, 100].map(t => `<span class="horizontal-chart-guide" style="left:${t}%;"></span>`).join('');
   const axisHtml = [20, 40, 60, 80, 100].map(t =>
     `<span class="horizontal-chart-axis-label" style="left:${t}%;">${t}%</span>`
@@ -3239,38 +3502,9 @@ function buildBasicChartHtml(data) {
   `;
 }
 
-function getGroupCompareViewMode(targetLabel) {
-  return resultState.groupCompareViewModes.get(targetLabel) || 'composition';
-}
-
-function getGroupCompareSortMode(targetLabel) {
-  return resultState.groupCompareSortModes.get(targetLabel) || '__overall__';
-}
-
-function buildGroupCompareViewToggleHtml(data) {
-  if (!data || !data.groupResults || data.groupResults.length === 0) return '';
-  const targetLabel = data.targetLabel || '';
-  const mode = getGroupCompareViewMode(targetLabel);
-  const sortMode = getGroupCompareSortMode(targetLabel);
-  const displayGroups = getDisplayGroupResults(data.groupResults);
-  const sortOptions = [
-    `<option value="__overall__" ${sortMode === '__overall__' ? 'selected' : ''}>전체 기준</option>`,
-    ...displayGroups.map(group => `<option value="${escapeHtml(group.value)}" ${sortMode === group.value ? 'selected' : ''}>${escapeHtml(group.label)} 기준</option>`)
-  ].join('');
-  return `
-    <div class="group-compare-controls">
-      <div class="viz-control-toggle" role="tablist" aria-label="그룹 비교 보기 방식">
-        <button type="button" class="viz-control-toggle__btn ${mode === 'composition' ? 'active' : ''}" data-group-compare-view="composition" data-target="${escapeHtml(targetLabel)}">구성비 보기</button>
-        <button type="button" class="viz-control-toggle__btn ${mode === 'item' ? 'active' : ''}" data-group-compare-view="item" data-target="${escapeHtml(targetLabel)}">항목 비교 보기</button>
-      </div>
-      <label class="group-compare-sort-wrap">
-        <span>정렬</span>
-        <select data-group-compare-sort data-target="${escapeHtml(targetLabel)}">${sortOptions}</select>
-      </label>
-    </div>
-  `;
-}
-
+/**
+ * 그룹 간 비교(가로/세로 막대 등) HTML을 생성합니다.
+ */
 function buildGroupCompareItems(data) {
   if (!data || !data.groupResults) return [];
   if (data.visualType === 'rank') {
@@ -3328,61 +3562,9 @@ function buildGroupCompareItems(data) {
   }));
 }
 
-function buildGroupedHorizontalCompareChartHtml(data, hiddenGroups = new Set()) {
-  const displayGroups = getDisplayGroupResults(data.groupResults, hiddenGroups);
-  if (!displayGroups.length) return '<div class="result-empty">표시할 그룹이 없습니다.</div>';
-  const groupByKey = new Map(displayGroups.map(group => [group.value, group]));
-  const sortKey = getGroupCompareSortMode(data.targetLabel || '');
-  const rows = buildGroupCompareItems(data).map(item => {
-    let sortMetric = item.overallPct || 0;
-    if (sortKey && sortKey !== '__overall__') {
-      const found = (item.groups || []).find(group => group.key === sortKey);
-      sortMetric = found ? (found.pct || 0) : 0;
-    }
-    return { ...item, sortMetric };
-  }).sort((a, b) => b.sortMetric - a.sortMetric);
-  const groupsLegend = displayGroups.map(group => {
-    const color = getGroupColor(data.groupResults, group.value);
-    return `<span class="grouped-legend-item"><span class="grouped-legend-dot" style="background:${color};"></span>${escapeHtml(group.label)}</span>`;
-  }).join('');
-  const rowHtml = rows.map(item => {
-    const barsHtml = (item.groups || [])
-      .filter(group => groupByKey.has(group.key))
-      .map(group => {
-        const color = getGroupColor(data.groupResults, group.key);
-        const pct = Math.max(0, Math.min(100, Number(group.pct || 0)));
-        const tip = encodeURIComponent(JSON.stringify({
-          kind: 'compare-bar',
-          groupLabel: group.label,
-          option: item.label,
-          pct: group.pct || 0,
-          count: group.count || 0
-        }));
-        return `
-          <div class="grouped-hbar-item">
-            <div class="grouped-hbar-meta">${escapeHtml(group.label)}</div>
-            <div class="grouped-hbar-track">
-              <div class="grouped-hbar-fill" style="width:${pct}%; background:${color};" data-tip="${tip}"></div>
-              <span class="grouped-hbar-value">${formatPercent(group.pct || 0)}</span>
-            </div>
-          </div>
-        `;
-      }).join('');
-    return `
-      <div class="grouped-hbar-row">
-        <div class="grouped-hbar-label">${escapeHtml(item.label)}</div>
-        <div class="grouped-hbar-bars">${barsHtml}</div>
-      </div>
-    `;
-  }).join('');
-  return `
-    <div class="grouped-hbar-chart">
-      <div class="grouped-hbar-legend">${groupsLegend}</div>
-      ${rowHtml}
-    </div>
-  `;
-}
-
+/**
+ * 그룹 간 비교(가로/세로 막대 등) HTML을 생성합니다.
+ */
 function buildGroupCompareChartHtml(data, hiddenGroups = new Set()) {
   const displayGroups = getDisplayGroupResults(data.groupResults, hiddenGroups);
   const displayGroupKeys = new Set(displayGroups.map(g => g.value));
@@ -3416,9 +3598,26 @@ function buildGroupCompareChartHtml(data, hiddenGroups = new Set()) {
       </div>
     `;
   }).join('');
-  return `<div class="single-hbar-chart group-compare">${rowHtml}</div>`;
+  const overlayHeight = items.length * 40;
+  const guideHtml = [0, 20, 40, 60, 80, 100].map(t => `<span class="horizontal-chart-guide" style="left:${t}%;"></span>`).join('');
+  const axisHtml = [20, 40, 60, 80, 100].map(t =>
+    `<span class="horizontal-chart-axis-label" style="left:${t}%;">${t}%</span>`
+  ).join('');
+  return `
+    <div class="single-hbar-chart group-compare">
+      <div class="horizontal-chart-guides" style="height:${overlayHeight}px;" aria-hidden="true">${guideHtml}</div>
+      ${rowHtml}
+      <div class="horizontal-chart-axis-row" aria-hidden="true">
+        <div class="horizontal-chart-axis-spacer"></div>
+        <div class="horizontal-chart-axis">${axisHtml}</div>
+      </div>
+    </div>
+  `;
 }
 
+/**
+ * 차트·표·컨트롤 등 화면용 HTML 조각을 생성합니다.
+ */
 function buildDualHbarChartHtml(data, hiddenGroups = new Set()) {
   const displayGroups = getDisplayGroupResults(data.groupResults, hiddenGroups);
   if (!displayGroups.length) return '<div class="result-empty">표시할 그룹이 없습니다.</div>';
@@ -3459,7 +3658,7 @@ function buildDualHbarChartHtml(data, hiddenGroups = new Set()) {
 
   const G = displayGroups.length;
   const rowH = G * 32 + Math.max(0, G - 1) * 4;
-  const overlayHeight = items.length * rowH + Math.max(0, items.length - 1) * 16;
+  const overlayHeight = items.length * rowH + Math.max(0, items.length - 1) * 16 + 8;
   const guideHtml = [0, 20, 40, 60, 80, 100].map(t => `<span class="horizontal-chart-guide" style="left:${t}%;"></span>`).join('');
   const axisHtml = [20, 40, 60, 80, 100].map(t =>
     `<span class="horizontal-chart-axis-label" style="left:${t}%;">${t}%</span>`
@@ -3476,88 +3675,9 @@ function buildDualHbarChartHtml(data, hiddenGroups = new Set()) {
   `;
 }
 
-function buildVerticalBarChartHtml(data) {
-  const rows = getChoiceChartRows(data);
-  const rowHtml = rows.map(r => {
-    const pct = Math.max(0, Math.min(100, r.pct));
-    const heightStr = `${pct}%`;
-    const labelTip = encodeURIComponent(JSON.stringify({
-      kind: 'option-label',
-      option: r.option
-    }));
-    const tip = encodeURIComponent(JSON.stringify({
-      kind: 'basic-bar',
-      option: r.option,
-      pct: r.pct,
-      count: r.count
-    }));
-    const innerValueHtml = pct >= 6 ? `<span class="vbar-fill-value">${formatPercent(r.pct)}</span>` : '';
-    return `
-      <div class="vbar-item">
-        <div class="vbar-value">${formatPercent(r.pct)}</div>
-        <div class="vbar-track">
-          <div class="vbar-fill"
-               style="height:${heightStr}; background:${SINGLE_BAR_COLOR};"
-               data-tip="${tip}">${innerValueHtml}</div>
-        </div>
-        <div class="vbar-label" title="${escapeHtml(r.option)}" data-tip="${labelTip}">${escapeHtml(r.option)}</div>
-      </div>
-    `;
-  }).join('');
-  return buildVerticalChartShell(rowHtml);
-}
-
-function buildGroupCompareVerticalChartHtml(data, hidden) {
-  const rows = getChoiceChartRows(data);
-  const displayGroups = getDisplayGroupResults(data.groupResults, hidden);
-  const itemWidth = Math.max(72, 36 + ((displayGroups.length + 1) * 18));
-  const rowHtml = rows.map(r => {
-    const overallHeight = `${Math.max(0, Math.min(100, r.pct))}%`;
-    const labelTip = encodeURIComponent(JSON.stringify({
-      kind: 'option-label',
-      option: r.option
-    }));
-    const overallTip = encodeURIComponent(JSON.stringify({
-      kind: 'compare-bar',
-      option: r.option,
-      pct: r.pct,
-      count: r.count
-    }));
-    const groupBarsHtml = displayGroups.map(g => {
-      const color = getGroupColor(data.groupResults, g.value);
-      const gr = g.results.find(x => x.option === r.option) || { pct: 0, count: 0 };
-      const pct = Math.max(0, Math.min(100, gr.pct));
-      const height = `${pct}%`;
-      const tip = encodeURIComponent(JSON.stringify({
-        kind: 'group-dot',
-        groupLabel: g.label,
-        option: r.option,
-        pct: gr.pct,
-        count: gr.count
-      }));
-      const labelHtml = '';
-      return `<div class="vbar-fill vbar-fill-group"
-                   style="height:${height}; background:${color};"
-                   data-tip="${tip}">${labelHtml}</div>`;
-    }).join('');
-    return `
-      <div class="vbar-item group-compare" style="flex-basis:${itemWidth}px;">
-        <div class="vbar-value">${formatPercent(r.pct)}</div>
-        <div class="vbar-track vbar-group-track">
-          <div class="vbar-group-bars">
-            <div class="vbar-fill vbar-fill-overall"
-                 style="height:${overallHeight}; background:${COMPARE_BAR_COLOR};"
-                 data-tip="${overallTip}"></div>
-            ${groupBarsHtml}
-          </div>
-        </div>
-        <div class="vbar-label" title="${escapeHtml(r.option)}" data-tip="${labelTip}">${escapeHtml(r.option)}</div>
-      </div>
-    `;
-  }).join('');
-  return buildVerticalChartShell(rowHtml, 'group-compare');
-}
-
+/**
+ * 숨긴 그룹을 제외한 그룹별 결과 배열을 반환합니다.
+ */
 function getDisplayGroupResults(groupResults, hidden) {
   if (!Array.isArray(groupResults)) return [];
   return groupResults.filter(group => {
@@ -3578,6 +3698,9 @@ function getDisplayGroupResults(groupResults, hidden) {
   });
 }
 
+/**
+ * 그룹 비교 범례용 색상을 반환합니다.
+ */
 function getGroupColor(groupResults, groupValue) {
   // 사용자 정의 그룹은 _customColor를 직접 사용
   const found = groupResults.find(g => g.value === groupValue);
@@ -3587,12 +3710,18 @@ function getGroupColor(groupResults, groupValue) {
   return GROUP_PALETTE[(idx < 0 ? 0 : idx) % GROUP_PALETTE.length];
 }
 
+/**
+ * 그룹 비교 범례용 색상을 반환합니다.
+ */
 function getCustomGroupColor(criterionLabel, groupId) {
   const defs = resultState.customGroupDefs.get(criterionLabel) || [];
   const idx = defs.findIndex(d => d.id === groupId);
   return CUSTOM_GROUP_PALETTE[(idx < 0 ? 0 : idx) % CUSTOM_GROUP_PALETTE.length];
 }
 
+/**
+ * 새 사용자 정의 그룹 ID를 발급합니다.
+ */
 function nextCustomGroupId(criterionLabel, defsOverride = null) {
   const defs = Array.isArray(defsOverride) ? defsOverride : (resultState.customGroupDefs.get(criterionLabel) || []);
   const ids = new Set(defs.map(d => d.id));
@@ -3601,6 +3730,9 @@ function nextCustomGroupId(criterionLabel, defsOverride = null) {
   return 'cg' + n;
 }
 
+/**
+ * 범례 한 줄에 표시할 사용자 정의 그룹 구성원을 반환합니다.
+ */
 function getCustomGroupLegendMembers(data, groupValue) {
   if (!data || !data.isCustomGroupView || !data.criterionLabel) return [];
   const assignments = resultState.customGroupAssignments.get(data.criterionLabel) || new Map();
@@ -3613,6 +3745,9 @@ function getCustomGroupLegendMembers(data, groupValue) {
     }));
 }
 
+/**
+ * 범례 영역 HTML을 생성합니다.
+ */
 function buildGroupedLegendRowsHtml(data, hiddenGroups = new Set()) {
   const displayGroups = getDisplayGroupResults(data.groupResults);
   if (displayGroups.length === 0) return '';
@@ -3647,11 +3782,17 @@ function buildGroupedLegendRowsHtml(data, hiddenGroups = new Set()) {
   }).join('');
 }
 
+/**
+ * 사용자 정의 그룹 설정이 묶인 대상 문항 라벨을 반환합니다.
+ */
 function getGroupConfigTargetLabel(data) {
   if (!data) return '';
   return data.rank1stSourceLabel || data.targetLabel || '';
 }
 
+/**
+ * 범례 영역 HTML을 생성합니다.
+ */
 function buildLegendHtml(data, hidden, opts = {}) {
   if (!data.groupResults) return '';
   const items = buildGroupedLegendRowsHtml(data, hidden);
@@ -3679,18 +3820,27 @@ function buildLegendHtml(data, hidden, opts = {}) {
   `;
 }
 
+/**
+ * 데이터 테이블 셀 라벨을 HTML 이스케이프와 함께 렌더링합니다.
+ */
 function renderTableOptionLabel(option, targetLabel) {
   const safeOption = escapeHtml(option);
   if (!isOtherOption(option)) return safeOption;
   return `${safeOption}<button type="button" class="other-response-open-btn" data-open-other="${escapeHtml(targetLabel)}">응답 보기</button>`;
 }
 
+/**
+ * 문항 전체 설명·타이틀 HTML을 생성합니다.
+ */
 function buildQuestionFullHtml(entry) {
   return entry && entry.full
     ? `<div class="result-question-full">Q. ${escapeHtml(entry.full)}</div>`
     : '';
 }
 
+/**
+ * 결과 블록 헤더·레이아웃 래퍼 HTML을 생성합니다.
+ */
 function buildResultHeaderHtml(titleHtml, fullTextHtml = '', controlsHtml = '', actionsHtml = '') {
   const actions = actionsHtml || '';
   return `
@@ -3707,14 +3857,23 @@ function buildResultHeaderHtml(titleHtml, fullTextHtml = '', controlsHtml = '', 
   `;
 }
 
+/**
+ * 현재 UI/상태/인덱스에서 파생 값을 조회합니다.
+ */
 function getResultVisualClass(hasLegend) {
   return hasLegend ? 'result-visual has-legend' : 'result-visual';
 }
 
+/**
+ * 차트·표·컨트롤 등 화면용 HTML 조각을 생성합니다.
+ */
 function buildGroupedCountHeader(label, count, colspan) {
   return `<th colspan="${colspan}" class="group-col">${escapeHtml(label)}</th>`;
 }
 
+/**
+ * 결과 데이터 테이블 HTML을 생성합니다.
+ */
 function buildDataTableToggleButtonHtml() {
   return `
     <button type="button" class="result-table-toggle" data-data-table-toggle aria-expanded="true">
@@ -3725,6 +3884,9 @@ function buildDataTableToggleButtonHtml() {
   `;
 }
 
+/**
+ * wrapResultTable: 대시보드 시각화/집계 로직의 일부입니다(이름·호출 맥락 참고).
+ */
 function wrapResultTable(tableHtml, noteHtml = '') {
   return `
     <div class="result-table-section" data-data-table-section>
@@ -3744,6 +3906,9 @@ function wrapResultTable(tableHtml, noteHtml = '') {
   `;
 }
 
+/**
+ * 단일·다중 선택 문항용 컨트롤·차트·표 HTML을 생성합니다.
+ */
 function buildSimpleChoiceTableHtml(data) {
   const { totalResults, totalN } = data;
   const sumPct = totalResults.reduce((s, r) => s + r.pct, 0);
@@ -3774,6 +3939,9 @@ function buildSimpleChoiceTableHtml(data) {
   `;
 }
 
+/**
+ * 단일·다중 선택 문항용 컨트롤·차트·표 HTML을 생성합니다.
+ */
 function buildChoiceDataTableHtml(data, noteHtml = '') {
   const { totalResults, groupResults, totalN } = data;
   if (!groupResults) {
@@ -3835,11 +4003,17 @@ function buildChoiceDataTableHtml(data, noteHtml = '') {
   return wrapResultTable(tableHtml, noteHtml);
 }
 
+/**
+ * 차트 팔레트용 고정/순환 색 값을 반환합니다.
+ */
 function allocationColor(index) {
   const idx = Math.max(0, Number(index) || 0);
   return ALLOCATION_PALETTE[idx % ALLOCATION_PALETTE.length];
 }
 
+/**
+ * 비율 배분 문항 차트·스택·표 HTML을 생성합니다.
+ */
 function buildRatioAllocationStackHtml(results, options = {}) {
   const { groupLabel = '', n = 0, showLabels = true } = options;
   const safeResults = Array.isArray(results) ? results : [];
@@ -3885,6 +4059,9 @@ function buildRatioAllocationStackHtml(results, options = {}) {
   `;
 }
 
+/**
+ * 범례 영역 HTML을 생성합니다.
+ */
 function buildAllocationGroupLegendHtml(data, hiddenGroups) {
   const options = data.totalResults || [];
   const optionItems = options.map((opt, i) => {
@@ -3914,6 +4091,9 @@ function buildAllocationGroupLegendHtml(data, hiddenGroups) {
   `;
 }
 
+/**
+ * 비율 배분 문항 차트·스택·표 HTML을 생성합니다.
+ */
 function buildRatioAllocationChartHtml(data, hiddenGroups = new Set()) {
   if (!data.groupResults) {
     return `
@@ -3947,6 +4127,9 @@ function buildRatioAllocationChartHtml(data, hiddenGroups = new Set()) {
   return `<div class="lane-group-chart">${overallRowHtml}${rowsHtml}</div>`;
 }
 
+/**
+ * 비율 배분 문항 차트·스택·표 HTML을 생성합니다.
+ */
 function buildRatioAllocationDataTableHtml(data, hiddenGroups = new Set()) {
   if (!data.groupResults) {
     const tableHtml = `
@@ -4010,6 +4193,9 @@ function buildRatioAllocationDataTableHtml(data, hiddenGroups = new Set()) {
   return wrapResultTable(tableHtml);
 }
 
+/**
+ * 비율 배분 문항 차트·스택·표 HTML을 생성합니다.
+ */
 function buildRatioAllocationSection(data) {
   if (!data) return '';
   const { codebookEntry, targetLabel, groupResults } = data;
@@ -4077,18 +4263,30 @@ function buildRatioAllocationSection(data) {
   `;
 }
 
+/**
+ * 척도 시각화 보기 모드(분포/평균 등)를 반환합니다.
+ */
 function getScaleViewMode(targetLabel) {
   return resultState.scaleViewModes.get(targetLabel) || 'distribution';
 }
 
+/**
+ * 척도 중립점 숨김을 지원하는지 데이터를 보고 판단합니다.
+ */
 function canHideScaleMidpoint(data) {
   return !!(data && Array.isArray(data.scoreRange) && data.scoreRange.length >= 3 && (data.scoreRange.length % 2 === 1));
 }
 
+/**
+ * 해당 문항에서 척도 중립점이 숨겨졌는지 상태를 반환합니다.
+ */
 function isScaleMidpointHidden(targetLabel) {
   return !!resultState.scaleMidpointHidden.get(targetLabel);
 }
 
+/**
+ * 단일 척도 문항 분포·축·범례·표 HTML을 생성합니다.
+ */
 function buildScaleToggleHtml(targetLabel, activeMode, options = {}) {
   const {
     showMidpointOption = false,
@@ -4182,6 +4380,9 @@ function buildScaleToggleHtml(targetLabel, activeMode, options = {}) {
   `;
 }
 
+/**
+ * 단일 척도 문항 분포·축·범례·표 HTML을 생성합니다.
+ */
 function buildScaleAxisHtml(maxScore, showLabels = false) {
   return `
     <div class="scale-axis">
@@ -4199,6 +4400,9 @@ function buildScaleAxisHtml(maxScore, showLabels = false) {
   `;
 }
 
+/**
+ * 단일 척도 문항 분포·축·범례·표 HTML을 생성합니다.
+ */
 function buildScaleMeanHtml(mean, maxScore, tipData, options = {}) {
   const { markerColor = '', hideValue = false, hideLabel = false, hideMarker = false } = options;
   if (hideMarker) return '<div class="scale-mean-row"></div>';
@@ -4217,6 +4421,9 @@ function buildScaleMeanHtml(mean, maxScore, tipData, options = {}) {
   `;
 }
 
+/**
+ * 척도 막대/트랙에 쓸 점수별 표시용 결과를 가공합니다.
+ */
 function getScaleDisplayResults(scoreResults, options = {}) {
   const { hideMidpoint = false } = options;
   const source = Array.isArray(scoreResults) ? scoreResults : [];
@@ -4235,6 +4442,9 @@ function getScaleDisplayResults(scoreResults, options = {}) {
   }));
 }
 
+/**
+ * 단일 척도 문항 분포·축·범례·표 HTML을 생성합니다.
+ */
 function buildScaleTrackHtml(scoreResults, maxScore, options = {}) {
   const { muted = false, interactive = true, hideMidpoint = false } = options;
   const displayResults = getScaleDisplayResults(scoreResults, { hideMidpoint });
@@ -4274,6 +4484,9 @@ function buildScaleTrackHtml(scoreResults, maxScore, options = {}) {
   `;
 }
 
+/**
+ * 단일 척도 문항 분포·축·범례·표 HTML을 생성합니다.
+ */
 function buildScaleEdgeLabelsHtml(scoreResults) {
   const items = Array.isArray(scoreResults) ? scoreResults : [];
   if (items.length < 2) return '';
@@ -4294,6 +4507,9 @@ function buildScaleEdgeLabelsHtml(scoreResults) {
   `;
 }
 
+/**
+ * 단일 척도 문항 분포·축·범례·표 HTML을 생성합니다.
+ */
 function buildScaleDistributionSummaryHtml(scoreResults) {
   const summary = getScalePolaritySummary(scoreResults);
   return `
@@ -4304,6 +4520,9 @@ function buildScaleDistributionSummaryHtml(scoreResults) {
   `;
 }
 
+/**
+ * 단일 척도 문항 분포·축·범례·표 HTML을 생성합니다.
+ */
 function buildScaleDistributionBarHtml(scoreResults, maxScore, options = {}) {
   const { hideMidpoint = false, hideSummary = false } = options;
   return `
@@ -4314,6 +4533,9 @@ function buildScaleDistributionBarHtml(scoreResults, maxScore, options = {}) {
   `;
 }
 
+/**
+ * 단일 척도 문항 분포·축·범례·표 HTML을 생성합니다.
+ */
 function buildScaleMeanOnlyHtml(mean, maxScore, meanTipData, scoreResults, options = {}) {
   const { hideMidpoint = false, meanMarkerColor = '', hideMeanValue = false, hideMeanLabel = false, hideMeanMarker = false } = options;
   return `
@@ -4333,6 +4555,9 @@ function buildScaleMeanOnlyHtml(mean, maxScore, meanTipData, scoreResults, optio
   `;
 }
 
+/**
+ * 단일 척도 문항 분포·축·범례·표 HTML을 생성합니다.
+ */
 function buildDerivedScaleBins(values, maxScore) {
   const binCount = 37;
   const minScore = 1;
@@ -4360,6 +4585,9 @@ function buildDerivedScaleBins(values, maxScore) {
   }));
 }
 
+/**
+ * 단일 척도 문항 분포·축·범례·표 HTML을 생성합니다.
+ */
 function buildDerivedScaleViolinPath(values, maxScore) {
   const bins = buildDerivedScaleBins(values, maxScore);
   if (!bins.some(bin => bin.density > 0)) return '';
@@ -4369,6 +4597,9 @@ function buildDerivedScaleViolinPath(values, maxScore) {
   return `M ${topPoints.join(' L ')} L ${bottomPoints.join(' L ')} Z`;
 }
 
+/**
+ * 단일 척도 문항 분포·축·범례·표 HTML을 생성합니다.
+ */
 function buildDerivedScaleQuartileMarkersHtml(data, maxScore, options = {}) {
   const { muted = false, groupLabel = "" } = options;
   const items = [
@@ -4394,48 +4625,9 @@ function buildDerivedScaleQuartileMarkersHtml(data, maxScore, options = {}) {
   }).join("");
 }
 
-function buildDerivedScaleViolinHtml(data, viewMode) {
-  const maxScore = data.scoreRange.length;
-  const path = buildDerivedScaleViolinPath(data.values, maxScore);
-  const meanLeft = getScaleMeanLeftPct(data.mean, maxScore);
-  const muted = viewMode === "mean";
-  const showMeanMarker = viewMode === "mean";
-  const gradientId = `derived-scale-gradient-${Math.random().toString(36).slice(2, 10)}`;
-  const meanTip = encodeURIComponent(JSON.stringify({
-    kind: "scale-mean",
-    mean: data.mean,
-    totalN: data.totalN,
-    groupLabel: data.groupLabel || ""
-  }));
-  return `
-    <div class="derived-scale-chart">
-      <div class="derived-scale-violin-wrap">
-        <svg class="derived-scale-violin" viewBox="0 0 100 84" preserveAspectRatio="none" aria-hidden="true">
-          <defs>
-            <linearGradient id="${gradientId}" x1="0%" y1="0%" x2="100%" y2="0%">
-              ${SCALE_DIVERGING_PALETTE.map((color, idx) => {
-                const offset = SCALE_DIVERGING_PALETTE.length === 1 ? 0 : (idx / (SCALE_DIVERGING_PALETTE.length - 1)) * 100;
-                return `<stop offset="${offset.toFixed(2)}%" stop-color="${color}"></stop>`;
-              }).join("")}
-            </linearGradient>
-          </defs>
-          <line class="derived-scale-centerline" x1="0" y1="42" x2="100" y2="42"></line>
-          ${path ? `<path class="derived-scale-violin-shape ${muted ? "is-muted" : ""}" style="fill:url(#${gradientId});" d="${path}"></path>` : ""}
-        </svg>
-        ${buildScaleAxisHtml(maxScore, true)}
-        ${buildDerivedScaleQuartileMarkersHtml(data, maxScore, { muted, groupLabel: data.groupLabel || "" })}
-        ${!showMeanMarker || meanLeft === null ? "" : `
-          <div class="derived-scale-mean-marker" style="left:${meanLeft}%;" data-tip="${meanTip}">
-            <div class="derived-scale-mean-line"></div>
-            <div class="derived-scale-mean-label">평균</div>
-            <div class="derived-scale-mean-dot">${Number(data.mean || 0).toFixed(2)}</div>
-          </div>
-        `}
-      </div>
-    </div>
-  `;
-}
-
+/**
+ * 척도 점수·평균 등 표시용 문자열로 포맷합니다.
+ */
 function formatScaleScoreLabel(result) {
   if (!result) return '';
   const baseLabel = `${result.score}점`;
@@ -4444,6 +4636,9 @@ function formatScaleScoreLabel(result) {
     : baseLabel;
 }
 
+/**
+ * 단일 척도 문항 분포·축·범례·표 HTML을 생성합니다.
+ */
 function buildDerivedScaleBoxPlotHtml(data, viewMode, { hideAxis = false, mutedMeanMarker = false, hideMeanMarker = false } = {}) {
   const axisMin = 1;
   const axisMax = data.scoreRange.length;
@@ -4458,6 +4653,9 @@ function buildDerivedScaleBoxPlotHtml(data, viewMode, { hideAxis = false, mutedM
   `;
 }
 
+/**
+ * 단일 척도 문항 분포·축·범례·표 HTML을 생성합니다.
+ */
 function buildScaleLegendItemsHtml(data) {
   const maxScore = data.scoreRange.length;
   const items = data.scoreResults.map(result => `
@@ -4469,6 +4667,9 @@ function buildScaleLegendItemsHtml(data) {
   return `<div class="legend is-static">${items}</div>`;
 }
 
+/**
+ * 단일 척도 문항 분포·축·범례·표 HTML을 생성합니다.
+ */
 function buildScaleLegendItemsByScoreRangeHtml(scoreRange) {
   const scores = Array.isArray(scoreRange) ? scoreRange : [];
   const maxScore = scores.length;
@@ -4481,6 +4682,9 @@ function buildScaleLegendItemsByScoreRangeHtml(scoreRange) {
   return `<div class="legend is-static">${items}</div>`;
 }
 
+/**
+ * 단일 척도 문항 분포·축·범례·표 HTML을 생성합니다.
+ */
 function buildScaleScoreOnlyLegendHtml(scoreRange) {
   return `
     <aside class="legend-panel">
@@ -4489,6 +4693,9 @@ function buildScaleScoreOnlyLegendHtml(scoreRange) {
   `;
 }
 
+/**
+ * 단일 척도 문항 분포·축·범례·표 HTML을 생성합니다.
+ */
 function buildScaleLegendHtml(data) {
   return `
     <aside class="legend-panel">
@@ -4497,6 +4704,9 @@ function buildScaleLegendHtml(data) {
   `;
 }
 
+/**
+ * 척도 다문항 비교 후보 엔트리 목록을 반환합니다.
+ */
 function getScaleCompareCandidateEntries(targetLabel) {
   const baseEntry = resultState.codebookByLabel.get(targetLabel);
   if (!baseEntry || !isScaleChoiceType(baseEntry.type)) return [];
@@ -4511,6 +4721,9 @@ function getScaleCompareCandidateEntries(targetLabel) {
   });
 }
 
+/**
+ * 비교 모달에서 선택된 척도 문항 라벨을 반환합니다.
+ */
 function getScaleCompareSelectedLabels(targetLabel) {
   const allowed = new Set(getScaleCompareCandidateEntries(targetLabel).map(entry => entry.label));
   const current = Array.isArray(resultState.scaleCompareSelections.get(targetLabel))
@@ -4524,6 +4737,9 @@ function getScaleCompareSelectedLabels(targetLabel) {
   return next;
 }
 
+/**
+ * 여러 대상 척도 문항을 같은 기준으로 묶어 비교용 데이터를 집계합니다.
+ */
 function aggregateTargetScaleCompareData(targetLabels, criterionLabel, rows) {
   const compareLabels = getTargetScaleCompareLabels(targetLabels);
   if (compareLabels.length < 2) return null;
@@ -4574,6 +4790,9 @@ function aggregateTargetScaleCompareData(targetLabels, criterionLabel, rows) {
   };
 }
 
+/**
+ * 척도 비교 표에서 문항을 평균 기준으로 정렬합니다.
+ */
 function sortScaleCompareQuestionsByMean(compareData) {
   if (!compareData || !Array.isArray(compareData.questions)) return compareData;
   const ordered = compareData.questions
@@ -4602,6 +4821,9 @@ function sortScaleCompareQuestionsByMean(compareData) {
   };
 }
 
+/**
+ * 숨김 처리 반영 후 실제로 그릴 척도 비교 그룹 목록을 반환합니다.
+ */
 function getDisplayScaleCompareGroups(groups, hiddenGroups) {
   if (!Array.isArray(groups)) return [];
   return groups.filter(group => {
@@ -4610,43 +4832,9 @@ function getDisplayScaleCompareGroups(groups, hiddenGroups) {
   });
 }
 
-function buildScaleCompareOverallDotHtml(question, maxScore, compact = false) {
-  const left = getScaleMeanLeftPct(question.mean, maxScore);
-  if (left === null) return '';
-  const tip = encodeURIComponent(JSON.stringify({
-    kind: 'scale-mean',
-    questionLabel: question.label,
-    groupLabel: '응답자 전체',
-    mean: question.mean,
-    totalN: question.totalN
-  }));
-  return `
-    <div class="scale-compare-dot is-overall ${compact ? 'is-compact' : ''}" style="left:${left}%;" data-tip="${tip}">
-      ${compact ? '' : `<span class="scale-compare-dot-label">평균</span><span class="scale-compare-dot-value">${formatScaleCompareMean(question.mean)}</span>`}
-    </div>
-  `;
-}
-
-function buildScaleCompareGroupDotHtml(group, point, maxScore, withOverall, compact = false) {
-  if (!point || point.n <= 0) return '';
-  const left = getScaleMeanLeftPct(point.mean, maxScore);
-  if (left === null) return '';
-  const tip = encodeURIComponent(JSON.stringify({
-    kind: 'scale-compare-group-dot',
-    groupLabel: group.label,
-    questionLabel: point.questionLabel,
-    mean: point.mean,
-    totalN: point.n
-  }));
-  return `
-    <div class="scale-compare-dot is-group ${withOverall ? 'has-overall' : ''} ${compact ? 'is-compact' : ''}"
-         style="left:${left}%; background:${group.color};"
-         data-tip="${tip}">
-      ${compact ? '' : `<span class="scale-compare-dot-label">평균</span><span class="scale-compare-dot-value">${formatScaleCompareMean(point.mean)}</span>`}
-    </div>
-  `;
-}
-
+/**
+ * 여러 척도 문항 비교 표/차트 HTML을 생성합니다.
+ */
 function buildScaleCompareLegendHtml(groups, hiddenGroups = new Set(), targetLabel = '', criterionLabel = '', opts = {}) {
   if (!Array.isArray(groups) || groups.length === 0) return '';
   const { showDualBar = false, isDualBar = false } = opts;
@@ -4687,35 +4875,9 @@ function buildScaleCompareLegendHtml(groups, hiddenGroups = new Set(), targetLab
   `;
 }
 
-function buildScaleCompareRowAxisHtml(maxScore, item = null) {
-  const safeMaxScore = Number.isFinite(Number(maxScore)) && Number(maxScore) >= 2 ? Math.round(Number(maxScore)) : 5;
-  return `
-    <div class="scale-compare-row-axis">
-      ${Array.from({ length: safeMaxScore }, (_, i) => {
-        const score = i + 1;
-        const left = i / (safeMaxScore - 1) * 100;
-        return `
-          <span class="scale-compare-row-axis-point" style="left:${left}%;"></span>
-          <span class="scale-compare-row-axis-label" style="left:${left}%;">
-            <span class="scale-compare-row-axis-score">${score}</span>
-          </span>
-        `;
-      }).join('')}
-      ${[0, safeMaxScore - 1].map((edgeIndex) => {
-        const score = edgeIndex + 1;
-        const isLeft = edgeIndex === 0;
-        const left = edgeIndex / (safeMaxScore - 1) * 100;
-        const edgeLabel = item && item.codebookEntry
-          ? getScaleScoreLabel(item.codebookEntry, score)
-          : String(score);
-        const label = edgeLabel && edgeLabel !== `${score}점` ? edgeLabel : '';
-        if (!label) return '';
-        return `<span class="scale-compare-row-axis-copy ${isLeft ? 'is-left' : 'is-right'}">${escapeHtml(label)}</span>`;
-      }).join('')}
-    </div>
-  `;
-}
-
+/**
+ * 여러 척도 문항 비교 표/차트 HTML을 생성합니다.
+ */
 function buildScaleCompareQuestionLabelHtml(question) {
   const tip = encodeURIComponent(JSON.stringify({
     kind: 'question-full',
@@ -4725,36 +4887,9 @@ function buildScaleCompareQuestionLabelHtml(question) {
   return `<div class="lane-group-label" data-tip="${tip}">${escapeHtml(question.label)}</div>`;
 }
 
-function buildScaleCompareDistributionBackgroundHtml(item) {
-  if (!item) return '';
-  const hideMidpoint = isScaleMidpointHidden(TARGET_SCALE_COMPARE_VIEW_KEY);
-  if (item.isDerivedScale) {
-    const path = buildDerivedScaleViolinPath(item.values, item.scoreRange.length);
-    if (!path) return '';
-    const gradientId = `derived-scale-compare-bg-${Math.random().toString(36).slice(2, 10)}`;
-    return `
-      <div class="scale-compare-distribution-bg" aria-hidden="true">
-        <svg class="derived-scale-violin" viewBox="0 0 100 84" preserveAspectRatio="none">
-          <defs>
-            <linearGradient id="${gradientId}" x1="0%" y1="0%" x2="100%" y2="0%">
-              ${SCALE_DIVERGING_PALETTE.map((color, idx) => {
-                const offset = SCALE_DIVERGING_PALETTE.length === 1 ? 0 : (idx / (SCALE_DIVERGING_PALETTE.length - 1)) * 100;
-                return `<stop offset="${offset.toFixed(2)}%" stop-color="${color}"></stop>`;
-              }).join('')}
-            </linearGradient>
-          </defs>
-          <path class="derived-scale-violin-shape is-muted" style="fill:url(#${gradientId});" d="${path}"></path>
-        </svg>
-      </div>
-    `;
-  }
-  return `
-    <div class="scale-compare-distribution-bg" aria-hidden="true">
-      ${buildScaleTrackHtml(item.scoreResults, item.scoreRange.length, { muted: true, interactive: false, hideMidpoint })}
-    </div>
-  `;
-}
-
+/**
+ * 여러 척도 문항 비교 표/차트 HTML을 생성합니다.
+ */
 function buildScaleCompareDistributionSectionHtml(compareData) {
   if (!compareData) return '';
   const scoreRange = compareData.baseData && Array.isArray(compareData.baseData.scoreRange)
@@ -4789,18 +4924,27 @@ function buildScaleCompareDistributionSectionHtml(compareData) {
   `;
 }
 
+/**
+ * 여러 척도 문항 비교 표/차트 HTML을 생성합니다.
+ */
 function buildScaleCompareScoreHeaders(scoreRange) {
   return (scoreRange || []).map(score => `
     <th class="num group-col" colspan="2">${Number(score).toLocaleString()}점</th>
   `).join("");
 }
 
+/**
+ * 여러 척도 문항 비교 표/차트 HTML을 생성합니다.
+ */
 function buildScaleCompareScoreSubHeaders(scoreRange) {
   return (scoreRange || []).map(() => `
     <th class="num group-col">응답 비율(%)</th><th class="num">응답 수(명)</th>
   `).join("");
 }
 
+/**
+ * 여러 척도 문항 비교 표/차트 HTML을 생성합니다.
+ */
 function buildScaleCompareScoreCells(scoreResults, scoreRange) {
   const results = Array.isArray(scoreResults) ? scoreResults : [];
   return (scoreRange || []).map(score => {
@@ -4810,6 +4954,9 @@ function buildScaleCompareScoreCells(scoreResults, scoreRange) {
   }).join('');
 }
 
+/**
+ * 여러 척도 문항 비교 표/차트 HTML을 생성합니다.
+ */
 function buildScaleCompareDataTableHtml(compareData, hiddenGroups = new Set()) {
   if (!compareData || !Array.isArray(compareData.questions)) return "";
   const hasGroups = !!compareData.criterionLabel;
@@ -4878,6 +5025,9 @@ function buildScaleCompareDataTableHtml(compareData, hiddenGroups = new Set()) {
   `);
 }
 
+/**
+ * 여러 척도 문항 비교 표/차트 HTML을 생성합니다.
+ */
 function buildScaleCompareSectionHtml(compareData, hiddenGroups, options = {}) {
   if (!compareData) return '';
   const { showHeader = true, flush = false, isDualBar = false, showDualBar = false } = options;
@@ -5049,6 +5199,9 @@ function buildScaleCompareSectionHtml(compareData, hiddenGroups, options = {}) {
 }
 
 
+/**
+ * 단일 척도 문항 분포·축·범례·표 HTML을 생성합니다.
+ */
 function buildScaleGroupLegendHtml(data, hiddenGroups, viewMode) {
   const showScoreColors = !data.isDerivedScale;
   const scoreItemsHtml = showScoreColors ? buildScaleLegendItemsHtml(data) : '';
@@ -5075,6 +5228,9 @@ function buildScaleGroupLegendHtml(data, hiddenGroups, viewMode) {
   `;
 }
 
+/**
+ * 숫자/시간 개방형 문항 차트·축·표 HTML을 생성합니다.
+ */
 function buildNumericOpenControlsHtml(targetLabel, interval, start, disabled = false, viewMode = 'histogram') {
   const safeMode = viewMode === 'box' ? 'box' : 'histogram';
   const inputDisabled = disabled || safeMode === 'box';
@@ -5123,6 +5279,9 @@ function buildNumericOpenControlsHtml(targetLabel, interval, start, disabled = f
   `;
 }
 
+/**
+ * 숫자/시간 개방형 문항 차트·축·표 HTML을 생성합니다.
+ */
 function buildNumericWhiskerTrackHtml(item, axisMin, axisMax, numberUnit = '', groupLabel = '', options = {}) {
   const fmtValue = typeof options.valueFormatter === 'function'
     ? options.valueFormatter
@@ -5192,30 +5351,9 @@ function buildNumericWhiskerTrackHtml(item, axisMin, axisMax, numberUnit = '', g
   `;
 }
 
-function buildNumericQuartileMarkersHtml(item, numberUnit = '', groupLabel = '') {
-  const statMarkers = [
-    { key: 'q1', label: 'Q1', tooltipLabel: 'Q1 (하위 25%)', value: item.q1, leftPct: getNumericValueLeftPct(item.q1, item.domainMin, item.domainMax) },
-    { key: 'median', label: 'Q2', tooltipLabel: 'Q2 (중앙값)', value: item.median, leftPct: getNumericValueLeftPct(item.median, item.domainMin, item.domainMax) },
-    { key: 'q3', label: 'Q3', tooltipLabel: 'Q3 (상위 25%)', value: item.q3, leftPct: getNumericValueLeftPct(item.q3, item.domainMin, item.domainMax) }
-  ];
-  return statMarkers.map(stat => {
-    if (stat.leftPct === null) return '';
-    const tip = encodeURIComponent(JSON.stringify({
-      kind: 'numeric-quartile',
-      groupLabel,
-      label: stat.label,
-      tooltipLabel: stat.tooltipLabel,
-      value: stat.value,
-      unit: numberUnit
-    }));
-    return `
-      <div class="numeric-open-stat-marker" style="left:${stat.leftPct}%;">
-        <div class="numeric-open-stat-label" data-tip="${tip}">${stat.label}</div>
-      </div>
-    `;
-  }).join('');
-}
-
+/**
+ * 차트·표·컨트롤 등 화면용 HTML 조각을 생성합니다.
+ */
 function buildIntegerBoxAxisHtml(domainMin, domainMax) {
   const n = domainMax - domainMin + 1;
   if (n <= 0) return '';
@@ -5227,6 +5365,9 @@ function buildIntegerBoxAxisHtml(domainMin, domainMax) {
   }).join('');
 }
 
+/**
+ * 숫자/시간 개방형 문항 차트·축·표 HTML을 생성합니다.
+ */
 function buildNumericBoxAxisHtml(domainMin, domainMax, fmtValue = (v, digits = 2) => formatNumericValue(v, digits)) {
   const range = domainMax - domainMin;
   if (!Number.isFinite(range) || range <= 0) {
@@ -5262,11 +5403,17 @@ function buildNumericBoxAxisHtml(domainMin, domainMax, fmtValue = (v, digits = 2
   }).join('');
 }
 
+/**
+ * 단일 척도 문항 분포·축·범례·표 HTML을 생성합니다.
+ */
 function buildScaleBottomAxisHtml(maxScore) {
   const safeMaxScore = Number.isFinite(Number(maxScore)) && Number(maxScore) >= 1 ? Math.round(Number(maxScore)) : 5;
   return `<div class="chart-bottom-axis">${buildIntegerBoxAxisHtml(1, safeMaxScore)}</div>`;
 }
 
+/**
+ * 숫자/시간 개방형 문항 차트·축·표 HTML을 생성합니다.
+ */
 function buildNumericBoundaryAxisLabelsHtml(bins, domainMax, className, fmtValue = (v, digits = 2) => formatNumericValue(v, digits)) {
   const safeBins = Array.isArray(bins) ? bins : [];
   const boundaryValues = safeBins.map(bin => bin.start).concat([domainMax]);
@@ -5281,6 +5428,9 @@ function buildNumericBoundaryAxisLabelsHtml(bins, domainMax, className, fmtValue
   }).join('');
 }
 
+/**
+ * 숫자/시간 개방형 문항 차트·축·표 HTML을 생성합니다.
+ */
 function buildNumericHistogramChartHtml(histogram, options = {}) {
   const {
     groupLabel = '',
@@ -5365,6 +5515,9 @@ function buildNumericHistogramChartHtml(histogram, options = {}) {
   `;
 }
 
+/**
+ * 숫자/시간 개방형 문항 차트·축·표 HTML을 생성합니다.
+ */
 function buildNumericOpenBoxChartHtml(data) {
   const isTimeMinutes = isTimeMinutesEntry(data.codebookEntry);
   const fmtValue = getNumericOpenValueFormatter(data.codebookEntry);
@@ -5384,6 +5537,9 @@ function buildNumericOpenBoxChartHtml(data) {
   `;
 }
 
+/**
+ * 여러 척도 문항 비교 표/차트 HTML을 생성합니다.
+ */
 function buildScaleCompareGroupedMeanDotHtml(group, point, maxScore) {
   if (!point || point.n <= 0) return '';
   const left = getScaleMeanLeftPct(point.mean, maxScore);
@@ -5408,6 +5564,9 @@ function buildScaleCompareGroupedMeanDotHtml(group, point, maxScore) {
   `;
 }
 
+/**
+ * 여러 척도 문항 비교 표/차트 HTML을 생성합니다.
+ */
 function buildScaleCompareOverallGroupedMeanDotHtml(question, maxScore) {
   const left = getScaleMeanLeftPct(question.mean, maxScore);
   if (left === null) return '';
@@ -5431,6 +5590,9 @@ function buildScaleCompareOverallGroupedMeanDotHtml(question, maxScore) {
   `;
 }
 
+/**
+ * 숫자/시간 개방형 문항 차트·축·표 HTML을 생성합니다.
+ */
 function buildNumericOpenGroupChartHtml(data, hiddenGroups) {
   const displayGroups = getDisplayGroupResults(data.groupResults, hiddenGroups);
   if (displayGroups.length === 0) {
@@ -5490,6 +5652,9 @@ function buildNumericOpenGroupChartHtml(data, hiddenGroups) {
   `;
 }
 
+/**
+ * 서술형 문항 응답 텍스트를 수집·요약합니다.
+ */
 function aggregateTextOpen(targetLabel, rowIndexes = []) {
   const entry = resultState.codebookByLabel.get(targetLabel);
   if (!entry) return null;
@@ -5514,6 +5679,9 @@ function aggregateTextOpen(targetLabel, rowIndexes = []) {
   };
 }
 
+/**
+ * 결과 패널에서 문항별 섹션(차트+표) HTML을 생성합니다.
+ */
 function buildTextOpenSection(data) {
   if (!data) return '';
   const { codebookEntry, targetLabel, responses, totalN } = data;
@@ -5548,6 +5716,9 @@ function buildTextOpenSection(data) {
   `;
 }
 
+/**
+ * 숫자/시간 개방형 문항 차트·축·표 HTML을 생성합니다.
+ */
 function buildNumericOpenSection(data) {
   if (!data) return '';
   const { codebookEntry, targetLabel, groupResults } = data;
@@ -5590,6 +5761,9 @@ function buildNumericOpenSection(data) {
   `;
 }
 
+/**
+ * 단일 척도 문항 분포·축·범례·표 HTML을 생성합니다.
+ */
 function buildScaleGroupRowHtml(group, maxScore, viewMode, hideMidpoint) {
   const meanTip = {
     kind: 'scale-mean',
@@ -5611,6 +5785,9 @@ function buildScaleGroupRowHtml(group, maxScore, viewMode, hideMidpoint) {
   `;
 }
 
+/**
+ * 단일 척도 문항 분포·축·범례·표 HTML을 생성합니다.
+ */
 function buildDerivedScaleGroupRowHtml(group, scoreRange, viewMode) {
   const chartData = {
     values: group.values || [],
@@ -5636,6 +5813,9 @@ function buildDerivedScaleGroupRowHtml(group, scoreRange, viewMode) {
   `;
 }
 
+/**
+ * 단일 척도 문항 분포·축·범례·표 HTML을 생성합니다.
+ */
 function buildScaleGroupChartHtml(data, hiddenGroups, viewMode) {
   const displayGroups = getDisplayGroupResults(data.groupResults, hiddenGroups);
   const maxScore = data.scoreRange.length;
@@ -5680,6 +5860,9 @@ function buildScaleGroupChartHtml(data, hiddenGroups, viewMode) {
   `;
 }
 
+/**
+ * 단일 척도 문항 분포·축·범례·표 HTML을 생성합니다.
+ */
 function buildScaleChartHtml(data, hiddenGroups, viewMode, chartType = 'bar_horizontal_100') {
   const maxScore = data.scoreRange.length;
   const hideMidpoint = isScaleMidpointHidden(data.targetLabel);
@@ -5697,6 +5880,9 @@ function buildScaleChartHtml(data, hiddenGroups, viewMode, chartType = 'bar_hori
   return `<div class="scale-chart">${chartHtml}</div>`;
 }
 
+/**
+ * 단일 척도 문항 분포·축·범례·표 HTML을 생성합니다.
+ */
 function buildDerivedScaleDataTableHtml(data, hiddenGroups = new Set()) {
   if (!data.groupResults) {
     const tableHtml = `
@@ -5763,6 +5949,9 @@ function buildDerivedScaleDataTableHtml(data, hiddenGroups = new Set()) {
   return wrapResultTable(tableHtml);
 }
 
+/**
+ * 단일 척도 문항 분포·축·범례·표 HTML을 생성합니다.
+ */
 function buildScaleDataTableHtml(data, hiddenGroups = new Set()) {
   if (data.isDerivedScale) return buildDerivedScaleDataTableHtml(data, hiddenGroups);
   if (!data.groupResults) {
@@ -5845,6 +6034,9 @@ function buildScaleDataTableHtml(data, hiddenGroups = new Set()) {
   return wrapResultTable(tableHtml);
 }
 
+/**
+ * 숫자/시간 개방형 문항 차트·축·표 HTML을 생성합니다.
+ */
 function buildNumericOpenDataTableHtml(data, hiddenGroups = new Set()) {
   const unit = data.codebookEntry && data.codebookEntry.numberUnit ? data.codebookEntry.numberUnit : "";
   const rows = data.groupResults
@@ -5913,6 +6105,9 @@ function buildNumericOpenDataTableHtml(data, hiddenGroups = new Set()) {
   return wrapResultTable(tableHtml);
 }
 
+/**
+ * 결과 데이터 테이블 HTML을 생성합니다.
+ */
 function buildDataTableHtml(data, hiddenGroups = new Set(), noteHtml = '') {
   if (data.visualType === 'rank') return buildRankDataTableHtml(data, hiddenGroups);
   if (data.visualType === 'scale') return buildScaleDataTableHtml(data, hiddenGroups);
@@ -5927,6 +6122,9 @@ function buildDataTableHtml(data, hiddenGroups = new Set(), noteHtml = '') {
 
 // 원 문항 라벨에서 순위별 expanded 컬럼 목록을 찾는다
 // pattern: `${targetLabel}__N순위` 또는 `${targetLabel}_N순위`
+/**
+ * 순위 문항의 확장(세분) 열 인덱스를 찾습니다.
+ */
 function findRankExpandedColumns(targetLabel) {
   const headerMap = filterState.headerMap;
   if (!headerMap) return [];
@@ -5946,6 +6144,9 @@ function findRankExpandedColumns(targetLabel) {
     .sort((a, b) => a.rank - b.rank);
 }
 
+/**
+ * 순위 문항을 기준별로 순위 분포를 집계합니다.
+ */
 function aggregateRank(targetLabel, criterionLabel, rows) {
   const entry = resultState.codebookByLabel.get(targetLabel);
   if (!entry) return null;
@@ -6167,15 +6368,24 @@ function aggregateRank(targetLabel, criterionLabel, rows) {
   };
 }
 
+/**
+ * 순위 결과 차트 유형을 반환합니다.
+ */
 function getRankChartType(targetLabel) {
   const stored = resultState.rankChartTypes.get(targetLabel);
   return RANK_CHART_TYPES.includes(stored) ? stored : 'lollipop';
 }
 
+/**
+ * 순위 정렬이 점수 기준인지 여부/설정을 반환합니다.
+ */
 function getRankSortByScore(targetLabel) {
   return !!resultState.rankSortByScore.get(targetLabel);
 }
 
+/**
+ * 순위 집계 데이터에 정렬 옵션을 적용합니다.
+ */
 function applyRankSortToData(data, sortByScore) {
   if (!sortByScore || !data) return data;
   const pinned = data.totalResults.filter(r => isPinnedSortOption(r.option));
@@ -6193,6 +6403,9 @@ function applyRankSortToData(data, sortByScore) {
   };
 }
 
+/**
+ * 순위형 문항 차트·범례·표·컨트롤 HTML을 생성합니다.
+ */
 function buildRankControlsHtml(targetLabel, options = {}) {
   const {
     chartType = 'lollipop',
@@ -6262,25 +6475,9 @@ function buildRankControlsHtml(targetLabel, options = {}) {
   return `<div class="viz-controls">${directionHtml}${chartTypeHtml}${sortHtml}${formulaNoteHtml}</div>`;
 }
 
-function buildRankSummaryHtml(data) {
-  if (!data.ranking || data.ranking.length === 0) return '';
-  const tokens = data.ranking.map((r, i) => {
-    const prev = i > 0 ? data.ranking[i - 1] : null;
-    const sepHtml = prev
-      ? `<span class="rank-sep">${prev.position === r.position ? '=' : '&gt;'}</span>`
-      : '';
-    return `${sepHtml}<span class="rank-token"><span class="rank-pos">${r.position}위</span><span class="rank-opt">${escapeHtml(r.option)}</span></span>`;
-  }).join('');
-  return `
-    <div class="rank-summary">
-      <div class="rank-summary-line">
-        <div class="rank-summary-title">종합 순위</div>
-        <div>${tokens}</div>
-      </div>
-    </div>
-  `;
-}
-
+/**
+ * 순위형 문항 차트·범례·표·컨트롤 HTML을 생성합니다.
+ */
 function buildRankFormulaNoteHtml(data) {
   return `
     <div class="viz-controls-note">
@@ -6289,6 +6486,9 @@ function buildRankFormulaNoteHtml(data) {
   `;
 }
 
+/**
+ * 순위형 문항 차트·범례·표·컨트롤 HTML을 생성합니다.
+ */
 function buildRankLollipopChartHtml(data) {
   const rows = [...(data.totalResults || [])];
   const axisMin = 0;
@@ -6300,7 +6500,7 @@ function buildRankLollipopChartHtml(data) {
     if (axisMax === axisMin) return 0;
     return ((safeValue - axisMin) / (axisMax - axisMin)) * 100;
   };
-  const overlayHeight = rows.length * 40 - 8;
+  const overlayHeight = rows.length * 40;
   const guideOverlayHtml = axisTicks.map(tick => {
     const tickPct = pctFor(tick);
     return `<span class="horizontal-chart-guide" style="left:${tickPct}%;"></span>`;
@@ -6350,6 +6550,9 @@ function buildRankLollipopChartHtml(data) {
   `;
 }
 
+/**
+ * 순위형 문항 차트·범례·표·컨트롤 HTML을 생성합니다.
+ */
 function buildRankLollipopGroupCompareChartHtml(data, hiddenGroups = new Set()) {
   const rows = [...(data.totalResults || [])];
   const axisMin = 0;
@@ -6362,7 +6565,7 @@ function buildRankLollipopGroupCompareChartHtml(data, hiddenGroups = new Set()) 
     return ((safeValue - axisMin) / (axisMax - axisMin)) * 100;
   };
   const displayGroups = getDisplayGroupResults(data.groupResults, hiddenGroups);
-  const overlayHeight = rows.length * 40 - 8;
+  const overlayHeight = rows.length * 40;
   const guideOverlayHtml = axisTicks.map(tick => {
     const tickPct = pctFor(tick);
     return `<span class="horizontal-chart-guide" style="left:${tickPct}%;"></span>`;
@@ -6423,6 +6626,9 @@ function buildRankLollipopGroupCompareChartHtml(data, hiddenGroups = new Set()) 
   `;
 }
 
+/**
+ * 순위형 문항 차트·범례·표·컨트롤 HTML을 생성합니다.
+ */
 function buildRankDualLollipopChartHtml(data, hiddenGroups = new Set()) {
   const rows = [...(data.totalResults || [])];
   const axisMin = 0;
@@ -6438,7 +6644,7 @@ function buildRankDualLollipopChartHtml(data, hiddenGroups = new Set()) {
   const trackH = 32;
   const trackGap = 4;
   const rowGap = 16;
-  const overlayHeight = rows.length * (displayGroups.length * trackH + (displayGroups.length - 1) * trackGap) + (rows.length - 1) * rowGap;
+  const overlayHeight = rows.length * (displayGroups.length * trackH + (displayGroups.length - 1) * trackGap) + (rows.length - 1) * rowGap + 8;
   const guideOverlayHtml = axisTicks.map(tick => {
     const tickPct = pctFor(tick);
     return `<span class="horizontal-chart-guide" style="left:${tickPct}%;"></span>`;
@@ -6500,6 +6706,9 @@ function buildRankDualLollipopChartHtml(data, hiddenGroups = new Set()) {
   `;
 }
 
+/**
+ * 순위형 문항 차트·범례·표·컨트롤 HTML을 생성합니다.
+ */
 function buildRankVerticalAxisMeta(maxValue, step, suffix = '') {
   const safeStep = Math.max(1, Number(step) || 1);
   const safeMax = Math.max(safeStep, Number(maxValue) || 0);
@@ -6516,6 +6725,9 @@ function buildRankVerticalAxisMeta(maxValue, step, suffix = '') {
   return { topValue, ticks };
 }
 
+/**
+ * 순위형 문항 차트·범례·표·컨트롤 HTML을 생성합니다.
+ */
 function buildRankVerticalLollipopChartHtml(data) {
   const rows = [...(data.totalResults || [])];
   const n = rows.length;
@@ -6578,6 +6790,9 @@ function buildRankVerticalLollipopChartHtml(data) {
   `;
 }
 
+/**
+ * 순위형 문항 차트·범례·표·컨트롤 HTML을 생성합니다.
+ */
 function buildRankStackChartHtml(data, hiddenRanks) {
   const rows = [...(data.totalResults || [])];
   const rankLabels = data.rankLabels;
@@ -6616,7 +6831,7 @@ function buildRankStackChartHtml(data, hiddenRanks) {
       </div>
     `;
   }).join('');
-  const overlayHeight = rows.length * 40 - 8;
+  const overlayHeight = rows.length * 40;
   const guideHtml = [0, 20, 40, 60, 80, 100].map(t => `<span class="horizontal-chart-guide" style="left:${t}%;"></span>`).join('');
   const axisHtml = [20, 40, 60, 80, 100].map(t =>
     `<span class="horizontal-chart-axis-label" style="left:${t}%;">${t}%</span>`
@@ -6634,6 +6849,9 @@ function buildRankStackChartHtml(data, hiddenRanks) {
   `;
 }
 
+/**
+ * 순위형 문항 차트·범례·표·컨트롤 HTML을 생성합니다.
+ */
 function buildRankVerticalStackChartHtml(data, hiddenRanks) {
   const rows = [...(data.totalResults || [])];
   const n = rows.length;
@@ -6710,6 +6928,9 @@ function buildRankVerticalStackChartHtml(data, hiddenRanks) {
   `;
 }
 
+/**
+ * 순위형 문항 차트·범례·표·컨트롤 HTML을 생성합니다.
+ */
 function buildRankLegendHtml(data, hiddenRanks) {
   const items = data.rankLabels.map((lab, ri) => {
     const isHidden = hiddenRanks.has(ri);
@@ -6735,6 +6956,9 @@ function buildRankLegendHtml(data, hiddenRanks) {
   `;
 }
 
+/**
+ * 순위형 문항 차트·범례·표·컨트롤 HTML을 생성합니다.
+ */
 function buildRankGroupLegendHtml(data, hiddenGroups, opts = {}) {
   if (!data.groupResults) return '';
   const { showDualBar = false, isDualBar = false } = opts;
@@ -6758,57 +6982,9 @@ function buildRankGroupLegendHtml(data, hiddenGroups, opts = {}) {
   `;
 }
 
-function buildRankGroupTextHtml(data, hiddenGroups) {
-  if (!data.groupResults) return '';
-  const displayGroups = data.groupResults.filter(g => !hiddenGroups.has(g.value));
-  if (displayGroups.length === 0) return '';
-  const groupedRankings = displayGroups.map(g => {
-    const groups = [];
-    (g.ranking || []).forEach(item => {
-      const last = groups[groups.length - 1];
-      if (last && last.position === item.position) {
-        last.items.push(item);
-      } else {
-        groups.push({ position: item.position, items: [item] });
-      }
-    });
-    return { group: g, rankGroups: groups };
-  });
-  const displayRankCount = groupedRankings.reduce((max, entry) => Math.max(max, entry.rankGroups.length), 0);
-  const headCells = [
-    `<th>그룹</th>`,
-    ...Array.from({ length: displayRankCount }, (_, i) => `<th>${i + 1}위</th>`)
-  ].join('');
-  const bodyRows = groupedRankings.map(({ group, rankGroups }) => {
-    const rankCells = Array.from({ length: displayRankCount }, (_, i) => {
-      const rankGroup = rankGroups[i];
-      const label = rankGroup
-        ? rankGroup.items.map(item => escapeHtml(item.option)).join(' / ')
-        : '-';
-      return `<td>${label}</td>`;
-    }).join('');
-    return `
-      <tr>
-        <td class="group-name">${escapeHtml(group.label)}</td>
-        ${rankCells}
-      </tr>
-    `;
-  }).join('');
-  return `
-    <div class="rank-group-panel">
-      <div class="rank-group-heading">
-        <div class="rank-summary-title">그룹별 순위</div>
-      </div>
-      <div class="rank-group-table-wrap">
-        <table class="rank-group-table">
-          <thead><tr>${headCells}</tr></thead>
-          <tbody>${bodyRows}</tbody>
-        </table>
-      </div>
-    </div>
-  `;
-}
-
+/**
+ * 순위 데이터에서 1순위 비율 행만 추려 반환합니다.
+ */
 function getRankFirstChoiceRows(data) {
   if (!data || !Array.isArray(data.totalResults)) return [];
   const order = Array.isArray(data.optionOrder) ? data.optionOrder : [];
@@ -6830,6 +7006,9 @@ function getRankFirstChoiceRows(data) {
     });
 }
 
+/**
+ * 특정 그룹·선택지의 1순위 비율을 반환합니다.
+ */
 function getRankFirstChoiceForGroup(group, option) {
   const perOpt = group && Array.isArray(group.perOption)
     ? group.perOption.find(x => x.option === option)
@@ -6843,41 +7022,9 @@ function getRankFirstChoiceForGroup(group, option) {
   };
 }
 
-function buildRankFirstChoiceGroupCompareChartHtml(data, hiddenGroups) {
-  const rows = getRankFirstChoiceRows(data);
-  if (rows.length === 0) return '';
-
-  const rowHtml = rows.map(r => {
-    const pct = Math.max(0, Math.min(100, r.pct));
-    const widthStr = `${pct}%`;
-    const valueClass = pct >= HBAR_INSIDE_VALUE_THRESHOLD ? 'single-hbar-outside-value is-inside' : 'single-hbar-outside-value';
-    const labelTip = encodeURIComponent(JSON.stringify({
-      kind: 'option-label',
-      option: r.option
-    }));
-    const tip = encodeURIComponent(JSON.stringify({
-      kind: 'compare-bar',
-      option: r.option,
-      pct: r.pct,
-      count: r.count
-    }));
-    const valueHtml = `<span class="${valueClass}" style="left:${widthStr};">${formatPercent(r.pct)}</span>`;
-    return `
-      <div class="single-hbar-row">
-        <div class="single-hbar-label" title="${escapeHtml(r.option)}" data-tip="${labelTip}">${escapeHtml(r.option)}</div>
-        <div class="single-hbar-track">
-          <div class="single-hbar-fill"
-               style="width:${widthStr}; background:${COMPARE_BAR_COLOR};"
-               data-tip="${tip}"></div>
-          ${valueHtml}
-        </div>
-      </div>
-    `;
-  }).join('');
-
-  return `<div class="single-hbar-chart group-compare rank-first-compare">${rowHtml}</div>`;
-}
-
+/**
+ * 순위형 문항 차트·범례·표·컨트롤 HTML을 생성합니다.
+ */
 function buildRankDataTableHtml(data, hiddenGroups = new Set()) {
   const { totalResults, rankLabels, groupResults, respondentN } = data;
   if (!groupResults) {
@@ -7017,10 +7164,16 @@ function buildRankDataTableHtml(data, hiddenGroups = new Set()) {
 
 /* ---------- 순위형 1순위만 보기 ---------- */
 
+/**
+ * 1순위 합성 문항 표시용 라벨을 만듭니다.
+ */
 function getRank1stSyntheticLabel(targetLabel) {
   return `${targetLabel}__rank1st`;
 }
 
+/**
+ * 1순위만 단일선택처럼 집계합니다.
+ */
 function aggregateRank1stSingle(targetLabel, criterionLabel, rows) {
   const entry = resultState.codebookByLabel.get(targetLabel);
   if (!entry) return null;
@@ -7042,6 +7195,9 @@ function aggregateRank1stSingle(targetLabel, criterionLabel, rows) {
   };
 }
 
+/**
+ * 순위형 문항 차트·범례·표·컨트롤 HTML을 생성합니다.
+ */
 function buildRankSection(data, rows) {
   if (resultState.rank1stCardOpen.has(data.targetLabel)) {
     const rank1stData = aggregateRank1stSingle(data.targetLabel, data.criterionLabel, rows);
@@ -7112,6 +7268,9 @@ function buildRankSection(data, rows) {
 }
 
 /* ---------- 기타 응답 모음 ---------- */
+/**
+ * 기타 서술형 응답 열 인덱스를 찾습니다.
+ */
 function findOtherTextColumnIndex(targetLabel) {
   const header = filterState.rows && filterState.rows[0] ? filterState.rows[0] : [];
   if (!Array.isArray(header) || header.length === 0) return undefined;
@@ -7134,26 +7293,9 @@ function findOtherTextColumnIndex(targetLabel) {
   return undefined;
 }
 
-function buildOtherResponsesHtml(targetLabel, rows) {
-  const entry = resultState.codebookByLabel.get(targetLabel);
-  if (!entry || !entry.otherInput) return "";
-  const textIdx = findOtherTextColumnIndex(targetLabel);
-  if (textIdx === undefined) return "";
-  const texts = [];
-  rows.forEach(row => {
-    const text = cleanCell((row || [])[textIdx]);
-    if (text) texts.push(text);
-  });
-  if (texts.length === 0) return "";
-  const listHtml = texts.map(text => `<li>${escapeHtml(text)}</li>`).join("");
-  return `
-    <div class="other-response-box">
-      <div class="other-response-title">기타 응답<span class="other-response-count">${texts.length}건</span></div>
-      <ul class="other-response-list">${listHtml}</ul>
-    </div>
-  `;
-}
-
+/**
+ * 기타 서술형 응답 텍스트 목록을 수집합니다.
+ */
 function getOtherResponseTexts(targetLabel, rows) {
   const entry = resultState.codebookByLabel.get(targetLabel);
   if (!entry || !entry.otherInput) return [];
@@ -7167,6 +7309,9 @@ function getOtherResponseTexts(targetLabel, rows) {
   return texts;
 }
 
+/**
+ * 모달을 열고 초기 상태를 채웁니다.
+ */
 function openOtherResponsesModal(targetLabel, event) {
   const modal = document.getElementById('other-response-modal');
   const panel = modal ? modal.querySelector('.modal') : null;
@@ -7201,6 +7346,9 @@ function openOtherResponsesModal(targetLabel, event) {
   });
 }
 
+/**
+ * 모달을 닫고 포커스를 복구합니다.
+ */
 function closeOtherResponsesModal() {
   const modal = document.getElementById('other-response-modal');
   const panel = modal ? modal.querySelector('.modal') : null;
@@ -7211,6 +7359,9 @@ function closeOtherResponsesModal() {
   if (modal) modal.classList.remove('show');
 }
 
+/**
+ * 모달 DOM 이벤트와 키보드 접근성을 연결합니다.
+ */
 function setupOtherResponseModal() {
   const modal = document.getElementById('other-response-modal');
   const closeBtn = document.getElementById('close-other-response-btn');
@@ -7226,6 +7377,9 @@ function setupOtherResponseModal() {
   });
 }
 
+/**
+ * 모달을 열고 초기 상태를 채웁니다.
+ */
 function openScaleCompareModal(targetLabel) {
   const modal = document.getElementById('scale-compare-modal');
   const titleEl = document.getElementById('scale-compare-modal-title');
@@ -7258,6 +7412,9 @@ function openScaleCompareModal(targetLabel) {
   modal.classList.add('show');
 }
 
+/**
+ * 모달을 닫고 포커스를 복구합니다.
+ */
 function closeScaleCompareModal() {
   const modal = document.getElementById('scale-compare-modal');
   const listEl = document.getElementById('scale-compare-modal-list');
@@ -7267,6 +7424,9 @@ function closeScaleCompareModal() {
   modal.classList.remove('show');
 }
 
+/**
+ * 모달에서 확인한 선택을 상태에 반영합니다.
+ */
 function applyScaleCompareModalSelection() {
   const modal = document.getElementById('scale-compare-modal');
   const listEl = document.getElementById('scale-compare-modal-list');
@@ -7281,6 +7441,9 @@ function applyScaleCompareModalSelection() {
   renderResults();
 }
 
+/**
+ * 모달 DOM 이벤트와 키보드 접근성을 연결합니다.
+ */
 function setupScaleCompareModal() {
   const modal = document.getElementById('scale-compare-modal');
   const closeBtn = document.getElementById('close-scale-compare-btn');
@@ -7302,32 +7465,41 @@ function setupScaleCompareModal() {
 }
 
 /* ---------- 객관식 단일: 그래프 모양 / 정렬 컨트롤 ---------- */
+/**
+ * 단일선택 결과의 차트 유형(파이/스택 등)을 반환합니다.
+ */
 function getSingleChoiceChartType(targetLabel) {
   const stored = resultState.singleChoiceChartTypes.get(targetLabel);
   const fallback = 'bar_horizontal';
   return CHOICE_CHART_TYPES.includes(stored) ? stored : fallback;
 }
 
+/**
+ * 척도 결과 차트 유형을 반환합니다.
+ */
 function getScaleChartType(targetLabel) {
   const stored = resultState.scaleChartTypes.get(targetLabel);
   return SCALE_CHART_TYPES.includes(stored) ? stored : 'bar_horizontal_100';
 }
 
+/**
+ * 비율 배분 결과 차트 유형을 반환합니다.
+ */
 function getRatioChartType(targetLabel) {
   const stored = resultState.ratioChartTypes.get(targetLabel);
   return RATIO_CHART_TYPES.includes(stored) ? stored : 'bar_horizontal_100';
 }
 
-function getChoiceBarChartType(targetLabel) {
-  const stored = resultState.choiceBarChartTypes.get(targetLabel);
-  const fallback = 'bar_horizontal';
-  return CHOICE_BAR_CHART_TYPES.includes(stored) ? stored : fallback;
-}
-
+/**
+ * 단일선택 막대 정렬이 응답률 기준인지 반환합니다.
+ */
 function getSingleChoiceSortByRate(targetLabel) {
   return !!resultState.singleChoiceSortByRate.get(targetLabel);
 }
 
+/**
+ * 단일선택 데이터에 정렬 옵션을 적용합니다.
+ */
 function applyChoiceSortToData(data, sortByRate) {
   if (!sortByRate || !data) return data;
   const pinned = data.totalResults.filter(r => isPinnedSortOption(r.option));
@@ -7356,12 +7528,18 @@ function applyChoiceSortToData(data, sortByRate) {
   };
 }
 
+/**
+ * 선택지별 팔레트 색을 반환합니다.
+ */
 function getOptionPaletteColor(data, option) {
   const baseOrder = data.originalOptionOrder || data.optionOrder || [];
   const idx = baseOrder.indexOf(option);
   return GROUP_PALETTE[(idx < 0 ? 0 : idx) % GROUP_PALETTE.length];
 }
 
+/**
+ * 단일·다중 선택 문항용 컨트롤·차트·표 HTML을 생성합니다.
+ */
 function buildChoiceControlsHtml(targetLabel, options) {
   const {
     showChartType = false,
@@ -7417,6 +7595,9 @@ function buildChoiceControlsHtml(targetLabel, options) {
 }
 
 /* ---------- 객관식 단일: 세로 막대 차트 ---------- */
+/**
+ * 단일·다중 선택 문항용 컨트롤·차트·표 HTML을 생성합니다.
+ */
 function buildSingleChoiceVerticalBarChartHtml(data) {
   const rows = data.totalResults;
   const maxPctValue = rows.reduce((max, row) => Math.max(max, row.pct || 0), 0);
@@ -7466,6 +7647,9 @@ function buildSingleChoiceVerticalBarChartHtml(data) {
 }
 
 /* ---------- 객관식 단일: 가로 100% 누적 - 그룹별 ---------- */
+/**
+ * 그룹 간 비교(가로/세로 막대 등) HTML을 생성합니다.
+ */
 function buildGroupCompareStack100ChartHtml(data, hiddenGroups = new Set()) {
   const displayGroups = getDisplayGroupResults(data.groupResults, hiddenGroups);
   const options = data.totalResults || [];
@@ -7513,6 +7697,9 @@ function buildGroupCompareStack100ChartHtml(data, hiddenGroups = new Set()) {
   `;
 }
 
+/**
+ * 100% 스택 막대 등 누적 비교 HTML을 생성합니다.
+ */
 function buildStack100GroupLegendHtml(data, hiddenGroups) {
   const options = data.totalResults || [];
   const optionItems = options.map((opt, i) => {
@@ -7543,6 +7730,9 @@ function buildStack100GroupLegendHtml(data, hiddenGroups) {
 }
 
 /* ---------- 객관식 단일: 가로 100% 누적 ---------- */
+/**
+ * 100% 스택 막대 등 누적 비교 HTML을 생성합니다.
+ */
 function buildStacked100ChartHtml(data) {
   const rows = data.totalResults;
   const widths = rows.map(row => Math.max(0, Math.min(100, row.pct)));
@@ -7581,6 +7771,9 @@ function buildStacked100ChartHtml(data) {
   `;
 }
 
+/**
+ * 단일·다중 선택 문항용 컨트롤·차트·표 HTML을 생성합니다.
+ */
 function buildChoiceOptionLegendHtml(data) {
   const baseOrder = data.originalOptionOrder || data.optionOrder || [];
   const rowsByOption = new Map((data.totalResults || []).map(row => [row.option, row]));
@@ -7606,6 +7799,9 @@ function buildChoiceOptionLegendHtml(data) {
 
 /* ---------- 원/파이 공통 렌더러 ---------- */
 // rows: [{ label, pct, count, color }]
+/**
+ * 파이 차트 SVG/HTML을 생성합니다.
+ */
 function buildPieChartFromRows(rows) {
   const cx = 140, cy = 140, r = 140;
   const visibleRows = rows.filter(row => (row.pct || 0) > 0);
@@ -7681,6 +7877,9 @@ function buildPieChartFromRows(rows) {
 }
 
 /* ---------- 객관식 단일: 원/파이 ---------- */
+/**
+ * 파이 차트 SVG/HTML을 생성합니다.
+ */
 function buildPieChartHtml(data) {
   const rows = (data.totalResults || []).map((row) => ({
     label: row.option,
@@ -7692,6 +7891,9 @@ function buildPieChartHtml(data) {
 }
 
 /* ---------- 객관식 척도: 원/파이 ---------- */
+/**
+ * 단일 척도 문항 분포·축·범례·표 HTML을 생성합니다.
+ */
 function buildScalePieChartHtml(data) {
   const maxScore = data.scoreRange.length;
   const rows = (data.scoreResults || []).map(result => ({
@@ -7704,6 +7906,9 @@ function buildScalePieChartHtml(data) {
 }
 
 /* ---------- 주관식 비율 배분: 원/파이 ---------- */
+/**
+ * 비율 배분 문항 차트·스택·표 HTML을 생성합니다.
+ */
 function buildRatioAllocationPieChartHtml(data) {
   const rows = (data.totalResults || []).map((result, index) => ({
     label: result.option,
@@ -7715,6 +7920,9 @@ function buildRatioAllocationPieChartHtml(data) {
 }
 
 /* ---------- 주관식 비율 배분: 파이 뷰 범례 ---------- */
+/**
+ * 비율 배분 문항 차트·스택·표 HTML을 생성합니다.
+ */
 function buildRatioAllocationItemLegendHtml(data) {
   const items = (data.totalResults || []).map((result, index) => `
     <div class="legend-item is-static">
@@ -7729,6 +7937,9 @@ function buildRatioAllocationItemLegendHtml(data) {
   `;
 }
 
+/**
+ * 단일·다중 선택 문항용 컨트롤·차트·표 HTML을 생성합니다.
+ */
 function buildSingleChoiceChartByType(data, chartType) {
   if (chartType === 'bar_vertical') return buildSingleChoiceVerticalBarChartHtml(data);
   if (chartType === 'bar_horizontal_100') return buildStacked100ChartHtml(data);
@@ -7736,6 +7947,9 @@ function buildSingleChoiceChartByType(data, chartType) {
   return buildBasicChartHtml(data);
 }
 
+/**
+ * 필요 시 DOM 요소/전역 훅을 한 번만 생성·초기화합니다.
+ */
 function ensureGroupConfigModal() {
   let modal = document.getElementById('group-config-modal');
   if (modal) return modal;
@@ -7769,14 +7983,23 @@ function ensureGroupConfigModal() {
   return document.getElementById('group-config-modal');
 }
 
+/**
+ * 그룹 정의 배열을 깊은 복사합니다.
+ */
 function cloneGroupDefs(defs) {
   return Array.isArray(defs) ? defs.map(def => ({ ...def })) : [];
 }
 
+/**
+ * 응답→그룹 배정 맵을 복제합니다.
+ */
 function cloneGroupAssignments(assignments) {
   return new Map(assignments ? Array.from(assignments.entries()) : []);
 }
 
+/**
+ * 새 그룹의 기본 표시 이름을 만듭니다.
+ */
 function getDefaultGroupName(defs) {
   const used = new Set((defs || []).map(def => String(def.name || '').trim()).filter(Boolean));
   let index = 1;
@@ -7784,6 +8007,9 @@ function getDefaultGroupName(defs) {
   return `그룹${index}`;
 }
 
+/**
+ * 모달에서 비교/저장할 그룹 설정 상태 객체를 만듭니다.
+ */
 function buildComparableGroupConfigState(defs, assignments) {
   const normalizedDefs = (defs || []).map((def, index) => ({
     id: String(def.id || ''),
@@ -7799,11 +8025,17 @@ function buildComparableGroupConfigState(defs, assignments) {
   });
 }
 
+/**
+ * 그룹 ID에 배정된 응답 값 목록을 반환합니다.
+ */
 function getGroupMembers(state, groupId) {
   if (!state || !groupId) return [];
   return (state.groupOptions || []).filter(option => state.draftAssignments.get(option.value) === groupId);
 }
 
+/**
+ * 편집 중인 그룹 색상을 반환합니다.
+ */
 function getDraftGroupColor(state, groupId) {
   if (!state || !groupId) return CUSTOM_GROUP_PALETTE[0];
   const defs = state.draftDefs || [];
@@ -7811,6 +8043,9 @@ function getDraftGroupColor(state, groupId) {
   return CUSTOM_GROUP_PALETTE[(index < 0 ? 0 : index) % CUSTOM_GROUP_PALETTE.length];
 }
 
+/**
+ * 그룹 이름 입력을 확정(트림·빈 이름 처리)합니다.
+ */
 function finalizeGroupConfigGroupName(state, groupId) {
   if (!state || !groupId) return;
   const target = (state.draftDefs || []).find(def => def.id === groupId);
@@ -7819,11 +8054,17 @@ function finalizeGroupConfigGroupName(state, groupId) {
   target.name = trimmed || getDefaultGroupName((state.draftDefs || []).filter(def => def.id !== groupId));
 }
 
+/**
+ * 저장 전 그룹 설정에 변경이 있는지 검사합니다.
+ */
 function hasGroupConfigChanges(state) {
   if (!state) return false;
   return buildComparableGroupConfigState(state.initialDefs, state.initialAssignments) !== buildComparableGroupConfigState(state.draftDefs, state.draftAssignments);
 }
 
+/**
+ * 그룹 이름 입력란에 포커스를 둡니다.
+ */
 function focusGroupConfigNameInput(state) {
   if (!state || !state.focusGroupId) return;
   const input = document.querySelector(`#group-config-list input[data-group-name-input="${CSS.escape(state.focusGroupId)}"]`);
@@ -7834,6 +8075,9 @@ function focusGroupConfigNameInput(state) {
   state.selectOnFocus = false;
 }
 
+/**
+ * 모달을 닫고 포커스를 복구합니다.
+ */
 function closeGroupConfigModal() {
   const modal = document.getElementById('group-config-modal');
   if (!modal) return;
@@ -7841,6 +8085,9 @@ function closeGroupConfigModal() {
   resultState.groupConfigModalState = null;
 }
 
+/**
+ * 같은 기준으로 묶인 결과 대상 문항 라벨들을 반환합니다.
+ */
 function getCurrentResultTargetLabelsForCustomGroup(criterionLabel) {
   if (!criterionLabel) return [];
   const targetLabels = getTargetChipLabels();
@@ -7854,12 +8101,18 @@ function getCurrentResultTargetLabelsForCustomGroup(criterionLabel) {
   });
 }
 
+/**
+ * 드래그 하이라이트 클래스를 제거합니다.
+ */
 function clearGroupConfigDropHighlight(root = document) {
   root.querySelectorAll('.group-config-group.is-drop-target').forEach(el => {
     el.classList.remove('is-drop-target');
   });
 }
 
+/**
+ * 사용자 정의 그룹 설정 모달 내용을 DOM에 그립니다.
+ */
 function renderGroupConfigModal() {
   const state = resultState.groupConfigModalState;
   const modal = ensureGroupConfigModal();
@@ -8082,6 +8335,9 @@ function renderGroupConfigModal() {
   setTimeout(() => focusGroupConfigNameInput(state), 0);
 }
 
+/**
+ * 모달을 열고 초기 상태를 채웁니다.
+ */
 function openGroupConfigModal(targetLabel, criterionLabel) {
   if (!targetLabel || !criterionLabel) return;
   const data = aggregateResultQuestion(targetLabel, criterionLabel, getFilteredLabelDataRows(), getFilteredValueDataRows(), getFilteredRowIndexes());
@@ -8122,6 +8378,9 @@ function openGroupConfigModal(targetLabel, criterionLabel) {
   modal.classList.add('show');
 }
 
+/**
+ * 모달 DOM 이벤트와 키보드 접근성을 연결합니다.
+ */
 function setupGroupConfigModal() {
   const modal = ensureGroupConfigModal();
   const closeBtn = document.getElementById('close-group-config-btn');
@@ -8422,6 +8681,9 @@ function buildCustomGroupData(data) {
   return { ...data, groupResults: mergedGroupResults, originalGroupResults: groupResults, isCustomGroupView: true };
 }
 
+/**
+ * 사용자 정의 그룹이 반영된 척도 비교 데이터를 만듭니다.
+ */
 function buildCustomScaleCompareData(compareData) {
   if (!compareData || !compareData.criterionLabel || !Array.isArray(compareData.groups) || compareData.groups.length === 0) return null;
   const defs = resultState.customGroupDefs.get(compareData.criterionLabel) || [];
@@ -8476,6 +8738,9 @@ function buildCustomScaleCompareData(compareData) {
   return { ...compareData, groups };
 }
 
+/**
+ * 이 결과 데이터에 사용자 정의 그룹 합산을 적용할지 판단합니다.
+ */
 function shouldApplyCustomGroup(data) {
   if (!data || !data.criterionLabel || !Array.isArray(data.groupResults) || data.groupResults.length === 0) return false;
   const defs = resultState.customGroupDefs.get(data.criterionLabel) || [];
@@ -8485,6 +8750,9 @@ function shouldApplyCustomGroup(data) {
 }
 
 
+/**
+ * 단일·다중 선택 문항용 컨트롤·차트·표 HTML을 생성합니다.
+ */
 function buildChoiceSectionHtml(data, rows) {
   if (!data) return '';
   const { codebookEntry, targetLabel, groupResults } = data;
@@ -8569,6 +8837,9 @@ function buildChoiceSectionHtml(data, rows) {
   `;
 }
 
+/**
+ * 단일 척도 문항 분포·축·범례·표 HTML을 생성합니다.
+ */
 function buildScaleSection(data, rows) {
   if (!data) return '';
   const { codebookEntry, targetLabel, groupResults } = data;
@@ -8611,6 +8882,9 @@ function buildScaleSection(data, rows) {
   `;
 }
 
+/**
+ * 여러 척도 문항 비교 표/차트 HTML을 생성합니다.
+ */
 function buildTargetScaleCompareSection(compareData) {
   if (!compareData || !compareData.baseData) return '';
   const customGroupOn = shouldApplyCustomGroup(compareData.baseData);
@@ -8652,6 +8926,9 @@ function buildTargetScaleCompareSection(compareData) {
   `;
 }
 
+/**
+ * 결과 패널에서 문항별 섹션(차트+표) HTML을 생성합니다.
+ */
 function buildResultSection(data, rows) {
   if (!data) return '';
   if (data.visualType === 'rank') return buildRankSection(data, rows);
@@ -8662,6 +8939,9 @@ function buildResultSection(data, rows) {
   return buildChoiceSectionHtml(data, rows);
 }
 
+/**
+ * 결과 패널에서 문항별 섹션(차트+표) HTML을 생성합니다.
+ */
 function buildUnsupportedSection(label, entry) {
   const fullText = buildQuestionFullHtml(entry);
   const typeText = entry ? entry.type : '알 수 없음';
@@ -8676,6 +8956,9 @@ function buildUnsupportedSection(label, entry) {
   `;
 }
 
+/**
+ * 필요 시 DOM 요소/전역 훅을 한 번만 생성·초기화합니다.
+ */
 async function ensureCodebookIndexLoaded() {
   if (resultState.codebookByLabel && resultState.codebookByLabel.size > 0) return;
   const currentId = sessionStorage.getItem('survey.currentId');
@@ -8689,6 +8972,9 @@ async function ensureCodebookIndexLoaded() {
   } catch (_) {}
 }
 
+/**
+ * 필터·선택 상태에 맞춰 전체 결과 패널을 다시 그립니다.
+ */
 async function renderResults() {
   const container = document.getElementById('result-container');
   if (!container) return;
@@ -8746,18 +9032,27 @@ async function renderResults() {
   addExportButtons(container);
 }
 
+/**
+ * 라벨 열 너비를 허용 범위로 클램프합니다.
+ */
 function clampVizLabelColWidth(value) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return null;
   return Math.max(VIZ_LABEL_COL_WIDTH_MIN, Math.min(VIZ_LABEL_COL_WIDTH_MAX, Math.round(numeric)));
 }
 
+/**
+ * 문항 라벨 열 너비를 localStorage에 저장할 키를 반환합니다.
+ */
 function getVizLabelColWidthKey(section) {
   const target = section && section.dataset ? (section.dataset.target || '') : '';
   const type = section && section.dataset ? (section.dataset.type || '') : '';
   return `${type}:${target}`;
 }
 
+/**
+ * 사라진 문항에 대한 저장된 라벨 열 너비를 정리합니다.
+ */
 function pruneVizLabelColWidths(targetLabels) {
   const activeLabels = new Set(targetLabels || []);
   resultState.vizLabelColWidths.forEach((_, key) => {
@@ -8766,6 +9061,9 @@ function pruneVizLabelColWidths(targetLabels) {
   });
 }
 
+/**
+ * 섹션의 문항 라벨 열 너비를 설정·저장합니다.
+ */
 function setSectionVizLabelColWidth(section, width, remember = false) {
   const clamped = clampVizLabelColWidth(width);
   if (!section || clamped === null) return;
@@ -8773,12 +9071,18 @@ function setSectionVizLabelColWidth(section, width, remember = false) {
   if (remember) resultState.vizLabelColWidths.set(getVizLabelColWidthKey(section), clamped);
 }
 
+/**
+ * 저장된 라벨 열 너비를 섹션에 적용합니다.
+ */
 function applyRememberedSectionVizLabelColWidth(section) {
   if (!section) return;
   const remembered = resultState.vizLabelColWidths.get(getVizLabelColWidthKey(section));
   if (remembered !== undefined) setSectionVizLabelColWidth(section, remembered, false);
 }
 
+/**
+ * 결과 컨테이너에 리사이저·이벤트 등을 연결합니다.
+ */
 function attachVizLabelColResizers(container) {
   if (!container) return;
   container.querySelectorAll(VIZ_LABEL_COL_RESIZE_SELECTORS).forEach(chart => {
@@ -8823,6 +9127,9 @@ function attachVizLabelColResizers(container) {
   });
 }
 
+/**
+ * 그룹/척도 비교 차트들의 레이아웃을 맞춥니다.
+ */
 function alignGroupCompareCharts(container) {
   if (!container) return;
   container.querySelectorAll('.single-hbar-chart.group-compare').forEach(chart => {
@@ -8856,6 +9163,9 @@ function alignGroupCompareCharts(container) {
   });
 }
 
+/**
+ * 그룹/척도 비교 차트들의 레이아웃을 맞춥니다.
+ */
 function alignScaleCompareCharts(container) {
   if (!container) return;
   container.querySelectorAll('.scale-compare-chart.is-group').forEach(chart => {
@@ -8907,6 +9217,9 @@ function alignScaleCompareCharts(container) {
   });
 }
 
+/**
+ * 데이터 테이블 접기/펼치기 상태를 적용합니다.
+ */
 function applyDataTableCollapsed(wrapper, btn, collapsed) {
   if (!wrapper || !btn) return;
   wrapper.classList.toggle('is-collapsed', !!collapsed);
@@ -8919,6 +9232,9 @@ function applyDataTableCollapsed(wrapper, btn, collapsed) {
   }
 }
 
+/**
+ * 테이블 DOM을 TSV(탭 구분) 문자열로 직렬화합니다.
+ */
 function tableToTsv(table) {
   if (!table) return '';
   return Array.from(table.querySelectorAll('tr')).map(row => {
@@ -8928,6 +9244,9 @@ function tableToTsv(table) {
   }).join('\n');
 }
 
+/**
+ * 복사용으로 테이블 셀을 행 단위 엔트리로 나눕니다.
+ */
 function getTableSectionCellEntries(rows) {
   const activeRowSpans = [];
   return Array.from(rows || []).map(row => {
@@ -8957,12 +9276,18 @@ function getTableSectionCellEntries(rows) {
   });
 }
 
+/**
+ * 표 헤더 셀이 응답 수 열인지 판별합니다.
+ */
 function isResponseCountHeaderCell(cell) {
   if (!cell) return false;
   const text = cleanCell(cell.innerText || cell.textContent || '').replace(/\s+/g, '');
   return text.includes('응답수');
 }
 
+/**
+ * 표에서 응답 수(n) 열 인덱스를 찾습니다.
+ */
 function getResponseCountColumnIndexes(table) {
   const rows = table && table.tHead
     ? Array.from(table.tHead.rows)
@@ -8977,6 +9302,9 @@ function getResponseCountColumnIndexes(table) {
   return columns;
 }
 
+/**
+ * 구간 내에서 제거 대상 열이 몇 개 겹치는지 셉니다.
+ */
 function countRemovedColumns(start, end, columnsToRemove) {
   let count = 0;
   for (let col = start; col < end; col += 1) {
@@ -8985,6 +9313,9 @@ function countRemovedColumns(start, end, columnsToRemove) {
   return count;
 }
 
+/**
+ * 행 배열에서 지정 인덱스 열들을 삭제합니다.
+ */
 function removeColumnsFromRows(rows, columnsToRemove) {
   const cellsToRemove = [];
   getTableSectionCellEntries(rows).forEach(entries => {
@@ -9001,6 +9332,9 @@ function removeColumnsFromRows(rows, columnsToRemove) {
   cellsToRemove.forEach(cell => cell.remove());
 }
 
+/**
+ * 복사 시 제외할 열을 반영해 테이블 데이터를 정리합니다.
+ */
 function prepareResultTableForCopy(table) {
   if (!table) return null;
   const copyTable = table.cloneNode(true);
@@ -9013,6 +9347,9 @@ function prepareResultTableForCopy(table) {
   return copyTable;
 }
 
+/**
+ * 클립보드 API 실패 시 대체 복사를 시도합니다.
+ */
 function copyTextFallback(text) {
   const textarea = document.createElement('textarea');
   textarea.value = text;
@@ -9027,6 +9364,9 @@ function copyTextFallback(text) {
   if (!ok) throw new Error('Copy command failed');
 }
 
+/**
+ * 짧은 토스트 메시지를 표시합니다.
+ */
 function showDashboardToast(message) {
   let toast = document.querySelector('[data-dashboard-toast]');
   if (!toast) {
@@ -9049,6 +9389,9 @@ function showDashboardToast(message) {
   }, 1800);
 }
 
+/**
+ * 결과 테이블을 클립보드로 비동기 복사합니다.
+ */
 async function copyResultTable(btn) {
   const section = btn ? btn.closest('[data-data-table-section]') : null;
   const table = section ? section.querySelector('.result-table') : null;
@@ -9090,6 +9433,9 @@ async function copyResultTable(btn) {
   }
 }
 
+/**
+ * 필요 시 DOM 요소/전역 훅을 한 번만 생성·초기화합니다.
+ */
 function ensureHbarDotOutsideReset() {
   if (resultState._hbarDotOutsideBound) return;
   resultState._hbarDotOutsideBound = true;
@@ -9106,6 +9452,9 @@ function ensureHbarDotOutsideReset() {
   });
 }
 
+/**
+ * 필요 시 DOM 요소/전역 훅을 한 번만 생성·초기화합니다.
+ */
 function ensureChoiceMenuOutsideClose() {
   if (resultState._choiceMenuOutsideBound) return;
   resultState._choiceMenuOutsideBound = true;
@@ -9126,6 +9475,9 @@ function ensureChoiceMenuOutsideClose() {
   });
 }
 
+/**
+ * 결과 컨테이너에 리사이저·이벤트 등을 연결합니다.
+ */
 function attachResultEventListeners(container) {
   ensureTooltip();
   ensureChoiceMenuOutsideClose();
@@ -9283,10 +9635,6 @@ function attachResultEventListeners(container) {
         if (!RATIO_CHART_TYPES.includes(type)) return;
         resultState.ratioChartTypes.set(targetLabel, type);
         resultState.openChoiceMenus.delete(`ratio:${targetLabel}`);
-      } else if (scope === 'bar') {
-        if (!CHOICE_BAR_CHART_TYPES.includes(type)) return;
-        resultState.choiceBarChartTypes.set(targetLabel, type);
-        resultState.openChoiceMenus.delete(targetLabel);
       } else {
         if (!CHOICE_CHART_TYPES.includes(type)) return;
         resultState.singleChoiceChartTypes.set(targetLabel, type);
@@ -9306,27 +9654,6 @@ function attachResultEventListeners(container) {
       } else {
         resultState.singleChoiceSortByRate.set(targetLabel, !!input.checked);
       }
-      renderResults();
-    });
-  });
-  container.querySelectorAll('[data-group-compare-view]').forEach(btn => {
-    btn.addEventListener('click', e => {
-      e.preventDefault();
-      e.stopPropagation();
-      const targetLabel = btn.dataset.target;
-      const mode = btn.dataset.groupCompareView;
-      if (!targetLabel || !mode) return;
-      resultState.groupCompareViewModes.set(targetLabel, mode === 'item' ? 'item' : 'composition');
-      renderResults();
-    });
-  });
-  container.querySelectorAll('[data-group-compare-sort]').forEach(select => {
-    select.addEventListener('change', e => {
-      e.stopPropagation();
-      const targetLabel = select.dataset.target;
-      if (!targetLabel) return;
-      const value = select.value || '__overall__';
-      resultState.groupCompareSortModes.set(targetLabel, value);
       renderResults();
     });
   });
@@ -9489,6 +9816,9 @@ function attachResultEventListeners(container) {
   });
 }
 
+/**
+ * 필요 시 DOM 요소/전역 훅을 한 번만 생성·초기화합니다.
+ */
 function ensureTooltip() {
   if (resultState.tooltipEl && document.body.contains(resultState.tooltipEl)) {
     return resultState.tooltipEl;
@@ -9500,6 +9830,9 @@ function ensureTooltip() {
   return el;
 }
 
+/**
+ * 차트 툴팁 마우스 이벤트 핸들러입니다.
+ */
 function onTipEnter(e) {
   const tip = ensureTooltip();
   const raw = e.currentTarget.dataset.tip;
@@ -9512,15 +9845,24 @@ function onTipEnter(e) {
   tip.style.maxWidth = data.kind === 'rank-group-text' ? '280px' : 'none';
   positionTooltip(tip, e);
 }
+/**
+ * 차트 툴팁 마우스 이벤트 핸들러입니다.
+ */
 function onTipMove(e) {
   const tip = resultState.tooltipEl;
   if (!tip || tip.style.display === 'none') return;
   positionTooltip(tip, e);
 }
+/**
+ * 차트 툴팁 마우스 이벤트 핸들러입니다.
+ */
 function onTipLeave() {
   const tip = resultState.tooltipEl;
   if (tip) tip.style.display = 'none';
 }
+/**
+ * 툴팁 요소를 포인터 근처로 이동시킵니다.
+ */
 function positionTooltip(tip, e) {
   const pad = 12;
   const rect = tip.getBoundingClientRect();
@@ -9532,6 +9874,9 @@ function positionTooltip(tip, e) {
   tip.style.top = y + 'px';
 }
 
+/**
+ * 차트 툴팁에 넣을 HTML 문자열을 데이터 객체로부터 만듭니다.
+ */
 function formatTooltipHtml(d) {
   const pct = (v) => formatPercent(v);
   const n = (v) => "N=" + Number(v || 0).toLocaleString();
@@ -9677,6 +10022,9 @@ function formatTooltipHtml(d) {
    3) UI Binding (events / modals / init)
    ===================================================================== */
 
+/**
+ * 드롭존 등 DOM 변화를 관찰해 UI를 갱신합니다.
+ */
 function observeDropZones() {
   ['drop-target', 'drop-criterion'].forEach(id => {
     const zone = document.getElementById(id);
@@ -9686,6 +10034,9 @@ function observeDropZones() {
   });
 }
 
+/**
+ * 필터 변경 등에 결과 리렌더를 후킹합니다.
+ */
 function hookFilterUpdates() {
   if (typeof updateFilterCount !== 'function') return;
   const original = updateFilterCount;
@@ -9697,6 +10048,9 @@ function hookFilterUpdates() {
   };
 }
 
+/**
+ * 결과 탭 기능을 초기화하고 첫 렌더를 수행합니다.
+ */
 async function initResultFeature() {
   if (resultState.initialized) return;
   resultState.initialized = true;
@@ -9784,21 +10138,65 @@ const EXPORT_HIDE_SELECTORS = [
   '.result-export-btn',
 ];
 
-const EXPORT_CUT_SELECTORS = [
-  '.result-header',
-  '.result-visual',
-  '.result-chart-col',
-  '.single-hbar-chart',
-  '.vbar-chart',
-  '.pie-chart-wrap',
-  '.stacked-chart-wrap',
-  '.lollipop-chart-wrap',
-  '.scale-body',
-  '.result-note',
-  '.result-side-panel',
-  '[data-data-table-section]',
+// 캡처 전용 — display:none으로 공간까지 제거할 셀렉터
+const CAPTURE_HIDE_SELECTORS = [
+  '.chart-view-controls',
+  '.group-compare-controls',
+  '.rank-controls',
+  '.scale-toggle',
+  '.viz-controls',
+  '.viz-label-col-resizer',
+  '[data-data-table-toggle]',
+  '[data-data-table-copy]',
+  '.result-export-btn',
+  '.legend-actions',
+  '.legend-item input[type="checkbox"]',
+  '.two-compare-btn',
+  '.rank1st-card-btn',
 ];
 
+// PPT 슬라이드 레이아웃 상수 (SAMPLE.pptx 기준, 단위: inches)
+const PPTX_MARGIN_L   = 0.406;
+const PPTX_CONTENT_W  = 12.127;
+const PPTX_BOX_Y      = 2.490;
+const PPTX_BOX_H      = 4.608;
+
+/**
+ * result-section 캡처 — 컨트롤 헤더를 display:none으로 제거 후 PNG canvas 반환
+ */
+async function captureSectionForClipboard(section) {
+  const hiddenEls = [];
+  try {
+    CAPTURE_HIDE_SELECTORS.forEach(function(sel) {
+      section.querySelectorAll(sel).forEach(function(el) {
+        hiddenEls.push({ el: el, prev: el.style.display });
+        el.style.display = 'none';
+      });
+    });
+    // 체크 해제된 범례 항목 숨기기
+    section.querySelectorAll('.legend-item').forEach(function(item) {
+      const cb = item.querySelector('input[type="checkbox"]');
+      if (cb && !cb.checked) {
+        hiddenEls.push({ el: item, prev: item.style.display });
+        item.style.display = 'none';
+      }
+    });
+    void section.offsetHeight;
+    await document.fonts.ready;
+
+    const scale = Math.max(window.devicePixelRatio || 1, 3);
+    return await domtoimage.toCanvas(section, {
+      bgcolor: '#ffffff',
+      scale,
+    });
+  } finally {
+    hiddenEls.forEach(function(item) { item.el.style.display = item.prev; });
+  }
+}
+
+/**
+ * 결과 섹션에 이미지/PPTX 내보내기 버튼을 붙입니다.
+ */
 function addExportButtons(container) {
   container.querySelectorAll('.result-section').forEach(function(section) {
     var header = section.querySelector('.result-header');
@@ -9844,6 +10242,36 @@ function addExportButtons(container) {
     imgBtn.addEventListener('click', function() { exportSectionAsImage(section, imgBtn); });
     actions.appendChild(imgBtn);
 
+    var captureBtn = document.createElement('button');
+    captureBtn.type = 'button';
+    captureBtn.className = 'result-export-btn';
+    captureBtn.innerHTML = '<span class="material-symbols-rounded result-export-icon">crop</span> 캡처';
+    captureBtn.addEventListener('click', async function() {
+      captureBtn.disabled = true;
+      captureBtn.innerHTML = '<span class="material-symbols-rounded result-export-icon">autorenew</span> 캡처 중...';
+      try {
+        const canvas = await captureSectionForClipboard(section);
+        await new Promise(function(resolve, reject) {
+          canvas.toBlob(async function(blob) {
+            try {
+              await navigator.clipboard.write([
+                new ClipboardItem({ 'image/png': blob })
+              ]);
+              showDashboardToast('클립보드에 복사되었습니다');
+              resolve();
+            } catch (e) { reject(e); }
+          }, 'image/png');
+        });
+      } catch (err) {
+        console.error('[캡처 오류]', err);
+        alert('[캡처 오류]\n' + (err && err.message ? err.message : String(err)));
+      } finally {
+        captureBtn.disabled = false;
+        captureBtn.innerHTML = '<span class="material-symbols-rounded result-export-icon">crop</span> 캡처';
+      }
+    });
+    actions.appendChild(captureBtn);
+
     /* PPT 내보내기 버튼 — 추후 활성화
     if (section.dataset.type === 'single') {
       var pptBtn = document.createElement('button');
@@ -9857,6 +10285,9 @@ function addExportButtons(container) {
   });
 }
 
+/**
+ * 단일선택 결과 섹션용 표시 데이터를 준비합니다.
+ */
 function getSingleChoiceSectionData(section, filteredRows, criterionLabel) {
   if (!section) return null;
   const targetLabel = section.dataset.target;
@@ -9868,18 +10299,25 @@ function getSingleChoiceSectionData(section, filteredRows, criterionLabel) {
   return aggregateSingle(targetLabel, criterionLabel, filteredRows);
 }
 
-async function exportAllSingleChoiceAsPptx(btn) {
+/**
+ * 결과를 PPTX·PNG 등으로 비동기 내보냅니다.
+ */
+async function exportAllSectionsAsPptx(btn) {
   if (typeof PptxGenJS === 'undefined') {
     alert('[오류] PptxGenJS 라이브러리가 로드되지 않았습니다.');
+    return;
+  }
+  if (typeof domtoimage === 'undefined') {
+    alert('[오류] dom-to-image-more 라이브러리가 로드되지 않았습니다.');
     return;
   }
 
   const container = document.getElementById('result-container');
   if (!container) return;
 
-  const sections = Array.from(container.querySelectorAll('.result-section[data-type="single"]'));
+  const sections = Array.from(container.querySelectorAll('.result-section'));
   if (sections.length === 0) {
-    alert('현재 화면에 객관식 단일 문항이 없습니다.');
+    alert('현재 화면에 결과 섹션이 없습니다.');
     return;
   }
 
@@ -9889,61 +10327,81 @@ async function exportAllSingleChoiceAsPptx(btn) {
   }
 
   try {
+    const surveyTitle = sessionStorage.getItem('survey.title') || '';
     const pptx = new PptxGenJS();
     pptx.layout = 'LAYOUT_WIDE';
 
-    const criterionLabel = getCriterionChipLabel();
-    const filteredRows = getFilteredLabelDataRows();
-
     for (const section of sections) {
-      const targetLabel = section.dataset.target;
-      if (!targetLabel) continue;
+      const targetLabel = section.dataset.target || '';
       const sourceLabel = section.dataset.rank1stSource || targetLabel;
+      const entry = (resultState.codebookByLabel && resultState.codebookByLabel.get(sourceLabel)) || {};
+      const cat1     = entry.category1 || '';
+      const fullText = entry.full ? 'Q. ' + entry.full : '';
 
-      const entry = resultState.codebookByLabel.get(sourceLabel);
-      if (!entry) continue;
+      const { dataUrl, w: imgW, h: imgH } = await captureSectionForPpt(section);
 
-      const data = getSingleChoiceSectionData(section, filteredRows, criterionLabel);
-      if (!data || !data.totalResults || data.totalResults.length === 0) continue;
-
-      const chartType = getSingleChoiceChartType(targetLabel);
-      const sortByRate = getSingleChoiceSortByRate(targetLabel);
-      const displayData = sortByRate ? applyChoiceSortToData(data, true) : data;
-      const rows = displayData.totalResults;
+      // 박스(12.127" × 4.608") 안에 비례 맞춤
+      let dispW = PPTX_CONTENT_W;
+      let dispH = imgH * (PPTX_CONTENT_W / imgW);
+      if (dispH > PPTX_BOX_H) {
+        dispH = PPTX_BOX_H;
+        dispW = imgW * (PPTX_BOX_H / imgH);
+      }
+      const imgX = PPTX_MARGIN_L + (PPTX_CONTENT_W - dispW) / 2;
+      const imgY = PPTX_BOX_Y   + (PPTX_BOX_H   - dispH) / 2;
 
       const slide = pptx.addSlide();
       slide.background = { color: 'FFFFFF' };
 
-      slide.addText(data.displayLabel || sourceLabel, {
-        x: 0.4, y: 0.3, w: 12, h: 0.4,
-        fontSize: 13, bold: true, color: '151515',
+      // 설문 제목
+      slide.addText(surveyTitle, {
+        x: PPTX_MARGIN_L, y: 0.372, w: PPTX_CONTENT_W, h: 0.168,
+        fontSize: 10, color: '808080', valign: 'middle',
       });
 
-      if (entry.full && entry.full.trim()) {
-        slide.addText('Q. ' + entry.full, {
-          x: 0.4, y: 0.75, w: 12, h: 0.35,
-          fontSize: 10, color: '555555',
+      // SURVEY RAW DATA
+      slide.addText('SURVEY RAW DATA', {
+        x: PPTX_MARGIN_L, y: 0.575, w: PPTX_CONTENT_W, h: 0.202,
+        fontSize: 12, color: '404040', valign: 'middle',
+      });
+
+      // 카테고리 1
+      if (cat1) {
+        slide.addText(cat1, {
+          x: PPTX_MARGIN_L, y: 1.033, w: PPTX_CONTENT_W, h: 0.337,
+          fontSize: 20, color: '151515', valign: 'middle',
         });
       }
 
-      slide.addText('N = ' + data.totalN, {
-        x: 0.4, y: 1.1, w: 3, h: 0.3,
-        fontSize: 9, color: '888888',
-      });
+      // 문항 라벨
+      if (targetLabel) {
+        slide.addText(targetLabel, {
+          x: PPTX_MARGIN_L, y: 1.771, w: PPTX_CONTENT_W, h: 0.185,
+          fontSize: 11, color: '404040', valign: 'middle',
+        });
+      }
 
-      addSingleChoiceChartToSlide(pptx, slide, chartType, rows, displayData, targetLabel);
+      // 문항 전문
+      if (fullText) {
+        slide.addText(fullText, {
+          x: PPTX_MARGIN_L, y: 2.038, w: PPTX_CONTENT_W, h: 0.168,
+          fontSize: 10, color: '404040', valign: 'middle',
+        });
+      }
+
+      // 차트 이미지
+      slide.addImage({ data: dataUrl, x: imgX, y: imgY, w: dispW, h: dispH });
     }
 
-    const projectTitle = (document.getElementById('project-title') || {}).textContent || '대시보드';
-    const safeTitle = projectTitle.replace(/[\\/:*?"<>|]/g, '_').slice(0, 40);
-    await pptx.writeFile({ fileName: safeTitle + '.pptx' });
+    const safeTitle = (surveyTitle || '대시보드').replace(/[\\/:*?"<>|]/g, '_').slice(0, 40);
+    await pptx.writeFile({ fileName: safeTitle + '_appendix.pptx' });
   } catch (e) {
     console.error('[PPT 전체 내보내기 오류]', e);
     alert('PPT 저장 중 오류가 발생했습니다: ' + e.message);
   } finally {
     if (btn) {
       btn.disabled = false;
-      btn.innerHTML = '<img class="dashboard-header-btn-icon" src="assets/icons/arrow_downward_40dp_151515_FILL0_wght400_GRAD0_opsz40.svg" alt=""> 전체 문항 PPT로 내보내기';
+      btn.innerHTML = '<img class="dashboard-header-btn-icon" src="assets/icons/arrow_downward_40dp_151515_FILL0_wght400_GRAD0_opsz40.svg" alt=""> PPT로 내보내기';
     }
   }
 }
@@ -9955,10 +10413,16 @@ const PPTX_PALETTE = [
   '5a9488','b07a9a','c08878','6a9880','7a9870'
 ];
 
+/**
+ * PPTX용 RGB 색 객체를 팔레트 인덱스로 반환합니다.
+ */
 function pptxPaletteColor(index) {
   return PPTX_PALETTE[index % PPTX_PALETTE.length];
 }
 
+/**
+ * PPTX 슬라이드에 단일선택 차트/표를 배치합니다.
+ */
 function addSingleChoiceChartToSlide(pptx, slide, chartType, rows, displayData, targetLabel) {
   const CHART_X = 0.4, CHART_Y = 1.5, CHART_W = 12;
 
@@ -10049,6 +10513,9 @@ function addSingleChoiceChartToSlide(pptx, slide, chartType, rows, displayData, 
   }
 }
 
+/**
+ * 결과를 PPTX·PNG 등으로 비동기 내보냅니다.
+ */
 async function exportSingleChoiceAsPptx(section, btn) {
   if (typeof PptxGenJS === 'undefined') {
     alert('[오류] PptxGenJS 라이브러리가 로드되지 않았습니다.');
@@ -10119,6 +10586,9 @@ async function exportSingleChoiceAsPptx(section, btn) {
 }
 
 /* 이미지 추출 기능 */
+/**
+ * 결과를 PPTX·PNG 등으로 비동기 내보냅니다.
+ */
 async function exportSectionAsImage(section, btn) {
   // 라이브러리 로드 확인
   if (typeof domtoimage === 'undefined') {
@@ -10182,6 +10652,9 @@ async function exportSectionAsImage(section, btn) {
 }
 
 // 섹션을 A4 한 페이지 캔버스에 합성. 영역 초과 시 { overflow: true } 반환
+/**
+ * 결과를 PPTX·PNG 등으로 비동기 내보냅니다.
+ */
 async function captureSectionToA4(section, forceHideDataTable) {
   var hiddenEls = [];
   var displayHiddenEls = [];  // display:none 처리한 요소 (높이 영향)
@@ -10288,38 +10761,9 @@ async function captureSectionToA4(section, forceHideDataTable) {
   }
 }
 
-function getExportCutPoints(section, scale) {
-  var sectionRect = section.getBoundingClientRect();
-  var points = new Set([0]);
-  EXPORT_CUT_SELECTORS.forEach(function(sel) {
-    section.querySelectorAll(sel).forEach(function(el) {
-      var rect = el.getBoundingClientRect();
-      var yRelative = rect.top - sectionRect.top;
-      if (yRelative > 1) points.add(Math.round(yRelative * scale));
-    });
-  });
-  return Array.from(points).sort(function(a, b) { return a - b; });
-}
-
-function sliceCanvasIntoPages(canvas, cutPoints) {
-  var pages = [];
-  var start = 0;
-  while (start < canvas.height) {
-    var targetEnd = start + EXPORT_CONTENT_H;
-    var end;
-    if (targetEnd >= canvas.height) {
-      end = canvas.height;
-    } else {
-      var valid = cutPoints.filter(function(p) { return p > start && p <= targetEnd; });
-      end = valid.length > 0 ? Math.max.apply(null, valid) : targetEnd;
-    }
-    pages.push(composePage(canvas, start, end, false));
-    if (end <= start) break;
-    start = end;
-  }
-  return pages;
-}
-
+/**
+ * 원본 캔버스의 일부 영역을 한 페이지 캔버스로 복사합니다.
+ */
 function composePage(srcCanvas, yStart, yEnd, center) {
   var sliceH = yEnd - yStart;
   var out = document.createElement('canvas');
@@ -10335,6 +10779,9 @@ function composePage(srcCanvas, yStart, yEnd, center) {
 }
 
 // 로고 이미지 로더
+/**
+ * 이미지 URL을 로드해 HTMLImageElement로 반환합니다(Promise).
+ */
 function loadImage(src) {
   return new Promise(function(resolve, reject) {
     var img = new Image();
@@ -10350,6 +10797,9 @@ function loadImage(src) {
 // 푸터 영역 = 페이지 하단 15mm (177px @ 300DPI). 다음 요소가 이 안에 모두 위치:
 //   1) 푸터 영역 상단(=콘텐츠 영역 종료점)에 가로 구분선
 //   2) 좌측 로고 + 우측 카피라이트 (구분선 아래, 푸터 영역 가운데 정렬)
+/**
+ * 내보내기 이미지 캔버스 하단에 푸터(로고 등)를 그립니다.
+ */
 function addFooterToCanvas(canvas, logoImg) {
   var ctx = canvas.getContext('2d');
   var footerY = EXPORT_PAGE_H - EXPORT_MARGIN_BOTTOM - EXPORT_FOOTER_H; // 푸터 영역 상단 Y (= 구분선 위치)
@@ -10381,6 +10831,9 @@ function addFooterToCanvas(canvas, logoImg) {
     EXPORT_PAGE_W - EXPORT_FOOTER_PAD, centerY);
 }
 
+/**
+ * 캔버스를 PNG 파일로 저장 트리거합니다.
+ */
 function downloadCanvas(canvas, filename) {
   function triggerDownload(href) {
     var a = document.createElement('a');
