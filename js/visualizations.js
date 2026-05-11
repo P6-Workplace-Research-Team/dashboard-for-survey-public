@@ -57,6 +57,18 @@ function readAsText(file) {
 /**
  * HTML 삽입용으로 &, <, 따옴표 등을 이스케이프합니다.
  */
+function applyDragImage(e, el) {
+  const clone = el.cloneNode(true);
+  clone.style.position = 'fixed';
+  clone.style.top = '-9999px';
+  clone.style.left = '-9999px';
+  clone.style.width = el.offsetWidth + 'px';
+  clone.style.pointerEvents = 'none';
+  document.body.appendChild(clone);
+  e.dataTransfer.setDragImage(clone, e.offsetX, e.offsetY);
+  setTimeout(() => document.body.removeChild(clone), 0);
+}
+
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({
     '&': '&amp;',
@@ -799,6 +811,7 @@ function setupSelectionAndDragDrop() {
 
     e.dataTransfer.setData('text/plain', JSON.stringify({ items: payload }));
     e.dataTransfer.effectAllowed = 'copy';
+    applyDragImage(e, item);
   });
 
   zones.forEach(zone => {
@@ -1136,6 +1149,7 @@ function renderFilters() {
         if (e.dataTransfer) {
           e.dataTransfer.effectAllowed = 'move';
           e.dataTransfer.setData('text/plain', item.key);
+          applyDragImage(e, wrap);
         }
       });
       wrap.addEventListener('dragend', () => {
@@ -8176,6 +8190,7 @@ function renderGroupConfigModal() {
       if (e.dataTransfer) {
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/plain', optionValue);
+        applyDragImage(e, row);
       }
     });
     row.addEventListener('dragend', () => {
