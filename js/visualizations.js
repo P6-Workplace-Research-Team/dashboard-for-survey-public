@@ -10166,6 +10166,7 @@ const PPTX_BOX_H      = 4.608;
  */
 async function captureSectionForClipboard(section) {
   const hiddenEls = [];
+  const overflowEls = [];
   try {
     CAPTURE_HIDE_SELECTORS.forEach(function(sel) {
       section.querySelectorAll(sel).forEach(function(el) {
@@ -10181,6 +10182,13 @@ async function captureSectionForClipboard(section) {
         item.style.display = 'none';
       }
     });
+    // 데이터 테이블 스크롤바 숨기기 — domtoimage 렌더링 시 스크롤바가 그려지는 것을 방지
+    // overflow-x: hidden 설정 시 CSS 스펙에 의해 overflow-y가 auto로 승격되므로 함께 처리
+    section.querySelectorAll('.result-table-wrap').forEach(function(el) {
+      overflowEls.push({ el: el, prevX: el.style.overflowX, prevY: el.style.overflowY });
+      el.style.overflowX = 'hidden';
+      el.style.overflowY = 'hidden';
+    });
     void section.offsetHeight;
     await document.fonts.ready;
 
@@ -10191,6 +10199,7 @@ async function captureSectionForClipboard(section) {
     });
   } finally {
     hiddenEls.forEach(function(item) { item.el.style.display = item.prev; });
+    overflowEls.forEach(function(item) { item.el.style.overflowX = item.prevX; item.el.style.overflowY = item.prevY; });
   }
 }
 
