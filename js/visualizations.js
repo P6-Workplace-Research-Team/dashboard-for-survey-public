@@ -1,11 +1,40 @@
 ﻿/* =====================================================================
-   visualizations.js
+   visualizations.js — 섹션 맵
 
-   이 파일은 레거시 단일 파일 구조를 유지하되, 아래 3개 레이어로 구획해 읽기/유지보수를 개선한다.
+   레거시 단일 파일 구조를 유지하되, 3개 레이어로 구획해 둠.
+   각 섹션의 진입점을 줄 번호로 안내한다. (줄 번호는 정리 시점 기준이며,
+   대규모 변경이 있었다면 이 맵도 갱신할 것)
 
-   1) Data / Aggregation
-   2) Chart Renderers (HTML builders)
-   3) UI Binding (events / modals / init)
+   ── 1) Data / Aggregation  (L1 ~ L1674) ───────────────────────────
+     L47    파일 I/O · CSV 파싱 (readAsText, parseCSV, readTabularFile)
+     L157   코드북/응답 검증 (validateFileForKey, detectValueLabelSwap 등)
+     L414   코드북 로드 · 문항 트리 구성 (loadCodebookRows, buildQuestionTree)
+     L576   사이드 패널 UI (아코디언, 검색, 드래그 앤 드롭)
+     L892   필터 후보 · 상태 · 렌더링 (buildFilterCandidates, renderFilters)
+     L1355  필터 · 제목 · 저장 모달 이벤트 바인딩
+
+   ── 2) Chart Renderers  (L1675 ~ L9929) ───────────────────────────
+     L1680  공통 (팔레트, 척도 색상, resultState, 타입 술어)
+     L2239  ─ [객관식 단일/복수] + [척도/비율/숫자/시간/텍스트] 집계·렌더
+       L2354  aggregateSingle · aggregateMulti
+       L2590  aggregateRatioAllocation
+       L2805  derived scale (단일 척도 분포·박스플롯)
+       L2970  buildNumericHistogram (숫자형)
+       L3996  비율 배분 차트 · 표
+       L4269  척도 UI (토글 · 축 · 트랙 · 평균 마커)
+       L4747  척도 비교 (다문항 비교)
+       L5143  숫자형 컨트롤 · 박스플롯 · 그룹 비교
+     L6028  ─ [객관식 순위] 집계·렌더
+       L6318  순위 컨트롤 · lollipop · stacked · 표 · 섹션
+     L8887  renderResults (전체 결과 패널 리렌더 오케스트레이터)
+
+   ── 3) UI Binding / Init / Export  (L9930 ~ end) ──────────────────
+     L9937  결과 패널 리렌더 트리거 · 초기화 (observeDropZones, initResultFeature)
+     L10017 EXPORT_LOGO_DATA_URI (로고 base64 데이터)
+     L10020 A4 추출 사양 (300DPI) · 페이지 · 여백 상수
+     L10222 exportAllSectionsAsPptx (PPTX 일괄 내보내기)
+     L10436 exportSingleChoiceAsPptx (개별 단일 차트 → PPTX, 현재 비활성)
+     L10509 exportSectionAsImage · addFooterToCanvas (이미지 추출 · 푸터 합성)
    ===================================================================== */
 
 
@@ -1676,7 +1705,6 @@ const CUSTOM_GROUP_PALETTE = [
   'var(--color-15)', 'var(--color-16)', 'var(--color-17)', 'var(--color-18)'
 ];
 const SINGLE_BAR_COLOR = DATA_VIZ_COLORS.singleBar;
-const COMPARE_BAR_COLOR = DATA_VIZ_COLORS.compareBar;
 const HBAR_INSIDE_VALUE_THRESHOLD = 90;
 
 const CHOICE_CHART_TYPES = ['bar_horizontal', 'bar_vertical', 'bar_horizontal_100', 'pie'];
@@ -1748,7 +1776,6 @@ const SCALE_7PT = [
   'var(--high-4)',      // 6
   DATA_VIZ_COLORS.scaleHigh, // 7
 ];
-const SCALE_DIVERGING_PALETTE = SCALE_7PT;
 
 /**
  * 현재 UI/상태/인덱스에서 파생 값을 조회합니다.
@@ -3386,13 +3413,6 @@ function getChoiceChartSortMode(targetLabel) {
 }
 
 /**
- * 순위 차트 정렬 모드를 반환합니다.
- */
-function getRankChartSortMode(targetLabel) {
-  return resultState.rankSortModes.get(targetLabel) || 'default';
-}
-
-/**
  * 행 배열을 지표 함수와 정렬 모드에 따라 정렬합니다.
  */
 function sortRowsByMetric(rows, metricFn, sortMode) {
@@ -3410,47 +3430,6 @@ function sortRowsByMetric(rows, metricFn, sortMode) {
 function getChoiceChartRows(data) {
   if (!data) return [];
   return sortRowsByMetric(data.totalResults, row => row.pct, getChoiceChartSortMode(data.targetLabel));
-}
-
-/**
- * 세로형 차트 공통 축·그리드·쉘 HTML을 생성합니다.
- */
-function buildVerticalPercentAxisHtml() {
-  const ticks = [100, 75, 50, 25, 0];
-  return `
-    <div class="vbar-axis" aria-hidden="true">
-      ${ticks.map(tick => `<span class="vbar-axis-label" style="bottom:${tick}%;">${tick}%</span>`).join('')}
-    </div>
-  `;
-}
-
-/**
- * 세로형 차트 공통 축·그리드·쉘 HTML을 생성합니다.
- */
-function buildVerticalPercentGridHtml() {
-  const ticks = [100, 75, 50, 25, 0];
-  return `
-    <div class="vbar-grid" aria-hidden="true">
-      ${ticks.map(tick => `<span class="vbar-grid-line" style="bottom:${tick}%;"></span>`).join('')}
-    </div>
-  `;
-}
-
-/**
- * 세로형 차트 공통 축·그리드·쉘 HTML을 생성합니다.
- */
-function buildVerticalChartShell(rowHtml, className = '') {
-  return `
-    <div class="vbar-chart ${className}">
-      <div class="vbar-chart-body">
-        ${buildVerticalPercentAxisHtml()}
-        <div class="vbar-plot">
-          ${buildVerticalPercentGridHtml()}
-          ${rowHtml}
-        </div>
-      </div>
-    </div>
-  `;
 }
 
 /**
@@ -4556,76 +4535,6 @@ function buildScaleMeanOnlyHtml(mean, maxScore, meanTipData, scoreResults, optio
 }
 
 /**
- * 단일 척도 문항 분포·축·범례·표 HTML을 생성합니다.
- */
-function buildDerivedScaleBins(values, maxScore) {
-  const binCount = 37;
-  const minScore = 1;
-  const safeMax = Number.isFinite(maxScore) && maxScore > minScore ? maxScore : 7;
-  const counts = Array.from({ length: binCount }, () => 0);
-  const nums = (Array.isArray(values) ? values : []).filter(Number.isFinite);
-  nums.forEach(value => {
-    if (value < minScore || value > safeMax) return;
-    const idx = Math.max(0, Math.min(binCount - 1, Math.round(((value - minScore) / (safeMax - minScore)) * (binCount - 1))));
-    counts[idx] += 1;
-  });
-  let smooth = counts;
-  for (let pass = 0; pass < 2; pass++) {
-    smooth = smooth.map((count, idx) => {
-      const prev = smooth[Math.max(0, idx - 1)];
-      const next = smooth[Math.min(smooth.length - 1, idx + 1)];
-      return (prev + (count * 2) + next) / 4;
-    });
-  }
-  const maxDensity = Math.max(...smooth, 0);
-  return smooth.map((density, idx) => ({
-    x: binCount === 1 ? 50 : (idx / (binCount - 1)) * 100,
-    density,
-    width: maxDensity > 0 ? (density / maxDensity) * 28 : 0
-  }));
-}
-
-/**
- * 단일 척도 문항 분포·축·범례·표 HTML을 생성합니다.
- */
-function buildDerivedScaleViolinPath(values, maxScore) {
-  const bins = buildDerivedScaleBins(values, maxScore);
-  if (!bins.some(bin => bin.density > 0)) return '';
-  const centerY = 42;
-  const topPoints = bins.map(bin => `${bin.x.toFixed(2)},${(centerY - bin.width).toFixed(2)}`);
-  const bottomPoints = [...bins].reverse().map(bin => `${bin.x.toFixed(2)},${(centerY + bin.width).toFixed(2)}`);
-  return `M ${topPoints.join(' L ')} L ${bottomPoints.join(' L ')} Z`;
-}
-
-/**
- * 단일 척도 문항 분포·축·범례·표 HTML을 생성합니다.
- */
-function buildDerivedScaleQuartileMarkersHtml(data, maxScore, options = {}) {
-  const { muted = false, groupLabel = "" } = options;
-  const items = [
-    { key: "q1", label: "Q1", fullLabel: "Q1(하위 25%)", value: data.q1 },
-    { key: "median", label: "Q2", fullLabel: "Q2(중앙값)", value: data.median },
-    { key: "q3", label: "Q3", fullLabel: "Q3(상위 25%)", value: data.q3 }
-  ];
-  return items.map(item => {
-    const left = getScaleMeanLeftPct(item.value, maxScore);
-    if (left === null) return "";
-    const tip = encodeURIComponent(JSON.stringify({
-      kind: "derived-scale-quartile",
-      groupLabel,
-      label: item.fullLabel,
-      value: item.value
-    }));
-    return `
-      <div class="derived-scale-quartile ${muted ? "is-muted" : ""}"
-           style="left:${left}%;"
-           data-label="${item.label}"
-           data-tip="${tip}"></div>
-    `;
-  }).join("");
-}
-
-/**
  * 척도 점수·평균 등 표시용 문자열로 포맷합니다.
  */
 function formatScaleScoreLabel(result) {
@@ -5217,9 +5126,9 @@ function buildScaleGroupLegendHtml(data, hiddenGroups, viewMode) {
 
   return `
     <aside class="legend-panel">
-      ${showScoreColors ? scoreItemsHtml + '<div class="lane-group-legend-divider"></div>' : ''}
-      <div class="legend" data-target="${escapeHtml(data.targetLabel)}" data-mode="group">${groupItems}</div>
-      <div class="legend-actions" data-target="${escapeHtml(data.targetLabel)}" data-mode="group">
+      ${showScoreColors ? scoreItemsHtml + '<div class="lane-group-legend-divider scale-group-section"></div>' : ''}
+      <div class="legend scale-group-section" data-target="${escapeHtml(data.targetLabel)}" data-mode="group">${groupItems}</div>
+      <div class="legend-actions scale-group-section" data-target="${escapeHtml(data.targetLabel)}" data-mode="group">
         <button type="button" class="legend-action-btn" data-legend-action="all-on">전체 선택</button>
         <button type="button" class="legend-action-btn" data-legend-action="all-off">전체 해제</button>
         ${criterionLabel ? `<button type="button" class="legend-action-btn" data-open-group-config="true" data-target="${escapeHtml(data.targetLabel)}" data-criterion="${escapeHtml(criterionLabel)}">그룹 편집</button>` : ''}
@@ -5644,11 +5553,8 @@ function buildNumericOpenGroupChartHtml(data, hiddenGroups) {
           <div class="chart-bottom-axis">${buildNumericBoxAxisHtml(data.domainMin, data.domainMax, fmtValue)}</div>
         </div>
       </div>
-    <div class="numeric-whisker-group-chart">
-      <div class="stack100-group-chart">${overallRowHtml}${groupRowsHtml}</div>
-      <div class="chart-bottom-axis">${buildNumericBoxAxisHtml(data.domainMin, data.domainMax, fmtValue)}</div>
-      ${numberUnit ? `<div class="numeric-open-unit">단위 : ${escapeHtml(numberUnit)}</div>` : ''}
     </div>
+    ${numberUnit ? `<div class="numeric-open-unit">단위 : ${escapeHtml(numberUnit)}</div>` : ''}
   `;
 }
 
@@ -5994,7 +5900,7 @@ function buildScaleDataTableHtml(data, hiddenGroups = new Set()) {
     ...displayGroups.map(group => buildGroupedCountHeader(group.label, group.n, 3))
   ].join("");
   const subRow = [
-    `<th class="num">응답 비율(%)</th><th class="num">응답 수(명)</th><th class="num">평균</th>`,
+    `<th class="num">응답 비율(%)</th><th class="num">응답 수(명)</th><th class="num group-col">평균</th>`,
     ...displayGroups.map(() => `<th class="num group-col">응답 비율(%)</th><th class="num">응답 수(명)</th><th class="num group-col">평균</th>`)
   ].join("");
   const bodyRows = data.scoreResults.map(result => {
@@ -6007,7 +5913,7 @@ function buildScaleDataTableHtml(data, hiddenGroups = new Set()) {
         <td>${formatScaleScoreLabel(result)}</td>
         <td class="num">${formatPercent(result.pct)}</td>
         <td class="num">${result.count.toLocaleString()}</td>
-        <td class="num">-</td>
+        <td class="num group-col">-</td>
         ${groupCells}
       </tr>
     `;
@@ -6025,7 +5931,7 @@ function buildScaleDataTableHtml(data, hiddenGroups = new Set()) {
           <td>합계</td>
           <td class="num">${formatPercent(100)}</td>
           <td class="num">${data.totalN.toLocaleString()}</td>
-          <td class="num">${data.mean.toFixed(2)}점</td>
+          <td class="num group-col">${data.mean.toFixed(2)}점</td>
           ${totalCells}
         </tr>
       </tbody>
@@ -7718,9 +7624,9 @@ function buildStack100GroupLegendHtml(data, hiddenGroups) {
   return `
     <aside class="legend-panel">
       <div class="legend is-static">${optionItems}</div>
-      <div class="lane-group-legend-divider"></div>
-      <div class="legend" data-target="${escapeHtml(data.targetLabel)}" data-mode="group">${groupItems}</div>
-      <div class="legend-actions" data-target="${escapeHtml(data.targetLabel)}" data-mode="group">
+      <div class="lane-group-legend-divider stack100-group-section"></div>
+      <div class="legend stack100-group-section" data-target="${escapeHtml(data.targetLabel)}" data-mode="group">${groupItems}</div>
+      <div class="legend-actions stack100-group-section" data-target="${escapeHtml(data.targetLabel)}" data-mode="group">
         <button type="button" class="legend-action-btn" data-legend-action="all-on">전체 선택</button>
         <button type="button" class="legend-action-btn" data-legend-action="all-off">전체 해제</button>
         ${criterionLabel ? `<button type="button" class="legend-action-btn" data-open-group-config="true" data-target="${escapeHtml(groupConfigTargetLabel)}" data-criterion="${escapeHtml(criterionLabel)}">그룹 편집</button>` : ''}
@@ -8774,7 +8680,7 @@ function buildChoiceSectionHtml(data, rows) {
   const displayData = sortByRate ? applyChoiceSortToData(baseData, true) : baseData;
 
   const showControls = isSingleWithoutGroup || data.isMulti || !!groupResults;
-  const chartTypes = CHOICE_CHART_TYPES;
+  const chartTypes = data.isMulti ? ['bar_horizontal', 'bar_vertical'] : CHOICE_CHART_TYPES;
   const chartType = getSingleChoiceChartType(targetLabel);
   const isMenuOpen = resultState.openChoiceMenus.has(targetLabel);
   const controlsHtml = showControls
@@ -10109,7 +10015,6 @@ const EXPORT_LOGO_DATA_URI = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAA14A
 // === A4 세로 추출 사양 (300 DPI) ===
 // docs/image-export-spec.md 기준
 const EXPORT_DPI = 300;
-const EXPORT_PX_PER_MM = EXPORT_DPI / 25.4; // ≈ 11.811
 
 const EXPORT_PAGE_W = 2480;            // A4 width: 210mm @ 300DPI
 const EXPORT_PAGE_H = 3508;            // A4 height: 297mm @ 300DPI
@@ -10136,6 +10041,9 @@ const EXPORT_HIDE_SELECTORS = [
   '[data-data-table-toggle]',
   '[data-data-table-copy]',
   '.result-export-btn',
+  '.stack100-group-section',
+  '.scale-group-section',
+  '[data-type="numeric-open"] .legend-panel',
 ];
 
 // 캡처 전용 — display:none으로 공간까지 제거할 셀렉터
@@ -10153,6 +10061,9 @@ const CAPTURE_HIDE_SELECTORS = [
   '.legend-item input[type="checkbox"]',
   '.two-compare-btn',
   '.rank1st-card-btn',
+  '.stack100-group-section',
+  '.scale-group-section',
+  '[data-type="numeric-open"] .legend-panel',
 ];
 
 // PPT 슬라이드 레이아웃 상수 (SAMPLE.pptx 기준, 단위: inches)
@@ -10167,6 +10078,7 @@ const PPTX_BOX_H      = 4.608;
 async function captureSectionForClipboard(section) {
   const hiddenEls = [];
   const overflowEls = [];
+  const pieViewBoxEls = [];
   try {
     CAPTURE_HIDE_SELECTORS.forEach(function(sel) {
       section.querySelectorAll(sel).forEach(function(el) {
@@ -10189,6 +10101,13 @@ async function captureSectionForClipboard(section) {
       el.style.overflowX = 'hidden';
       el.style.overflowY = 'hidden';
     });
+    // 파이 차트 외부 레이블 클리핑 방지 — 캡처 시에만 viewBox·크기 확장
+    section.querySelectorAll('.pie-svg').forEach(function(svg) {
+      pieViewBoxEls.push({ el: svg, prevViewBox: svg.getAttribute('viewBox'), prevW: svg.style.width, prevH: svg.style.height });
+      svg.setAttribute('viewBox', '-60 -60 400 400');
+      svg.style.width = '400px';
+      svg.style.height = '400px';
+    });
     void section.offsetHeight;
     await document.fonts.ready;
 
@@ -10200,6 +10119,7 @@ async function captureSectionForClipboard(section) {
   } finally {
     hiddenEls.forEach(function(item) { item.el.style.display = item.prev; });
     overflowEls.forEach(function(item) { item.el.style.overflowX = item.prevX; item.el.style.overflowY = item.prevY; });
+    pieViewBoxEls.forEach(function(item) { item.el.setAttribute('viewBox', item.prevViewBox); item.el.style.width = item.prevW; item.el.style.height = item.prevH; });
   }
 }
 
@@ -10668,6 +10588,7 @@ async function captureSectionToA4(section, forceHideDataTable) {
   var hiddenEls = [];
   var displayHiddenEls = [];  // display:none 처리한 요소 (높이 영향)
   var widthRestore = null;    // 너비 강제 변경 복원용
+  var pieViewBoxEls = [];
 
   try {
     // 제외 대상 UI 컨트롤 visibility:hidden (높이는 유지)
@@ -10676,6 +10597,13 @@ async function captureSectionToA4(section, forceHideDataTable) {
         el.style.visibility = 'hidden';
         hiddenEls.push(el);
       });
+    });
+    // 파이 차트 외부 레이블 클리핑 방지 — 캡처 시에만 viewBox·크기 확장
+    section.querySelectorAll('.pie-svg').forEach(function(svg) {
+      pieViewBoxEls.push({ el: svg, prevViewBox: svg.getAttribute('viewBox'), prevW: svg.style.width, prevH: svg.style.height });
+      svg.setAttribute('viewBox', '-60 -60 400 400');
+      svg.style.width = '400px';
+      svg.style.height = '400px';
     });
 
     // 데이터 테이블 처리:
@@ -10759,6 +10687,7 @@ async function captureSectionToA4(section, forceHideDataTable) {
     // 복원
     try { hiddenEls.forEach(function(el) { el.style.visibility = ''; }); } catch(_) {}
     try { displayHiddenEls.forEach(function(item) { item.el.style.display = item.original; }); } catch(_) {}
+    try { pieViewBoxEls.forEach(function(item) { item.el.setAttribute('viewBox', item.prevViewBox); item.el.style.width = item.prevW; item.el.style.height = item.prevH; }); } catch(_) {}
     try {
       if (widthRestore) {
         section.style.width = widthRestore.width;
@@ -10768,23 +10697,6 @@ async function captureSectionToA4(section, forceHideDataTable) {
       }
     } catch(_) {}
   }
-}
-
-/**
- * 원본 캔버스의 일부 영역을 한 페이지 캔버스로 복사합니다.
- */
-function composePage(srcCanvas, yStart, yEnd, center) {
-  var sliceH = yEnd - yStart;
-  var out = document.createElement('canvas');
-  out.width = EXPORT_PAGE_W;
-  out.height = EXPORT_PAGE_H;
-  var ctx = out.getContext('2d');
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, EXPORT_PAGE_W, EXPORT_PAGE_H);
-  // 차트는 콘텐츠 영역(1920 × EXPORT_CONTENT_H)에만 배치
-  var yDest = center ? Math.floor((EXPORT_CONTENT_H - sliceH) / 2) : 0;
-  ctx.drawImage(srcCanvas, 0, yStart, EXPORT_PAGE_W, sliceH, 0, yDest, EXPORT_PAGE_W, sliceH);
-  return out;
 }
 
 // 로고 이미지 로더
