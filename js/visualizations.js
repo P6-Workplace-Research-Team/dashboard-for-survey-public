@@ -10195,17 +10195,13 @@ function addExportButtons(container) {
       captureBtn.innerHTML = '<span class="material-symbols-rounded result-export-icon">autorenew</span> 캡처 중...';
       try {
         const canvas = await captureSectionForClipboard(section);
-        await new Promise(function(resolve, reject) {
-          canvas.toBlob(async function(blob) {
-            try {
-              await navigator.clipboard.write([
-                new ClipboardItem({ 'image/png': blob })
-              ]);
-              showDashboardToast('클립보드에 복사되었습니다');
-              resolve();
-            } catch (e) { reject(e); }
-          }, 'image/png');
+        const blobPromise = new Promise(function(resolve, reject) {
+          canvas.toBlob(function(blob) { blob ? resolve(blob) : reject(new Error('toBlob failed')); }, 'image/png');
         });
+        await navigator.clipboard.write([
+          new ClipboardItem({ 'image/png': blobPromise })
+        ]);
+        showDashboardToast('클립보드에 복사되었습니다');
       } catch (err) {
         console.error('[캡처 오류]', err);
         alert('[캡처 오류]\n' + (err && err.message ? err.message : String(err)));
