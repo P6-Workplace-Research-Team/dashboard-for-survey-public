@@ -1,3 +1,5 @@
+// 홈 화면에 사용자가 파일을 업로드하면 업로드한 파일을 읽어서 검증하고 대시보드를 만드는 로직입니다.
+
 // Home page logic (upload + validation + create survey)
 // Depends on supabase-client.js for: persistSurveyFiles, loadSurveys, saveSurveys
 

@@ -4306,7 +4306,9 @@ body.filter-dragging .filter-add-btn:hover {
 
 .lane-group-label {
   min-height: var(--viz-stack-height);
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
   font-size: var(--label-1-size);
   font-weight: var(--font-weight-regular);
   color: var(--neutral-900);

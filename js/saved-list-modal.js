@@ -1,3 +1,5 @@
+//저장된 대시보드 리스트를 생성하고 관리하는 함수입니다.
+
 // Shared saved dashboard list modal (home.html + dashboard.html)
 // Depends on supabase-client.js for: loadSurveysFromServer, loadSurveys, saveSurveys, formatDate, deleteSurveyFiles (optional)
 (function () {
