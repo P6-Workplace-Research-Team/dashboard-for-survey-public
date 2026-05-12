@@ -2388,6 +2388,10 @@ body.filter-dragging .filter-add-btn:hover {
   color: var(--neutral-700);
 }
 
+.viz-control-number:has(.viz-control-number__input:disabled) {
+  color: var(--neutral-300);
+}
+
 .viz-control-number__input {
   width: 72px;
   padding: 8px 6px 8px 10px;
@@ -4204,7 +4208,16 @@ body.filter-dragging .filter-add-btn:hover {
   top: 0;
   transform: translateX(-50%);
   text-align: center;
-  cursor: help;
+  cursor: pointer;
+  transition: opacity .15s;
+}
+
+.box-plot-q-item.is-dimmed {
+  opacity: 0.15;
+}
+
+.box-plot-q-item.is-highlighted {
+  z-index: 2;
 }
 
 .box-plot-q-name {

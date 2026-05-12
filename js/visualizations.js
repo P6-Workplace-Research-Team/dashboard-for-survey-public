@@ -2065,7 +2065,10 @@ function isTimeMinutesEntry(entry) {
   const type = cleanCell(entry.type);
   const role = cleanCell(entry.role).toLowerCase();
   const label = cleanCell(entry.label);
-  return type.includes('주관식 시간') && role === 'derived' && label.includes('분환산');
+  const unit = cleanCell(entry.numberUnit);
+  if (type.includes('주관식 시간') && role === 'derived' && label.includes('분환산')) return true;
+  if (role === 'derived' && unit === '분') return true;
+  return false;
 }
 
 /**
@@ -2925,11 +2928,54 @@ function formatMinutesAsTime(value) {
   return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
 }
 
+function formatMinutesAsHourMin(value) {
+  if (!Number.isFinite(value)) return '-';
+  const total = Math.round(Number(value));
+  const h = Math.floor(Math.abs(total) / 60);
+  const m = Math.abs(total) % 60;
+  const sign = total < 0 ? '-' : '';
+  if (h === 0) return `${sign}${m}분`;
+  if (m === 0) return `${sign}${h}시간`;
+  return `${sign}${h}시간 ${m}분`;
+}
+
+function formatMinutesAsClockTime(value) {
+  if (!Number.isFinite(value)) return '-';
+  const total = Math.round(Number(value));
+  const dayMinutes = 24 * 60;
+  const normalized = ((total % dayMinutes) + dayMinutes) % dayMinutes;
+  const h = Math.floor(normalized / 60);
+  const m = normalized % 60;
+  if (m === 0) return `${h}시`;
+  return `${h}시 ${m}분`;
+}
+
+function formatMinutesAsHHMM(value) {
+  if (!Number.isFinite(value)) return '-';
+  const total = Math.round(Number(value));
+  const sign = total < 0 ? '-' : '';
+  const abs = Math.abs(total);
+  const h = Math.floor(abs / 60);
+  const m = abs % 60;
+  return `${sign}${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+function getTimeMinutesFormat(entry) {
+  if (!isTimeMinutesEntry(entry)) return 'duration';
+  if (cleanCell(entry.role).toLowerCase() === 'derived') return 'duration';
+  const baseLabel = cleanCell(entry.label).replace(/_분환산$/, '');
+  if (resultState.codebookByLabel.has(baseLabel + '__시')) return 'clock';
+  return 'duration';
+}
+
 /**
  * 숫자/시간 단위에 맞는 값 포맷 함수를 반환합니다.
  */
 function getNumericOpenValueFormatter(entry) {
-  if (isTimeMinutesEntry(entry)) return (value, _digits = 2) => formatMinutesAsTime(value);
+  if (isTimeMinutesEntry(entry)) {
+    const fmt = getTimeMinutesFormat(entry);
+    return fmt === 'clock' ? formatMinutesAsClockTime : formatMinutesAsHourMin;
+  }
   return (value, digits = 2) => formatNumericValue(value, digits);
 }
 
@@ -5230,7 +5276,8 @@ function buildNumericWhiskerTrackHtml(item, axisMin, axisMax, numberUnit = '', g
   const q2Tip  = encodeURIComponent(JSON.stringify({ kind: 'numeric-boxplot-stat', groupLabel, label: 'Q2(중앙값)',   value: item.median, unit: numberUnit, valueFormat: options.valueFormat || '' }));
   const q3Tip  = encodeURIComponent(JSON.stringify({ kind: 'numeric-boxplot-stat', groupLabel, label: 'Q3(상위 25%)', value: item.q3,     unit: numberUnit, valueFormat: options.valueFormat || '' }));
   const maxTip = encodeURIComponent(JSON.stringify({ kind: 'numeric-boxplot-stat', groupLabel, label: '최댓값',       value: item.max,    unit: numberUnit, valueFormat: options.valueFormat || '' }));
-  const meanLabel = Number.isFinite(Number(item.mean)) ? fmtValue(item.mean, options.meanDecimals ?? 1) : '-';
+  const meanFmt = (options.valueFormat === 'time-clock' || options.valueFormat === 'time-duration') ? formatMinutesAsHHMM : (v) => fmtValue(v, options.meanDecimals ?? 1);
+  const meanLabel = Number.isFinite(Number(item.mean)) ? meanFmt(item.mean) : '-';
   const fmtQ = v => Number.isFinite(Number(v)) ? fmtValue(v, 1) : '-';
   const meanStyle = options.mutedMeanMarker
     ? `left:${meanLeft}%;background:var(--neutral-300);color:transparent;`
@@ -5257,15 +5304,15 @@ function buildNumericWhiskerTrackHtml(item, axisMin, axisMax, numberUnit = '', g
         `}
       </div>
       <div class="box-plot-q-label-layer">
-        <div class="box-plot-q-item" style="left:${q1Left}%;"  data-tip="${q1Tip}">
+        <div class="box-plot-q-item" style="left:${q1Left}%;"  data-q="Q1" data-tip="${q1Tip}">
           <div class="box-plot-q-name">Q1</div>
           <div class="box-plot-q-val">${fmtQ(item.q1)}</div>
         </div>
-        <div class="box-plot-q-item" style="left:${medLeft}%;" data-tip="${q2Tip}">
+        <div class="box-plot-q-item" style="left:${medLeft}%;" data-q="Q2" data-tip="${q2Tip}">
           <div class="box-plot-q-name">Q2</div>
           <div class="box-plot-q-val">${fmtQ(item.median)}</div>
         </div>
-        <div class="box-plot-q-item" style="left:${q3Left}%;"  data-tip="${q3Tip}">
+        <div class="box-plot-q-item" style="left:${q3Left}%;"  data-q="Q3" data-tip="${q3Tip}">
           <div class="box-plot-q-name">Q3</div>
           <div class="box-plot-q-val">${fmtQ(item.q3)}</div>
         </div>
@@ -5443,6 +5490,7 @@ function buildNumericHistogramChartHtml(histogram, options = {}) {
  */
 function buildNumericOpenBoxChartHtml(data) {
   const isTimeMinutes = isTimeMinutesEntry(data.codebookEntry);
+  const timeFormat = isTimeMinutes ? getTimeMinutesFormat(data.codebookEntry) : '';
   const fmtValue = getNumericOpenValueFormatter(data.codebookEntry);
   const numberUnit = isTimeMinutes ? '' : (data.codebookEntry && data.codebookEntry.numberUnit ? data.codebookEntry.numberUnit : '');
   return `
@@ -5450,7 +5498,7 @@ function buildNumericOpenBoxChartHtml(data) {
       <div class="box-plot-body">
         <div class="numeric-open-summary-whisker">
           <div class="numeric-open-summary-body">
-            ${buildNumericWhiskerTrackHtml(data, data.domainMin, data.domainMax, numberUnit, '응답자 전체', { valueFormatter: fmtValue, valueFormat: isTimeMinutes ? 'time-minutes' : '' })}
+            ${buildNumericWhiskerTrackHtml(data, data.domainMin, data.domainMax, numberUnit, '응답자 전체', { valueFormatter: fmtValue, valueFormat: timeFormat ? 'time-' + timeFormat : '' })}
             <div class="chart-bottom-axis">${buildNumericBoxAxisHtml(data.domainMin, data.domainMax, fmtValue)}</div>
           </div>
           ${numberUnit ? `<div class="numeric-open-unit">단위 : ${escapeHtml(numberUnit)}</div>` : ''}
@@ -5522,6 +5570,8 @@ function buildNumericOpenGroupChartHtml(data, hiddenGroups) {
     return '<div class="result-empty">표시할 그룹이 없습니다.</div>';
   }
   const isTimeMinutes = isTimeMinutesEntry(data.codebookEntry);
+  const timeFormat = isTimeMinutes ? getTimeMinutesFormat(data.codebookEntry) : '';
+  const vf = timeFormat ? 'time-' + timeFormat : '';
   const fmtValue = getNumericOpenValueFormatter(data.codebookEntry);
   const numberUnit = isTimeMinutes ? '' : (data.codebookEntry && data.codebookEntry.numberUnit ? data.codebookEntry.numberUnit : '');
   const criterionLabel = data.criterionLabel || '';
@@ -5534,7 +5584,7 @@ function buildNumericOpenGroupChartHtml(data, hiddenGroups) {
       data.domainMax,
       numberUnit,
       groupLabel,
-      { color, valueFormatter: fmtValue, valueFormat: isTimeMinutes ? 'time-minutes' : '' }
+      { color, valueFormatter: fmtValue, valueFormat: vf }
     );
     return `
       <div class="lane-group-row">
@@ -5549,7 +5599,7 @@ function buildNumericOpenGroupChartHtml(data, hiddenGroups) {
     data.domainMax,
     numberUnit,
     '응답자 전체',
-    { valueFormatter: fmtValue, valueFormat: isTimeMinutes ? 'time-minutes' : '' }
+    { valueFormatter: fmtValue, valueFormat: vf }
   );
   const overallRowHtml = `
     <div class="lane-group-row">
@@ -5649,9 +5699,10 @@ function buildNumericOpenSection(data) {
   const showTable = true;
   const viewMode = groupResults ? 'box' : (resultState.numericOpenViewModes.get(targetLabel) || 'box');
   const isTimeMinutes = isTimeMinutesEntry(codebookEntry);
+  const timeFormat = isTimeMinutes ? getTimeMinutesFormat(codebookEntry) : '';
   const fmtValue = getNumericOpenValueFormatter(codebookEntry);
   const numberUnit = isTimeMinutes ? '' : (codebookEntry && codebookEntry.numberUnit ? codebookEntry.numberUnit : '');
-  const valueFormat = isTimeMinutes ? 'time-minutes' : '';
+  const valueFormat = timeFormat ? 'time-' + timeFormat : '';
   const chartHtml = groupResults
     ? buildNumericOpenGroupChartHtml(baseData, hiddenGroups)
     : viewMode === 'box'
@@ -5958,7 +6009,12 @@ function buildScaleDataTableHtml(data, hiddenGroups = new Set()) {
  * 숫자/시간 개방형 문항 차트·축·표 HTML을 생성합니다.
  */
 function buildNumericOpenDataTableHtml(data, hiddenGroups = new Set()) {
-  const unit = data.codebookEntry && data.codebookEntry.numberUnit ? data.codebookEntry.numberUnit : "";
+  const isTimeMinutes = isTimeMinutesEntry(data.codebookEntry);
+  const timeFormat = isTimeMinutes ? getTimeMinutesFormat(data.codebookEntry) : '';
+  const unit = isTimeMinutes ? '' : (data.codebookEntry && data.codebookEntry.numberUnit ? data.codebookEntry.numberUnit : "");
+  const timeFmtFn = timeFormat === 'clock' ? formatMinutesAsClockTime : formatMinutesAsHourMin;
+  const fmtStat = isTimeMinutes ? timeFmtFn : formatNumericValue;
+  const fmtMean = isTimeMinutes ? timeFmtFn : (v) => formatNumericMeanDisplay(v, unit);
   const rows = data.groupResults
     ? [
         {
@@ -5996,12 +6052,12 @@ function buildNumericOpenDataTableHtml(data, hiddenGroups = new Set()) {
   const rowsHtml = rows.map(row => `
     <tr>
       <td>${escapeHtml(row.label)}</td>
-      <td class="num metric">${formatNumericValue(row.min)}</td>
-      <td class="num metric">${formatNumericValue(row.q1)}</td>
-      <td class="num metric">${formatNumericValue(row.median)}</td>
-      <td class="num metric">${formatNumericValue(row.q3)}</td>
-      <td class="num metric">${formatNumericValue(row.max)}</td>
-      <td class="num metric mean-value">${formatNumericMeanDisplay(row.mean, unit)}</td>
+      <td class="num metric">${fmtStat(row.min)}</td>
+      <td class="num metric">${fmtStat(row.q1)}</td>
+      <td class="num metric">${fmtStat(row.median)}</td>
+      <td class="num metric">${fmtStat(row.q3)}</td>
+      <td class="num metric">${fmtStat(row.max)}</td>
+      <td class="num metric mean-value">${fmtMean(row.mean)}</td>
       <td class="num respondents">${Number(row.n || 0).toLocaleString()}</td>
     </tr>
   `).join("");
@@ -9373,6 +9429,19 @@ function ensureHbarDotOutsideReset() {
   });
 }
 
+function ensureBoxPlotQOutsideReset() {
+  if (resultState._boxPlotQOutsideBound) return;
+  resultState._boxPlotQOutsideBound = true;
+  document.addEventListener('click', (e) => {
+    if (!document.querySelector('.box-plot-q-item.is-dimmed')) return;
+    if (e.target && e.target.closest && e.target.closest('.box-plot-q-item')) return;
+    document.querySelectorAll('.box-plot-q-item').forEach(i => {
+      i.classList.remove('is-dimmed');
+      i.classList.remove('is-highlighted');
+    });
+  });
+}
+
 /**
  * 필요 시 DOM 요소/전역 훅을 한 번만 생성·초기화합니다.
  */
@@ -9735,6 +9804,25 @@ function attachResultEventListeners(container) {
       }
     });
   });
+  container.querySelectorAll('.box-plot-q-item').forEach(item => {
+    item.addEventListener('click', e => {
+      e.stopPropagation();
+      const layer = item.closest('.box-plot-q-label-layer');
+      if (!layer) return;
+      const allItems = layer.querySelectorAll('.box-plot-q-item');
+      const isActive = item.classList.contains('is-highlighted');
+      if (isActive) {
+        allItems.forEach(i => { i.classList.remove('is-dimmed'); i.classList.remove('is-highlighted'); });
+      } else {
+        allItems.forEach(i => {
+          const same = i === item;
+          i.classList.toggle('is-dimmed', !same);
+          i.classList.toggle('is-highlighted', same);
+        });
+      }
+    });
+  });
+  ensureBoxPlotQOutsideReset();
 }
 
 /**
@@ -9849,77 +9937,31 @@ function formatTooltipHtml(d) {
         line(pct(d.pct)),
         line(n(d.count))
       ].join("");
-    case "numeric-mean":
-      if (d.valueFormat === 'time-minutes') {
-        return [
-          d.groupLabel ? line(escapeHtml(d.groupLabel)) : "",
-          line(`평균값 ${formatMinutesAsTime(Number(d.mean))}`),
-          line(n(d.totalN))
-        ].join("");
-      }
-      return [
-        d.groupLabel ? line(escapeHtml(d.groupLabel)) : "",
-        line(`평균값 ${formatNumericMeanDisplay(d.mean, d.unit || "")}`),
-        line(n(d.totalN))
-      ].join("");
-    case "numeric-quartile":
-      if (d.valueFormat === 'time-minutes') {
-        return [
-          d.groupLabel ? line(escapeHtml(d.groupLabel)) : "",
-          line(escapeHtml(d.tooltipLabel || d.label || "")),
-          line(`사분위값 ${formatMinutesAsTime(Number(d.value))}`)
-        ].join("");
-      }
-      return [
-        d.groupLabel ? line(escapeHtml(d.groupLabel)) : "",
-        line(escapeHtml(d.tooltipLabel || d.label || "")),
-        line(`사분위값 ${formatNumericValueWithUnit(Number(d.value), d.unit || "")}`)
-      ].join("");
-    case "numeric-boxplot-stat":
-      if (d.valueFormat === 'time-minutes') {
-        return [
-          d.groupLabel ? line(escapeHtml(d.groupLabel)) : "",
-          line(escapeHtml(d.label || "")),
-          line(formatMinutesAsTime(Number(d.value)))
-        ].join("");
-      }
-      return [
-        d.groupLabel ? line(escapeHtml(d.groupLabel)) : "",
-        line(escapeHtml(d.label || "")),
-        line(formatNumericValueWithUnit(Number(d.value), d.unit || ""))
-      ].join("");
-    case "numeric-whisker-range":
-      if (d.valueFormat === 'time-minutes') {
-        return [
-          d.groupLabel ? line(escapeHtml(d.groupLabel)) : "",
-          line(`최소값 ${formatMinutesAsTime(Number(d.min))}`),
-          line(`최대값 ${formatMinutesAsTime(Number(d.max))}`),
-          line(n(d.totalN))
-        ].join("");
-      }
-      return [
-        d.groupLabel ? line(escapeHtml(d.groupLabel)) : "",
-        line(`최소값 ${formatNumericValueWithUnit(Number(d.min), d.unit || "")}`),
-        line(`최대값 ${formatNumericValueWithUnit(Number(d.max), d.unit || "")}`),
-        line(n(d.totalN))
-      ].join("");
-    case "numeric-whisker-box":
-      if (d.valueFormat === 'time-minutes') {
-        return [
-          d.groupLabel ? line(escapeHtml(d.groupLabel)) : "",
-          line(`Q1(하위 25%) ${formatMinutesAsTime(Number(d.q1))}`),
-          line(`Q2(중앙값) ${formatMinutesAsTime(Number(d.median))}`),
-          line(`Q3(상위 25%) ${formatMinutesAsTime(Number(d.q3))}`),
-          line(n(d.totalN))
-        ].join("");
-      }
-      return [
-        d.groupLabel ? line(escapeHtml(d.groupLabel)) : "",
-        line(`Q1(하위 25%) ${formatNumericValueWithUnit(Number(d.q1), d.unit || "")}`),
-        line(`Q2(중앙값) ${formatNumericValueWithUnit(Number(d.median), d.unit || "")}`),
-        line(`Q3(상위 25%) ${formatNumericValueWithUnit(Number(d.q3), d.unit || "")}`),
-        line(n(d.totalN))
-      ].join("");
+    case "numeric-mean": {
+      const tfmt = d.valueFormat === 'time-clock' ? formatMinutesAsClockTime : d.valueFormat === 'time-duration' ? formatMinutesAsHourMin : null;
+      if (tfmt) return [d.groupLabel ? line(escapeHtml(d.groupLabel)) : "", line(`평균값 ${tfmt(Number(d.mean))}`), line(n(d.totalN))].join("");
+      return [d.groupLabel ? line(escapeHtml(d.groupLabel)) : "", line(`평균값 ${formatNumericMeanDisplay(d.mean, d.unit || "")}`), line(n(d.totalN))].join("");
+    }
+    case "numeric-quartile": {
+      const tfmt = d.valueFormat === 'time-clock' ? formatMinutesAsClockTime : d.valueFormat === 'time-duration' ? formatMinutesAsHourMin : null;
+      if (tfmt) return [d.groupLabel ? line(escapeHtml(d.groupLabel)) : "", line(escapeHtml(d.tooltipLabel || d.label || "")), line(`사분위값 ${tfmt(Number(d.value))}`)].join("");
+      return [d.groupLabel ? line(escapeHtml(d.groupLabel)) : "", line(escapeHtml(d.tooltipLabel || d.label || "")), line(`사분위값 ${formatNumericValueWithUnit(Number(d.value), d.unit || "")}`)].join("");
+    }
+    case "numeric-boxplot-stat": {
+      const tfmt = d.valueFormat === 'time-clock' ? formatMinutesAsClockTime : d.valueFormat === 'time-duration' ? formatMinutesAsHourMin : null;
+      if (tfmt) return [d.groupLabel ? line(escapeHtml(d.groupLabel)) : "", line(escapeHtml(d.label || "")), line(tfmt(Number(d.value)))].join("");
+      return [d.groupLabel ? line(escapeHtml(d.groupLabel)) : "", line(escapeHtml(d.label || "")), line(formatNumericValueWithUnit(Number(d.value), d.unit || ""))].join("");
+    }
+    case "numeric-whisker-range": {
+      const tfmt = d.valueFormat === 'time-clock' ? formatMinutesAsClockTime : d.valueFormat === 'time-duration' ? formatMinutesAsHourMin : null;
+      if (tfmt) return [d.groupLabel ? line(escapeHtml(d.groupLabel)) : "", line(`최소값 ${tfmt(Number(d.min))}`), line(`최대값 ${tfmt(Number(d.max))}`), line(n(d.totalN))].join("");
+      return [d.groupLabel ? line(escapeHtml(d.groupLabel)) : "", line(`최소값 ${formatNumericValueWithUnit(Number(d.min), d.unit || "")}`), line(`최대값 ${formatNumericValueWithUnit(Number(d.max), d.unit || "")}`), line(n(d.totalN))].join("");
+    }
+    case "numeric-whisker-box": {
+      const tfmt = d.valueFormat === 'time-clock' ? formatMinutesAsClockTime : d.valueFormat === 'time-duration' ? formatMinutesAsHourMin : null;
+      if (tfmt) return [d.groupLabel ? line(escapeHtml(d.groupLabel)) : "", line(`Q1(하위 25%) ${tfmt(Number(d.q1))}`), line(`Q2(중앙값) ${tfmt(Number(d.median))}`), line(`Q3(상위 25%) ${tfmt(Number(d.q3))}`), line(n(d.totalN))].join("");
+      return [d.groupLabel ? line(escapeHtml(d.groupLabel)) : "", line(`Q1(하위 25%) ${formatNumericValueWithUnit(Number(d.q1), d.unit || "")}`), line(`Q2(중앙값) ${formatNumericValueWithUnit(Number(d.median), d.unit || "")}`), line(`Q3(상위 25%) ${formatNumericValueWithUnit(Number(d.q3), d.unit || "")}`), line(n(d.totalN))].join("");
+    }
     case "ratio-allocation":
       return [
         d.groupLabel ? line(escapeHtml(d.groupLabel)) : "",
