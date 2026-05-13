@@ -3799,7 +3799,7 @@ body.filter-dragging .filter-add-btn:hover {
 
 .allocation-item-label {
   min-width: 0;
-  padding-top: 8px;
+  padding: 8px 8px 0;
   font-size: var(--label-1-size);
   line-height: var(--body-line-height);
   font-weight: var(--font-weight-regular);
