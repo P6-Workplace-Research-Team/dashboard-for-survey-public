@@ -122,10 +122,11 @@
   --viz-bar-right-col: 44px;
   --viz-bar-row-gap: 8px;
   --viz-label-bar-gap: 16px;
-  --viz-vertical-track-height: 280px;
-  --viz-vertical-top-space: 24px;
+  --viz-vertical-track-height: 280px; /* y(값)축·막대(또는 트랙) 본체 높이 */
+  --viz-vertical-top-space: 24px; /* 플롯 상단: 100% 막대의 수치 레이블이 잘리지 않도록 */
   --viz-vertical-axis-pad-right: 40px;
   --viz-vertical-col-gap: 4px;
+  --viz-vertical-label-pad-x: 8px; /* 세로 막대 보기명·stack100 구간 하단 보기명 좌우 패딩 */
   --viz-bar-radius: var(--radius-4);
   --viz-axis-color: var(--neutral-400);
   --viz-grid-color: var(--neutral-200);
@@ -3232,7 +3233,7 @@ body.filter-dragging .filter-add-btn:hover {
 
 /* ================ 차트 상세 : 세로 차트 공통 ================ */
 
-/* 세로 차트가 그려지는 영역 */
+/* 세로 차트가 그려지는 영역 (높이 = 상단 여백 + 트랙 280px — 상단 수치 레이블 잘림 방지) */
 .vertical-chart-plot {
   position: relative;
   display: flow-root;
@@ -3326,7 +3327,7 @@ body.filter-dragging .filter-add-btn:hover {
   color: var(--neutral-900);
   text-align: center;
   line-height: var(--body-line-height);
-  padding: 0 8px;
+  padding: 0 var(--viz-vertical-label-pad-x);
   word-break: keep-all;
   overflow-wrap: anywhere;
   display: -webkit-box;
@@ -3383,7 +3384,7 @@ body.filter-dragging .filter-add-btn:hover {
   transform: translateX(-50%);
   font-size: var(--label-1-size);
   font-weight: var(--font-weight-semibold);
-  color: var(--neutral-900);
+  color: var(--neutral-700);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   pointer-events: none;
@@ -3713,7 +3714,7 @@ body.filter-dragging .filter-add-btn:hover {
 .stack100-label-slot {
   display: flex;
   justify-content: center;
-  padding: 0 8px;
+  padding: 0 var(--viz-vertical-label-pad-x);
   min-width: 0;
   text-align: center;
 }

@@ -1708,7 +1708,8 @@ const DATA_VIZ_COLORS = {
     'var(--neutral-700)',
     'var(--neutral-400)',
     'var(--neutral-300)',
-    'var(--neutral-200)'
+    'var(--neutral-200)',
+    'var(--neutral-100)'
   ]
 };
 
