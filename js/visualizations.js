@@ -7202,7 +7202,7 @@ function buildRankSection(data, rows) {
     groupMode: hasGroupResults
   });
   const displayGroups = hasGroupResults ? getDisplayGroupResults(baseData.groupResults, hiddenGroups) : [];
-  const canDualBar = hasGroupResults && displayGroups.length >= 1 && displayGroups.length <= 2;
+  const canDualBar = hasGroupResults && displayGroups.length === 2;
   const isDualBar = canDualBar && !!resultState.dualBarModes.get(targetLabel);
   let chartHtml = '';
   let legendHtml = '';
@@ -8771,7 +8771,7 @@ function buildChoiceSectionHtml(data, rows) {
 
   const legendData = customGroupData || data;
   const displayGroupsForBtn = legendData.groupResults ? getDisplayGroupResults(legendData.groupResults, displayHidden) : [];
-  const canDualBar = !!groupResults && chartType === 'bar_horizontal' && displayGroupsForBtn.length >= 1 && displayGroupsForBtn.length <= 2;
+  const canDualBar = !!groupResults && chartType === 'bar_horizontal' && displayGroupsForBtn.length === 2;
   const isDualBar = canDualBar && !!resultState.dualBarModes.get(targetLabel);
 
   const chartHtml = groupResults
@@ -8889,7 +8889,7 @@ function buildTargetScaleCompareSection(compareData) {
     sortByMean: !!resultState.targetScaleCompareSortByMean
   });
   const visibleGroupsForBtn = hasGroups ? getDisplayScaleCompareGroups(displayCompareData.groups, hiddenGroups) : [];
-  const canDualBar = hasGroups && visibleGroupsForBtn.length >= 1 && visibleGroupsForBtn.length <= 2;
+  const canDualBar = hasGroups && visibleGroupsForBtn.length === 2;
   const isDualBar = canDualBar && !!resultState.dualBarModes.get(displayCompareData.targetLabel);
   const compareSectionHtml = viewMode === 'distribution'
     ? buildScaleCompareDistributionSectionHtml(displayCompareData)
