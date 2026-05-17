@@ -4786,6 +4786,14 @@ body.is-viz-label-col-resizing {
   border-bottom: 1px solid var(--neutral-300);
 }
 
+.result-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.result-table tbody tr:last-child td:first-child::after {
+  bottom: 0;
+}
+
 .result-table tr.total-row td:first-child {
   background: var(--neutral-50);
 }
