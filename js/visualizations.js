@@ -3502,20 +3502,16 @@ function buildBasicChartHtml(data) {
     const pct = Math.max(0, Math.min(100, r.pct));
     const widthStr = `${pct}%`;
     const valueClass = pct >= HBAR_INSIDE_VALUE_THRESHOLD ? 'single-hbar-outside-value is-inside' : 'single-hbar-outside-value';
-    const labelTip = encodeURIComponent(JSON.stringify({
-      kind: 'option-label',
-      option: r.option
-    }));
     const tip = encodeURIComponent(JSON.stringify({
       kind: 'basic-bar',
       option: r.option,
       pct: r.pct,
       count: r.count
     }));
-    const valueHtml = `<span class="${valueClass}" style="left:${widthStr};">${formatPercent(r.pct)}</span>`;
+    const valueHtml = `<span class="${valueClass}" style="left:${widthStr};" data-tip="${tip}">${formatPercent(r.pct)}</span>`;
     return `
       <div class="single-hbar-row">
-        <div class="single-hbar-label" title="${escapeHtml(r.option)}" data-tip="${labelTip}">${escapeHtml(r.option)}</div>
+        <div class="single-hbar-label" title="${escapeHtml(r.option)}" data-tip="${tip}">${escapeHtml(r.option)}</div>
         <div class="single-hbar-track">
           <div class="single-hbar-fill"
                style="width:${widthStr}; background:${SINGLE_BAR_COLOR};"
@@ -7600,11 +7596,13 @@ function buildSingleChoiceVerticalBarChartHtml(data) {
     `;
   }).join('');
   const labelsHtml = rows.map(r => {
-    const labelTip = encodeURIComponent(JSON.stringify({
-      kind: 'option-label',
-      option: r.option
+    const tip = encodeURIComponent(JSON.stringify({
+      kind: 'basic-bar',
+      option: r.option,
+      pct: r.pct,
+      count: r.count
     }));
-    return `<div class="vertical-chart-label" title="${escapeHtml(r.option)}" data-tip="${labelTip}">${escapeHtml(r.option)}</div>`;
+    return `<div class="vertical-chart-label" title="${escapeHtml(r.option)}" data-tip="${tip}">${escapeHtml(r.option)}</div>`;
   }).join('');
   const guidesHtml = guideMarks.map(mark => `
     <div class="vertical-chart-guide" style="bottom:${(mark / axisMax) * 100}%;">
@@ -9899,9 +9897,13 @@ function formatTooltipHtml(d) {
     case "basic-bar":
       return [line(escapeHtml(d.option)), line(pct(d.pct)), line(n(d.count))].join("");
     case "compare-bar":
-      return [d.groupLabel ? line(escapeHtml(d.groupLabel)) : line("응답자 전체"), `<div class="label-2-strong">${pct(d.pct)}</div>`, line(n(d.count))].join("");
     case "group-dot":
-      return [line(escapeHtml(d.groupLabel)), line(escapeHtml(d.option)), line(pct(d.pct)), line(n(d.count))].join("");
+      return [
+        d.groupLabel ? line(escapeHtml(d.groupLabel)) : "",
+        line(escapeHtml(d.option)),
+        line(pct(d.pct)),
+        line(n(d.count))
+      ].filter(Boolean).join("");
     case "rank-seg":
     case "rank-nonranked":
       return [line(escapeHtml(d.option)), line(escapeHtml(d.rankLabel)), line(pct(d.pct)), line(n(d.count))].join("");

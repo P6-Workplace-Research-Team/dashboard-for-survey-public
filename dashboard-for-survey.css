@@ -4720,7 +4720,7 @@ body.is-viz-label-col-resizing {
   padding: 8px 16px;
   text-align: left;
   white-space: nowrap;
-  border-bottom: 1px solid var(--neutral-300);
+  border-bottom: 1px solid var(--neutral-200);
   font-size: var(--label-2-size);
   line-height: var(--body-line-height);
   font-weight: var(--font-weight-regular);
@@ -4730,6 +4730,11 @@ body.is-viz-label-col-resizing {
 .result-table th {
   background: var(--neutral-50);
   font-weight: var(--font-weight-semibold);
+  border-bottom: 1px solid var(--neutral-300);
+}
+
+.result-table tbody td {
+  border-bottom-style: dashed;
 }
 
 .result-table th.num {
@@ -4783,7 +4788,10 @@ body.is-viz-label-col-resizing {
   color: var(--neutral-700);
   font-weight: var(--font-weight-semibold);
   border-top: 1px solid var(--neutral-300);
-  border-bottom: 1px solid var(--neutral-300);
+}
+
+.result-table tbody tr:has(+ tr.total-row) td {
+  border-bottom: none;
 }
 
 .result-table tbody tr:last-child td {
